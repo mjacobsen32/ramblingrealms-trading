@@ -1,5 +1,13 @@
-.vscode
-.project
+# data
 data
-**/__pycache__
+
+# builds
 dist
+
+# cache files
+**/__pycache__
+
+# user-specific files
+.project
+.vscode
+trading/cli/configuration/prod.yml
