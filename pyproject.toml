@@ -42,6 +42,9 @@ etrade = 'trading.cli.etrade.etrade:etrade'
 [tool.poetry.scripts]
 etrade = 'trading.cli.etrade.etrade:etrade'
 
+[tool.poetry.group.dev.dependencies]
+black = "^25.1.0"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
@@ -51,3 +54,7 @@ version = "0.1.0"
 packages = [
     { include = "trading" }
 ]
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
