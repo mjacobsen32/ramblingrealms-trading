@@ -1,0 +1,5 @@
+.vscode
+.project
+data
+**/__pycache__
+dist

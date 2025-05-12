@@ -1,0 +1,53 @@
+[project]
+name = "ramblingrealms-trading"
+dynamic = ["version"]
+description = "Rambling Realms Trading Platform"
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    {name = "Matthew Jacobsen",email = "matthewjacobsen1999@gmail.com"}
+]
+maintainers = [
+    {name = "Matthew Jacobsen",email = "matthewjacobsen1999@gmail.com"}
+]
+keywords = [
+    "trading",
+    "finance",
+    "investing",
+    "stocks",
+    "cryptocurrency",
+    "portfolio management"
+]
+classifiers = []
+dependencies = [
+    "numpy>=2.2.5,<3.0.0",
+    "pandas>=2.2.3,<3.0.0",
+    "pyetrade>=2.1.1,<3.0.0",
+    "huggingface-hub>=0.31.1,<0.32.0",
+    "typer (>=0.7,<0.10)",
+    "rich>=14.0.0,<15.0.0",
+    "appdirs (>=1.4.4,<2.0.0)",
+    "tomli (>=2.2.1,<3.0.0)",
+    "tomli-w (>=1.2.0,<2.0.0)",
+    "click (>=8.1,<8.2)"
+
+]
+[project.urls]
+repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
+
+[project.scripts]
+etrade = 'trading.commands.etrade.etrade:etrade'
+
+[tool.poetry.scripts]
+etrade = 'trading.commands.etrade.etrade:etrade'
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+version = "0.1.0"
+packages = [
+    { include = "trading" }
+]
