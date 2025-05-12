@@ -37,10 +37,10 @@ dependencies = [
 repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
 
 [project.scripts]
-etrade = 'trading.commands.etrade.etrade:etrade'
+etrade = 'trading.cli.etrade.etrade:etrade'
 
 [tool.poetry.scripts]
-etrade = 'trading.commands.etrade.etrade:etrade'
+etrade = 'trading.cli.etrade.etrade:etrade'
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
