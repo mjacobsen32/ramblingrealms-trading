@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "Rambling Realms Trading Platform"
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<4.0"
 authors = [
     {name = "Matthew Jacobsen",email = "matthewjacobsen1999@gmail.com"}
 ]
@@ -30,7 +30,8 @@ dependencies = [
     "appdirs (>=1.4.4,<2.0.0)",
     "tomli (>=2.2.1,<3.0.0)",
     "tomli-w (>=1.2.0,<2.0.0)",
-    "click (>=8.1,<8.2)"
+    "click (>=8.1,<8.2)",
+    "polygon-api-client (>=1.14.5,<2.0.0)"
 
 ]
 [project.urls]
@@ -38,9 +39,11 @@ repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
 
 [project.scripts]
 etrade = 'trading.cli.etrade.etrade:etrade'
+data = 'trading.cli.data.data:data'
 
 [tool.poetry.scripts]
 etrade = 'trading.cli.etrade.etrade:etrade'
+data = 'trading.cli.data.data:data'
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
