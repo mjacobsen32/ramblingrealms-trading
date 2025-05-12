@@ -1,9 +1,0 @@
-{
-  "etrade": {
-    "api_key_path": "/home/user/secrets/sandbox/etrade.pub.key",
-    "api_secret_path": "/home/user/secrets/sandbox/etrade.priv.key"
-  },
-  "polygon": {
-    "api_key_path": "/home/user/secrets/polygon_io.priv.key"
-  }
-}
