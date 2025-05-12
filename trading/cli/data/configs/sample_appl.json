@@ -1,0 +1,13 @@
+{
+  "ticker": "AAPL",
+  "multiplier": 1,
+  "timespan": "day",
+  "from_": "2023-01-01",
+  "to": "2023-12-31",
+  "adjusted": true,
+  "sort": "asc",
+  "limit": 5000,
+  "params": {},
+  "raw": false,
+  "options": null
+}

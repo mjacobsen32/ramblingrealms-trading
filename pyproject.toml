@@ -32,7 +32,8 @@ dependencies = [
     "tomli-w (>=1.2.0,<2.0.0)",
     "click (>=8.1,<8.2)",
     "polygon-api-client (>=1.14.5,<2.0.0)",
-    "pydantic (>=2.11.4,<3.0.0)"
+    "pydantic (>=2.11.4,<3.0.0)",
+    "fastparquet (>=2024.11.0,<2025.0.0)"
 
 ]
 [project.urls]

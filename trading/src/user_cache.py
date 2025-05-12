@@ -79,7 +79,7 @@ class UserCache(BaseModel):
         return None
     
     @property
-    def polygon_access_token(self) -> Optional[str]:
+    def polygon_access_token(self) -> str:
         """
         Get the Polygon.io access token from the specified path.
         """
