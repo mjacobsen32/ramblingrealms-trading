@@ -10,18 +10,20 @@ from typing_extensions import Annotated
 
 app = typer.Typer(name="polygon_io", help="Trading CLI commands")
 
+
 class FileType(str, Enum):
     parquet = "parquet"
     json = "json"
     csv = "csv"
 
+
 @app.command(help="Pull data via json configuration file")
 def pull_data(
     config_file: str = typer.Option(..., help="Path to the JSON configuration file"),
-    output_file: str = typer.Option(
-        None, help="Path to the output file (optional)"
-    ),
-    file_type: Annotated[FileType, typer.Option(case_sensitive=False)] = FileType.parquet
+    output_file: str = typer.Option(None, help="Path to the output file (optional)"),
+    file_type: Annotated[
+        FileType, typer.Option(case_sensitive=False)
+    ] = FileType.parquet,
 ):
     """
     Pull data via json configuration file
