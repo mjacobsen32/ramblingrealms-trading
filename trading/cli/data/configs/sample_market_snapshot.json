@@ -1,0 +1,7 @@
+{
+    "endpoint": "get_snapshot_all",
+    "parameters":{
+        "ticker": "stocks",
+        "include_otc": true
+    }
+}
