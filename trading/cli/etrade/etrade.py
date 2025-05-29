@@ -1,37 +1,53 @@
 import typer
 import pyetrade
 from rich import print
-from trading.src.user_cache import UserCache as user
+from trading.src.user_cache.user_cache import UserCache as user
+from pydantic import SecretStr
 
 app = typer.Typer(name="etrade", help="E-Trade API commands")
 
 
 @app.command(help="Authenticate with E-Trade. Will set OAuth tokens")
-def authenticate():
+def authenticate(sandbox: bool = typer.Option(
+    True,
+    "--sandbox",
+    "-s",
+    help="Use the E-Trade sandbox environment for testing.",
+)):
     """
     Authenticate with E-Trade
     """
-    config = user.load()
-    oauth = pyetrade.ETradeOAuth(config.etrade_api_key, config.etrade_api_secret)
-    print(oauth.get_request_token())  # Use the printed URL
+    user_cfg = user.load()
+    etrade_secrets = user_cfg.get_active_secrets(sandbox=sandbox)
+    
+    oauth = pyetrade.ETradeOAuth(etrade_secrets.api_key.get_secret_value(), etrade_secrets.api_secret.get_secret_value())  # Use the printed URL
+    print("[yellow]Please visit the following URL to authenticate: {}".format(oauth.get_request_token()))
     verifier_code = input("Enter verification code: ")
     tokens = oauth.get_access_token(verifier_code)
     print("[green]Authentication successful!")
-
-    config.etrade_oauth_token = tokens["oauth_token"]
-    config.etrade_oauth_token_secret = tokens["oauth_token_secret"]
-
-
+    
+    etrade_secrets.oauth_token          = SecretStr(tokens["oauth_token"])
+    etrade_secrets.oauth_token_secret   = SecretStr(tokens["oauth_token_secret"])
+    user_cfg.set_active_secrets(secrets=etrade_secrets, sandbox=sandbox)
+    
 @app.command(help="List accounts")
-def list_accounts():
+def list_accounts(sandbox: bool = typer.Option(
+    True,
+    "--sandbox",
+    "-s",
+    help="Use the E-Trade sandbox environment for testing.",
+)):
     """
     List accounts
     """
-    config = user.load()
-    accounts = pyetrade.ETradeAccounts(
-        config.etrade_api_key,
-        config.etrade_api_secret,
-        config.etrade_oauth_token,
-        config.etrade_oauth_token_secret,
+    etrade_secrets = user.load().get_active_secrets(sandbox=sandbox)
+    etrade_accounts = pyetrade.ETradeAccounts(
+        etrade_secrets.api_key.get_secret_value(),
+        etrade_secrets.api_secret.get_secret_value(),
+        etrade_secrets.oauth_token.get_secret_value(),
+        etrade_secrets.oauth_token_secret.get_secret_value(),
+        dev=sandbox,
     )
-    print(accounts.list_accounts())
+    accounts = etrade_accounts.list_accounts()["AccountListResponse"]["Accounts"]["Account"]
+    for account in accounts:
+        print(etrade_accounts.get_account_balance(account["accountIdKey"]))

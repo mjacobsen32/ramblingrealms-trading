@@ -1,11 +1,11 @@
 import os
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field
 from typing import Optional
 from pathlib import Path
 import json
 from appdirs import user_config_dir
 from rich.console import Console
-
+from trading.src.user_cache.etrade_secrets import ETradeSecrets
 
 class UserCache(BaseModel):
     """
@@ -15,21 +15,12 @@ class UserCache(BaseModel):
     `RR_TRADING_USER_CACHE_PATH`. If this variable is not set, the default path is
     `~/.rr_trading/user_cache.json`.
     """
-
-    etrade_api_key_path: Path = Field(default="", description="E-Trade API key path")
-    etrade_api_secret_path: Path = Field(
-        default="", description="E-Trade API secret path"
-    )
-    etrade_oauth_token: str = Field(
-        default="",
-        description="E-Trade OAuth Token. This field is set from E-Trade authentication",
-    )
-    etrade_oauth_token_secret: str = Field(
-        default="",
-        description="E-Trade OAuth Token Secret. This field is set from E-Trade authentication",
-    )
+    
+    etrade_sandbox_secrets: ETradeSecrets = Field(default_factory=lambda: ETradeSecrets(), description="E-Trade Sandbox Configuration")
+    etrade_live_secrets: ETradeSecrets = Field(default_factory=lambda: ETradeSecrets(), description="E-Trade Live Configuration")
+    
     polygon_access_token_path: Path = Field(
-        default="", description="Polygon Access Token Path"
+        default=Path(""), description="Polygon Access Token Path"
     )
 
     user_cache_path: Path = Path(
@@ -38,8 +29,6 @@ class UserCache(BaseModel):
             os.path.join(user_config_dir("rr_trading"), "user_cache.json"),
         )
     )
-
-    model_config = ConfigDict(json_encoders={Path: str, None: str})
 
     def __setattr__(self, name, value):
         """
@@ -56,56 +45,29 @@ class UserCache(BaseModel):
             )
         return attr
 
+    def get_active_secrets(self, sandbox: bool = True) -> ETradeSecrets:
+        """
+        Get the active E-Trade secrets based on the sandbox flag.
+        If sandbox is True, return the sandbox secrets, otherwise return the live secrets.
+        """
+        if sandbox:
+            return self.etrade_sandbox_secrets
+        return self.etrade_live_secrets
+    
+    def set_active_secrets(
+        self, secrets: ETradeSecrets, sandbox: bool = True
+    ) -> None:
+        """
+        Set the active E-Trade secrets based on the sandbox flag.
+        If sandbox is True, set the sandbox secrets, otherwise set the live secrets.
+        """
+        if sandbox:
+            self.etrade_sandbox_secrets = secrets
+        else:
+            self.etrade_live_secrets = secrets
+    
     @property
-    def etrade_oauth_token(self) -> Optional[str]:
-        """
-        Get the E-Trade OAuth token.
-        """
-        if self.etrade_oauth_token:
-            return self.etrade_oauth_token
-        Console().print(
-            "[bold red]E-Trade OAuth token not found. Please authenticate first using the E-Trade CLI."
-        )
-        return None
-
-    @property
-    def etrade_oauth_token_secret(self) -> Optional[str]:
-        """
-        Get the E-Trade OAuth token secret.
-        """
-        if self.etrade_oauth_token:
-            return self.etrade_oauth_token
-        Console().print(
-            "[bold red]E-Trade OAuth token secret not found. Please authenticate first using the E-Trade CLI."
-        )
-        return None
-
-    @property
-    def etrade_api_key(self) -> str:
-        """
-        Get the E-Trade API key from the specified path.
-        """
-        if self.etrade_api_key_path and os.path.exists(self.etrade_api_key_path):
-            return self.etrade_api_key_path.read_text(encoding="utf-8").strip()
-        Console().print(
-            "[bold red]E-Trade API Key not found at {self.etrade_api_key_path}."
-        )
-        return "None"
-
-    @property
-    def etrade_api_secret(self) -> str:
-        """
-        Get the E-Trade API secret from the specified path.
-        """
-        if self.etrade_api_secret_path and os.path.exists(self.etrade_api_secret_path):
-            return self.etrade_api_secret_path.read_text(encoding="utf-8").strip()
-        Console().print(
-            "[bold red]E-Trade API Key Secret not found at {self.etrade_api_secret_path}."
-        )
-        return None
-
-    @property
-    def polygon_access_token(self) -> str:
+    def polygon_access_token(self) -> Optional[str]:
         """
         Get the Polygon.io access token from the specified path.
         """
@@ -137,6 +99,7 @@ class UserCache(BaseModel):
         Save the user cache to a JSON file.
         """
         path.parent.mkdir(parents=True, exist_ok=True)
+        print("saving to {}".format(path))
         with path.open("w") as f:
             f.write(self.model_dump_json(indent=4))
 

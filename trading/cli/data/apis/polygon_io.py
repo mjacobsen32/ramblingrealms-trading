@@ -1,5 +1,5 @@
 import typer
-from trading.src.user_cache import UserCache as user
+from trading.src.user_cache.user_cache import UserCache as user
 from polygon import RESTClient
 from rich import print as print
 from dataclasses import asdict
