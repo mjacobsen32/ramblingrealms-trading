@@ -47,6 +47,7 @@ rr_trading = "trading.cli.main:app"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
