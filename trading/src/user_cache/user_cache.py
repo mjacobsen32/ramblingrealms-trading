@@ -7,6 +7,7 @@ from appdirs import user_config_dir
 from rich.console import Console
 from trading.src.user_cache.etrade_secrets import ETradeSecrets
 
+
 class UserCache(BaseModel):
     """
     User Cache / Config for accessing and storing user-specific data.
@@ -15,10 +16,16 @@ class UserCache(BaseModel):
     `RR_TRADING_USER_CACHE_PATH`. If this variable is not set, the default path is
     `~/.rr_trading/user_cache.json`.
     """
-    
-    etrade_sandbox_secrets: ETradeSecrets = Field(default_factory=lambda: ETradeSecrets(), description="E-Trade Sandbox Configuration")
-    etrade_live_secrets: ETradeSecrets = Field(default_factory=lambda: ETradeSecrets(), description="E-Trade Live Configuration")
-    
+
+    etrade_sandbox_secrets: ETradeSecrets = Field(
+        default_factory=lambda: ETradeSecrets(),
+        description="E-Trade Sandbox Configuration",
+    )
+    etrade_live_secrets: ETradeSecrets = Field(
+        default_factory=lambda: ETradeSecrets(),
+        description="E-Trade Live Configuration",
+    )
+
     polygon_access_token_path: Path = Field(
         default=Path(""), description="Polygon Access Token Path"
     )
@@ -53,10 +60,8 @@ class UserCache(BaseModel):
         if sandbox:
             return self.etrade_sandbox_secrets
         return self.etrade_live_secrets
-    
-    def set_active_secrets(
-        self, secrets: ETradeSecrets, sandbox: bool = True
-    ) -> None:
+
+    def set_active_secrets(self, secrets: ETradeSecrets, sandbox: bool = True) -> None:
         """
         Set the active E-Trade secrets based on the sandbox flag.
         If sandbox is True, set the sandbox secrets, otherwise set the live secrets.
@@ -65,7 +70,7 @@ class UserCache(BaseModel):
             self.etrade_sandbox_secrets = secrets
         else:
             self.etrade_live_secrets = secrets
-    
+
     @property
     def polygon_access_token(self) -> Optional[str]:
         """

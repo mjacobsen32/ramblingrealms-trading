@@ -30,8 +30,12 @@ def setup():
     etrade = Prompt.ask("Do you want to set up E-Trade Live?", default="n")
     if etrade.lower() == "y":
         # E-Trade Live setup
-        user.etrade_live_secrets.set_api_key_from_file(Path(Prompt.ask("Enter your E-Trade API key path")))
-        user.etrade_live_secrets.set_api_secret_from_file(Path(Prompt.ask("Enter your E-Trade API secret path")))
+        user.etrade_live_secrets.set_api_key_from_file(
+            Path(Prompt.ask("Enter your E-Trade API key path"))
+        )
+        user.etrade_live_secrets.set_api_secret_from_file(
+            Path(Prompt.ask("Enter your E-Trade API secret path"))
+        )
         user.save()
 
         etrade_authenticate = Prompt.ask(
@@ -45,8 +49,12 @@ def setup():
     etrade = Prompt.ask("Do you want to set up E-Trade Sandbox?", default="n")
     if etrade.lower() == "y":
         # E-Trade Sandbox setup
-        user.etrade_sandbox_secrets.set_api_key_from_file(Path(Prompt.ask("Enter your E-Trade API key path")))
-        user.etrade_sandbox_secrets.set_api_secret_from_file(Path(Prompt.ask("Enter your E-Trade API secret path")))
+        user.etrade_sandbox_secrets.set_api_key_from_file(
+            Path(Prompt.ask("Enter your E-Trade API key path"))
+        )
+        user.etrade_sandbox_secrets.set_api_secret_from_file(
+            Path(Prompt.ask("Enter your E-Trade API secret path"))
+        )
         user.save()
 
         etrade_authenticate = Prompt.ask(
@@ -60,6 +68,6 @@ def setup():
     polygon = Prompt.ask("Do you want to set up Polygon?", default="n")
     if polygon.lower() == "y":
         # Polygon setup
-        user.polygon_access_token_path = Path(Prompt.ask(
-            "Enter your Polygon access token path"
-        ))
+        user.polygon_access_token_path = Path(
+            Prompt.ask("Enter your Polygon access token path")
+        )
