@@ -2,6 +2,7 @@ import typer
 from trading.src.user_cache import UserCache as User
 from trading.cli.etrade import etrade
 from trading.cli.data import data
+from trading.src.utility.utils import read_key
 from rich import print
 from rich.prompt import Prompt
 
@@ -45,3 +46,8 @@ def setup():
         user.polygon_access_token_path = Prompt.ask(
             "Enter your Polygon access token path"
         )
+    alpaca = Prompt.ask("Do you want to set up Alpaca?", default="n")
+    if alpaca.lower() == "y":
+        # Alpaca setup
+        user.alpaca_api_key = read_key(Prompt.ask("Enter your Alpaca API key path"))
+        user.alpaca_api_secret = read_key(Prompt.ask("Enter your Alpaca API secret path"))

@@ -1,5 +1,5 @@
 import os
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, SecretStr
 from typing import Optional
 from pathlib import Path
 import json
@@ -31,6 +31,8 @@ class UserCache(BaseModel):
     polygon_access_token_path: Path = Field(
         default="", description="Polygon Access Token Path"
     )
+    alpaca_api_key: 
+
 
     user_cache_path: Path = Path(
         os.environ.get(
