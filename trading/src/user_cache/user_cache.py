@@ -1,5 +1,5 @@
 import os
-from pydantic import BaseModel, Field, ConfigDict, SecretStr
+from pydantic import BaseModel, Field, field_serializer, SecretStr
 from typing import Optional
 from pathlib import Path
 import json
@@ -29,8 +29,14 @@ class UserCache(BaseModel):
     polygon_access_token_path: Path = Field(
         default=Path(""), description="Polygon Access Token Path"
     )
-    alpaca_api_key: 
-
+    alpaca_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Alpaca API Key",
+    )
+    alpaca_api_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="Alpaca API Secret",
+    )
 
     user_cache_path: Path = Path(
         os.environ.get(
@@ -38,6 +44,12 @@ class UserCache(BaseModel):
             os.path.join(user_config_dir("rr_trading"), "user_cache.json"),
         )
     )
+
+    @field_serializer(
+        "alpaca_api_key", "alpaca_api_secret", when_used="json"
+    )
+    def dump_secret(self, v):
+        return v.get_secret_value()
 
     def __setattr__(self, name, value):
         """
@@ -106,7 +118,6 @@ class UserCache(BaseModel):
         Save the user cache to a JSON file.
         """
         path.parent.mkdir(parents=True, exist_ok=True)
-        print("saving to {}".format(path))
         with path.open("w") as f:
             f.write(self.model_dump_json(indent=4))
 

@@ -6,6 +6,7 @@ from trading.src.utility.utils import read_key
 from rich import print
 from rich.prompt import Prompt
 from pathlib import Path
+from pydantic import SecretStr
 
 app = typer.Typer(name="rr_trading", help="rr_trading CLI commands")
 app.add_typer(etrade.app, name="etrade", help="E-Trade API commands")
@@ -75,5 +76,5 @@ def setup():
     alpaca = Prompt.ask("Do you want to set up Alpaca?", default="n")
     if alpaca.lower() == "y":
         # Alpaca setup
-        user.alpaca_api_key = read_key(Prompt.ask("Enter your Alpaca API key path"))
-        user.alpaca_api_secret = read_key(Prompt.ask("Enter your Alpaca API secret path"))
+        user.alpaca_api_key = SecretStr(read_key(Prompt.ask("Enter your Alpaca API key path")))
+        user.alpaca_api_secret = SecretStr(read_key(Prompt.ask("Enter your Alpaca API secret path")))
