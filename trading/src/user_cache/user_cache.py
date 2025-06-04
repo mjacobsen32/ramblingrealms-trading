@@ -1,10 +1,11 @@
 import os
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, field_serializer, SecretStr
 from typing import Optional
 from pathlib import Path
 import json
 from appdirs import user_config_dir
 from rich.console import Console
+from trading.src.user_cache.etrade_secrets import ETradeSecrets
 
 
 class UserCache(BaseModel):
@@ -16,20 +17,25 @@ class UserCache(BaseModel):
     `~/.rr_trading/user_cache.json`.
     """
 
-    etrade_api_key_path: Path = Field(default="", description="E-Trade API key path")
-    etrade_api_secret_path: Path = Field(
-        default="", description="E-Trade API secret path"
+    etrade_sandbox_secrets: ETradeSecrets = Field(
+        default_factory=lambda: ETradeSecrets(),
+        description="E-Trade Sandbox Configuration",
     )
-    etrade_oauth_token: str = Field(
-        default="",
-        description="E-Trade OAuth Token. This field is set from E-Trade authentication",
+    etrade_live_secrets: ETradeSecrets = Field(
+        default_factory=lambda: ETradeSecrets(),
+        description="E-Trade Live Configuration",
     )
-    etrade_oauth_token_secret: str = Field(
-        default="",
-        description="E-Trade OAuth Token Secret. This field is set from E-Trade authentication",
-    )
+
     polygon_access_token_path: Path = Field(
-        default="", description="Polygon Access Token Path"
+        default=Path(""), description="Polygon Access Token Path"
+    )
+    alpaca_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Alpaca API Key",
+    )
+    alpaca_api_secret: SecretStr = Field(
+        default=SecretStr(""),
+        description="Alpaca API Secret",
     )
 
     user_cache_path: Path = Path(
@@ -39,7 +45,11 @@ class UserCache(BaseModel):
         )
     )
 
-    model_config = ConfigDict(json_encoders={Path: str, None: str})
+    @field_serializer(
+        "alpaca_api_key", "alpaca_api_secret", when_used="json"
+    )
+    def dump_secret(self, v):
+        return v.get_secret_value()
 
     def __setattr__(self, name, value):
         """
@@ -56,56 +66,27 @@ class UserCache(BaseModel):
             )
         return attr
 
-    @property
-    def etrade_oauth_token(self) -> Optional[str]:
+    def get_active_secrets(self, sandbox: bool = True) -> ETradeSecrets:
         """
-        Get the E-Trade OAuth token.
+        Get the active E-Trade secrets based on the sandbox flag.
+        If sandbox is True, return the sandbox secrets, otherwise return the live secrets.
         """
-        if self.etrade_oauth_token:
-            return self.etrade_oauth_token
-        Console().print(
-            "[bold red]E-Trade OAuth token not found. Please authenticate first using the E-Trade CLI."
-        )
-        return None
+        if sandbox:
+            return self.etrade_sandbox_secrets
+        return self.etrade_live_secrets
+
+    def set_active_secrets(self, secrets: ETradeSecrets, sandbox: bool = True) -> None:
+        """
+        Set the active E-Trade secrets based on the sandbox flag.
+        If sandbox is True, set the sandbox secrets, otherwise set the live secrets.
+        """
+        if sandbox:
+            self.etrade_sandbox_secrets = secrets
+        else:
+            self.etrade_live_secrets = secrets
 
     @property
-    def etrade_oauth_token_secret(self) -> Optional[str]:
-        """
-        Get the E-Trade OAuth token secret.
-        """
-        if self.etrade_oauth_token:
-            return self.etrade_oauth_token
-        Console().print(
-            "[bold red]E-Trade OAuth token secret not found. Please authenticate first using the E-Trade CLI."
-        )
-        return None
-
-    @property
-    def etrade_api_key(self) -> str:
-        """
-        Get the E-Trade API key from the specified path.
-        """
-        if self.etrade_api_key_path and os.path.exists(self.etrade_api_key_path):
-            return self.etrade_api_key_path.read_text(encoding="utf-8").strip()
-        Console().print(
-            "[bold red]E-Trade API Key not found at {self.etrade_api_key_path}."
-        )
-        return "None"
-
-    @property
-    def etrade_api_secret(self) -> str:
-        """
-        Get the E-Trade API secret from the specified path.
-        """
-        if self.etrade_api_secret_path and os.path.exists(self.etrade_api_secret_path):
-            return self.etrade_api_secret_path.read_text(encoding="utf-8").strip()
-        Console().print(
-            "[bold red]E-Trade API Key Secret not found at {self.etrade_api_secret_path}."
-        )
-        return None
-
-    @property
-    def polygon_access_token(self) -> str:
+    def polygon_access_token(self) -> Optional[str]:
         """
         Get the Polygon.io access token from the specified path.
         """

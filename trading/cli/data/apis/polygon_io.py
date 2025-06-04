@@ -1,5 +1,5 @@
 import typer
-from trading.src.user_cache import UserCache as user
+from trading.src.user_cache.user_cache import UserCache as user
 from polygon import RESTClient
 from rich import print as print
 from dataclasses import asdict
@@ -16,10 +16,11 @@ class FileType(str, Enum):
     json = "json"
     csv = "csv"
 
+
 def fetch_polygon(endpoint=str, params=dict):
     api_key = user.load().polygon_access_token
     client = RESTClient(api_key)
-    
+
     # Lookup the method by name
     func = getattr(client, endpoint, None)
 
@@ -27,6 +28,7 @@ def fetch_polygon(endpoint=str, params=dict):
         raise ValueError(f"Invalid Polygon API endpoint: {endpoint}")
 
     return func(**params)
+
 
 @app.command(help="Pull data via json configuration file")
 def pull_data(
@@ -44,7 +46,9 @@ def pull_data(
     with open(config_file, "r") as f:
         query_config = json.load(f)
 
-    data = fetch_polygon(endpoint=query_config["endpoint"], params=query_config.get("params", {}))
+    data = fetch_polygon(
+        endpoint=query_config["endpoint"], params=query_config.get("params", {})
+    )
     df = pd.DataFrame([asdict(Agg(**vars(agg))) for agg in data])
     if output_file:
         if file_type is FileType.parquet:

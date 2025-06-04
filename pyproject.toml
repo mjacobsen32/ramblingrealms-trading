@@ -33,7 +33,12 @@ dependencies = [
     "click (>=8.1,<8.2)",
     "polygon-api-client (>=1.14.5,<2.0.0)",
     "pydantic (>=2.11.4,<3.0.0)",
-    "fastparquet (>=2024.11.0,<2025.0.0)"
+    "fastparquet (>=2024.11.0,<2025.0.0)",
+    "alpaca-py (>=0.40.1,<0.41.0)",
+    "torch (>=2.7.0,<3.0.0)",
+    "transformers (>=4.52.4,<5.0.0)",
+    "scikit-learn (>=1.6.1,<2.0.0)",
+    "matplotlib (>=3.10.3,<4.0.0)"
 
 ]
 [project.urls]
@@ -47,6 +52,7 @@ rr_trading = "trading.cli.main:app"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
