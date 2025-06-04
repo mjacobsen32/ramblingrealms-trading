@@ -36,7 +36,9 @@ dependencies = [
     "fastparquet (>=2024.11.0,<2025.0.0)",
     "alpaca-py (>=0.40.1,<0.41.0)",
     "torch (>=2.7.0,<3.0.0)",
-    "transformers (>=4.52.4,<5.0.0)"
+    "transformers (>=4.52.4,<5.0.0)",
+    "scikit-learn (>=1.6.1,<2.0.0)",
+    "matplotlib (>=3.10.3,<4.0.0)"
 
 ]
 [project.urls]
