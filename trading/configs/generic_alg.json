@@ -1,0 +1,20 @@
+{
+    "name": "Generic",
+    "description": "A generic trading algorithm configuration.",
+    "version": "1.0",
+    "feature_config": {
+        "features": [
+            {
+                "type": "candle",
+                "name": "candle",
+                "enabled": true
+            },
+            {
+                "type": "moving_average",
+                "name": "ma5", 
+                "enabled": true,
+                "period": 5
+            }
+        ]
+    }
+}

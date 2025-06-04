@@ -2,6 +2,7 @@ import typer
 from trading.src.user_cache.user_cache import UserCache as User
 from trading.cli.etrade import etrade
 from trading.cli.data import data
+from trading.cli.alg import alg
 from trading.src.utility.utils import read_key
 from rich import print
 from rich.prompt import Prompt
@@ -11,6 +12,7 @@ from pydantic import SecretStr
 app = typer.Typer(name="rr_trading", help="rr_trading CLI commands")
 app.add_typer(etrade.app, name="etrade", help="E-Trade API commands")
 app.add_typer(data.app, name="data", help="Data CLI commands")
+app.add_typer(alg.app, name="alg", help="Algorithmic commands")
 
 
 @app.command(help="Print the current user configuration")
@@ -76,5 +78,9 @@ def setup():
     alpaca = Prompt.ask("Do you want to set up Alpaca?", default="n")
     if alpaca.lower() == "y":
         # Alpaca setup
-        user.alpaca_api_key = SecretStr(read_key(Prompt.ask("Enter your Alpaca API key path")))
-        user.alpaca_api_secret = SecretStr(read_key(Prompt.ask("Enter your Alpaca API secret path")))
+        user.alpaca_api_key = SecretStr(
+            read_key(Prompt.ask("Enter your Alpaca API key path"))
+        )
+        user.alpaca_api_secret = SecretStr(
+            read_key(Prompt.ask("Enter your Alpaca API secret path"))
+        )
