@@ -7,7 +7,11 @@ dist
 # cache files
 **/__pycache__
 **/*.parquet
+
 # user-specific files
 .project
 .vscode
 trading/cli/configuration/prod.yml
+
+# logs
+logs
