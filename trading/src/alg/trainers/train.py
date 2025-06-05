@@ -2,19 +2,12 @@ import torch
 import torch.optim as optim
 import numpy as np
 import pandas as pd
-from trading.src.alg.models.hf_time_series import HuggingFaceTimeSeriesModel, SimpleMLP3
+from trading.src.alg.models.hf_time_series import SimpleMLP3
 from trading.src.alg.loss.profit_loss import ProfitLoss
-import trading.src.alg.trainers.train as rr_train
-import trading.src.alg.models as rr_models
 import trading.cli.alg.config as rr_config
 import trading.src.user_cache.user_cache as rr_user_cache
 import trading.src.alg.data_process.data_loader as rr_data_loader
-import trading.src.alg.models.hf_time_series as rr_hf_models
 from rich import print as rprint
-import time
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, TimeInForce
 import vectorbt as vbt
 
 
@@ -28,13 +21,13 @@ class Trainer:
         self.alg_config = alg_config
         self.user_cache = user_cache
 
-        df = data_loader.load_tensors()
+        df = data_loader.load_df()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.loss_fn = ProfitLoss(df["close"].values)
 
-        self.X_train, self.X_test, self.y_train, self.y_test = data_loader.prepare_data(
-            df
+        self.X_train, self.X_test, self.y_train, self.y_test = (
+            data_loader.get_train_test()
         )
 
         self.model = SimpleMLP3(self.X_train.shape[1]).to(device=self.device)

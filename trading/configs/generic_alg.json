@@ -3,26 +3,35 @@
     "description": "A generic trading algorithm configuration.",
     "version": "1.0",
     "data_config": {
-        "dataset_name": "simple",
-        "cache_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/data",
-        "tickers": [
-            "AAPL",
-            "GOOGL",
-            "MSFT"
-        ],
         "start_date": "2000-01-01",
-        "end_date": "2023-01-01"
+        "end_date": "2025-06-05",
+        "time_step": "Hour",
+        "cache_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/data",
+        "requests": [
+            {
+                "dataset_name": "apples",
+                "source": "alpaca",
+                "endpoint": "StockBarsRequest",
+                "cache_enabled": true,
+                "kwargs": {
+                    "symbol_or_symbols": ["AAPL"]
+                }
+            }
+        ]
     },
     "feature_config": {
+        "cache_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/data",
         "features": [
             {
                 "type": "candle",
                 "name": "candle",
+                "source": "apples",
                 "enabled": true
             },
             {
                 "type": "moving_average",
                 "name": "ma5", 
+                "source": "apples",
                 "enabled": true,
                 "period": 5
             }

@@ -1,7 +1,12 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Union, List
-
+from typing import Union, List, Dict
+from enum import Enum
 from trading.src.features.generic_features import Feature
+from alpaca.data.timeframe import TimeFrameUnit
+
+
+class DataSourceType(str, Enum):
+    ALPACA = "alpaca"
 
 
 class FeatureConfig(BaseModel):
@@ -17,28 +22,37 @@ class FeatureConfig(BaseModel):
     )
 
 
+class DataRequests(BaseModel):
+    """
+    Individual Data Request
+    """
+
+    dataset_name: str = Field("Generic", description="Name of the dataset")
+    source: DataSourceType = Field(..., description="DataSourceType Enum")
+    endpoint: str = Field(..., description="Endpoint of API")
+    cache_enabled: bool = Field(
+        True, description="Whether to cache the downloaded data"
+    )
+    kwargs: Dict = Field(..., description="Kwargs to pass in to the endpoint")
+
+
 class DataConfig(BaseModel):
     """
     Configuration for data used in the algorithm.
     """
 
-    dataset_name: str = Field("Generic", description="Name of the dataset")
-    cache_path: str = Field(
-        "cache/",
-        description="Path to cache the downloaded data",
-    )
-    cache_enabled: bool = Field(
-        True, description="Whether to cache the downloaded data"
-    )
-    time_step: str = Field("1d", description="Time step of the data (e.g., '1d', '1h')")
     start_date: str = Field(
         "2020-01-01", description="Start date for the data collection"
     )
     end_date: str = Field("2023-01-01", description="End date for the data collection")
-    tickers: Union[List[str], str] = Field(
-        ["AAPL", "GOOGL", "MSFT"],
-        description='List of stock tickers to include in the dataset, or "ALL" for all available tickers',
+    time_step: TimeFrameUnit = Field(
+        TimeFrameUnit.Day, description="Time step of the data"
     )
+    cache_path: str = Field(
+        "cache/",
+        description="Path to cache the downloaded data",
+    )
+    requests: List[DataRequests] = Field(..., description="List of data requests")
 
 
 class TrainConfig(BaseModel):

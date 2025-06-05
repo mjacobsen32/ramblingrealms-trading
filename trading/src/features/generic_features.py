@@ -1,22 +1,7 @@
 from pydantic import BaseModel, Field
 from enum import Enum
 from typing import Literal, Dict, Type, ClassVar
-
-
-class Period(str, Enum):
-    """
-    Enum for different time periods.
-    """
-
-    ONE_MINUTE = "1min"
-    FIVE_MINUTES = "5min"
-    FIFTEEN_MINUTES = "15min"
-    THIRTY_MINUTES = "30min"
-    ONE_HOUR = "1hour"
-    FOUR_HOURS = "4hour"
-    DAILY = "daily"
-    WEEKLY = "weekly"
-    MONTHLY = "monthly"
+from alpaca.data.timeframe import TimeFrameUnit
 
 
 class FeatureType(str, Enum):
@@ -33,16 +18,6 @@ class FeatureType(str, Enum):
     PIOTROSKI = "piotroski"
 
 
-class FeatureSource(str, Enum):
-    """
-    Enum for feature sources.
-    """
-
-    ALPACA = "ALPACA"
-    FILE = "FILE"
-    ALPHA_VANTAGE = "ALPHA_VANTAGE"
-
-
 class Feature(BaseModel):
     """
     Represents a single feature with its name and value.
@@ -51,9 +26,7 @@ class Feature(BaseModel):
     type: FeatureType
     name: str = Field(..., description="Name of the feature")
     enabled: bool = Field(True, description="Whether the feature is enabled or not")
-    source: FeatureSource = Field(
-        FeatureSource.ALPACA, description="Source of the feature data"
-    )
+    source: str = Field(..., description="Source file of the feature data")
 
     # Registry for subclasses
     _registry: ClassVar[Dict[FeatureType, Type["Feature"]]] = {}
@@ -87,8 +60,8 @@ class Candle(Feature):
     low: float = Field(..., description="Low price of the candle")
     close: float = Field(..., description="Close price of the candle")
     volume: float = Field(..., description="Volume of the candle")
-    period: Period = Field(
-        Period.DAILY, description="Time period of the candle (e.g., '1d', '1h')"
+    period: TimeFrameUnit = Field(
+        TimeFrameUnit.Day, description="Time period of the candle (e.g., '1d', '1h')"
     )
 
 
