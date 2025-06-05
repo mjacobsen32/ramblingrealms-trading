@@ -39,7 +39,7 @@ dependencies = [
     "transformers (>=4.52.4,<5.0.0)",
     "scikit-learn (>=1.6.1,<2.0.0)",
     "matplotlib (>=3.10.3,<4.0.0)",
-    "backtrader (>=1.9.78.123,<2.0.0.0)"
+    "vectorbt (>=0.27.3,<0.28.0)",
 
 ]
 [project.urls]

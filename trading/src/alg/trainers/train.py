@@ -11,6 +11,11 @@ import trading.src.user_cache.user_cache as rr_user_cache
 import trading.src.alg.data_process.data_loader as rr_data_loader
 import trading.src.alg.models.hf_time_series as rr_hf_models
 from rich import print as rprint
+import time
+from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.client import TradingClient
+from alpaca.trading.enums import OrderSide, TimeInForce
+import vectorbt as vbt
 
 
 class Trainer:
@@ -75,3 +80,54 @@ class Trainer:
 
             avg_loss = total_loss / batch_count
             rprint(f"Epoch {epoch+1}/{self.epochs}, Profit-based Loss: {avg_loss:.6f}")
+
+    def test(self):
+        self.model.eval()
+        actions = ["SELL", "HOLD", "BUY"]
+        symbol = "AAPL"  # You can make this dynamic or configurable
+
+        with torch.no_grad():
+            X_test_tensor = torch.tensor(self.X_test, dtype=torch.float32).to(
+                self.device
+            )
+            outputs = self.model(X_test_tensor)
+            predictions = torch.argmax(outputs, dim=1).cpu().numpy()
+
+        position = 0  # Track if we're holding a position
+
+        entries = np.zeros_like(predictions, dtype=bool)
+        exits = np.zeros_like(predictions, dtype=bool)
+
+        for i, action_id in enumerate(predictions):
+            action = actions[action_id]
+
+            # Execute action using Alpaca
+            if action == "BUY":
+                entries[i] = True
+                position += 1
+                # rprint(f"BUY executed at ${price:.2f}")
+            elif action == "SELL" and position > 0:
+                exits[i] = True
+                # rprint(f"SELL executed at ${price:.2f}")
+                position -= 1
+        exits[-1] = True
+
+        entries = pd.Series(entries)
+        exits = pd.Series(exits)
+
+        rprint(entries)
+        rprint(exits)
+
+        pf = vbt.Portfolio.from_signals(
+            close=self.close_prices[-len(predictions)],
+            price=self.close_prices[-len(predictions)],
+            size=1,
+            entries=entries,
+            exits=exits,
+            init_cash=100000,
+            fees=0.001,
+            slippage=0.001,
+        )
+        rprint(pf.stats())
+        pf.plot().show()
+        print("[green]Backtest complete.")

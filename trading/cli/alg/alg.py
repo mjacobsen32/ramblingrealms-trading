@@ -35,3 +35,4 @@ def train(
     )
     trainer = Trainer(alg_config, UserCache().load(), data_loader)
     trainer.train()
+    trainer.test()
