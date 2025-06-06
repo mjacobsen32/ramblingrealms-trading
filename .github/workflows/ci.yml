@@ -2,7 +2,7 @@ name: rambling-realms-pipeline
 
 on:
   push:
-    branches: [cicd-init]
+    branches: [main]
   pull_request:
 
 jobs:
