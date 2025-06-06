@@ -38,7 +38,9 @@ dependencies = [
     "torch (>=2.7.0,<3.0.0)",
     "transformers (>=4.52.4,<5.0.0)",
     "scikit-learn (>=1.6.1,<2.0.0)",
-    "matplotlib (>=3.10.3,<4.0.0)"
+    "matplotlib (>=3.10.3,<4.0.0)",
+    "isort (>=6.0.1,<7.0.0)",
+    "mypy (>=1.16.0,<2.0.0)"
 
 ]
 [project.urls]
@@ -67,3 +69,6 @@ packages = [
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+
+[tool.mypy]
+ignore_missing_imports = true

@@ -1,11 +1,12 @@
-import os
-from pydantic import BaseModel, Field, field_serializer, SecretStr
-from typing import Optional
-from pathlib import Path
 import json
+import os
+from pathlib import Path
+from typing import Optional
+
 from appdirs import user_config_dir
+from pydantic import BaseModel, Field, SecretStr, field_serializer
 from rich.console import Console
-from trading.src.user_cache.etrade_secrets import ETradeSecrets
+from src.user_cache.etrade_secrets import ETradeSecrets
 
 
 class UserCache(BaseModel):
@@ -45,9 +46,7 @@ class UserCache(BaseModel):
         )
     )
 
-    @field_serializer(
-        "alpaca_api_key", "alpaca_api_secret", when_used="json"
-    )
+    @field_serializer("alpaca_api_key", "alpaca_api_secret", when_used="json")
     def dump_secret(self, v):
         return v.get_secret_value()
 
