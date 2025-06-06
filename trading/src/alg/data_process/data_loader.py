@@ -1,22 +1,18 @@
 import os
-import pandas as pd
+from typing import ClassVar, Dict, Type
+
 import numpy as np
-from rich import print as rprint
+import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
-from alpaca.data.timeframe import TimeFrame
-from sklearn.preprocessing import StandardScaler
+from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+from rich import print as rprint
 from sklearn.model_selection import train_test_split
-from alpaca.data.timeframe import TimeFrameUnit, TimeFrame
+from sklearn.preprocessing import StandardScaler
 
+from trading.cli.alg.config import (DataConfig, DataRequests, DataSourceType,
+                                    FeatureConfig)
 from trading.src.user_cache import user_cache
-from trading.cli.alg.config import (
-    DataConfig,
-    FeatureConfig,
-    DataSourceType,
-    DataRequests,
-)
-from typing import Dict, Type, ClassVar
 
 
 class DataSource:

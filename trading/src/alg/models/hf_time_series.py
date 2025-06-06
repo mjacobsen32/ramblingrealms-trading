@@ -1,6 +1,7 @@
-import torch.nn as nn
 import torch
-from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerModel
+import torch.nn as nn
+from transformers import (TimeSeriesTransformerConfig,
+                          TimeSeriesTransformerModel)
 
 
 class SimpleMLP3(nn.Module):

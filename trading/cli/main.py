@@ -1,13 +1,15 @@
+from pathlib import Path
+
 import typer
-from trading.src.user_cache.user_cache import UserCache as User
-from trading.cli.etrade import etrade
-from trading.cli.data import data
-from trading.cli.alg import alg
-from trading.src.utility.utils import read_key
+from pydantic import SecretStr
 from rich import print
 from rich.prompt import Prompt
-from pathlib import Path
-from pydantic import SecretStr
+
+from trading.cli.alg import alg
+from trading.cli.data import data
+from trading.cli.etrade import etrade
+from trading.src.user_cache.user_cache import UserCache as User
+from trading.src.utility.utils import read_key
 
 app = typer.Typer(name="rr_trading", help="rr_trading CLI commands")
 app.add_typer(etrade.app, name="etrade", help="E-Trade API commands")

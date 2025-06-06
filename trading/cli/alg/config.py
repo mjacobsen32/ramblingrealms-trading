@@ -1,8 +1,10 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Union, List, Dict
 from enum import Enum
-from trading.src.features.generic_features import Feature
+from typing import Dict, List, Union
+
 from alpaca.data.timeframe import TimeFrameUnit
+from pydantic import BaseModel, Field, field_validator
+
+from trading.src.features.generic_features import Feature
 
 
 class DataSourceType(str, Enum):

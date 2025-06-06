@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
 from enum import Enum
-from typing import Literal, Dict, Type, ClassVar
+from typing import ClassVar, Dict, Literal, Type
+
 from alpaca.data.timeframe import TimeFrameUnit
+from pydantic import BaseModel, Field
 
 
 class FeatureType(str, Enum):

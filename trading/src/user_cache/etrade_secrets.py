@@ -1,6 +1,7 @@
 import os
-from pydantic import BaseModel, Field, SecretStr, field_serializer
 from pathlib import Path
+
+from pydantic import BaseModel, Field, SecretStr, field_serializer
 
 
 class ETradeSecrets(BaseModel):

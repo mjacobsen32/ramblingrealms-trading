@@ -1,13 +1,14 @@
-import typer
-from rich import print as rprint
-from typing_extensions import Annotated
 import json
 from pathlib import Path
 
+import typer
+from rich import print as rprint
+from typing_extensions import Annotated
+
 from trading.cli.alg.config import AlgConfig
+from trading.src.alg.data_process.data_loader import DataLoader
 from trading.src.alg.trainers.train import Trainer
 from trading.src.user_cache.user_cache import UserCache
-from trading.src.alg.data_process.data_loader import DataLoader
 
 app = typer.Typer(
     name="alg", help="Algorithm training, testing, and evaluation commands."
