@@ -11,3 +11,5 @@ dist
 .project
 .vscode
 trading/cli/configuration/prod.yml
+# docs
+docs/build

@@ -39,12 +39,6 @@ dependencies = [
     "transformers (>=4.52.4,<5.0.0)",
     "scikit-learn (>=1.6.1,<2.0.0)",
     "matplotlib (>=3.10.3,<4.0.0)",
-    "pytest (>=8.4.0,<9.0.0)",
-    "coverage (>=7.8.2,<8.0.0)",
-    "pre-commit (>=4.2.0,<5.0.0)",
-    "isort (>=6.0.1,<7.0.0)",
-    "mypy (>=1.16.0,<2.0.0)",
-    "ruff (>=0.11.13,<0.12.0)"
 
 ]
 [project.urls]
@@ -56,6 +50,14 @@ rr_trading = "trading.cli.main:app"
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 ipykernel = "^6.29.5"
+isort = "^6.0.1"
+ruff = "^0.11.13"
+mypy = "^1.16.0"
+pytest = "^8.4.0"
+coverage = "^7.8.2"
+pre-commit = "^4.2.0"
+sphinx = "^8.2.3"
+furo = "^2024.8.6"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
