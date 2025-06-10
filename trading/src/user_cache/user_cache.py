@@ -6,7 +6,8 @@ from typing import Optional
 from appdirs import user_config_dir
 from pydantic import BaseModel, Field, SecretStr, field_serializer
 from rich.console import Console
-from src.user_cache.etrade_secrets import ETradeSecrets
+
+from trading.src.user_cache.etrade_secrets import ETradeSecrets
 
 
 class UserCache(BaseModel):

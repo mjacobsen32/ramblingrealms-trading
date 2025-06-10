@@ -3,7 +3,8 @@ from typing import Dict, List
 
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field
-from src.features.generic_features import Feature
+
+from trading.src.features.generic_features import Feature
 
 
 class DataSourceType(str, Enum):

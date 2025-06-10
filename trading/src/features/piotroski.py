@@ -1,4 +1,4 @@
-from src.features.generic_features import Feature
+from trading.src.features.generic_features import Feature
 
 
 class Piotroski(Feature):
