@@ -40,7 +40,6 @@ dependencies = [
     "scikit-learn (>=1.6.1,<2.0.0)",
     "matplotlib (>=3.10.3,<4.0.0)",
     "vectorbt (>=0.27.3,<0.28.0)",
-    "isort (>=6.0.1,<7.0.0)",
 
 ]
 [project.urls]
@@ -79,6 +78,10 @@ packages = [
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
 
 [tool.mypy]
 ignore_missing_imports = true
