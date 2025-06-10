@@ -12,4 +12,4 @@ dist
 .vscode
 trading/cli/configuration/prod.yml
 # docs
-docs/build
+docs/_build
