@@ -29,11 +29,73 @@
                 "enabled": true
             },
             {
-                "type": "moving_average",
-                "name": "ma5", 
+                "type": "moving_window",
+                "name": "ma100_close",
                 "source": "apples",
                 "enabled": true,
-                "period": 5
+                "field": "close",
+                "period": 100
+            },
+            {
+                "type": "moving_window",
+                "name": "ma50_close",
+                "source": "apples",
+                "enabled": true,
+                "field": "close",
+                "period": 50
+            },
+            {
+                "type": "moving_window",
+                "name": "ma100_volume",
+                "source": "apples",
+                "enabled": true,
+                "field": "volume",
+                "period": 100
+            },
+            {
+                "type": "moving_window",
+                "name": "volatility100",
+                "source": "apples",
+                "enabled": true,
+                "field": "close",
+                "period": 100,
+                "operation": "std"
+            },
+            {
+                "type": "macd",
+                "name": "macd_small",
+                "source": "apples",
+                "enabled": true,
+                "fast_period": 12,
+                "slow_period": 26,
+                "signal_period": 9,
+                "field": "close"
+            },
+            {
+                "type": "rsi",
+                "name": "rsi_15",
+                "source": "apples",
+                "period": 15,
+                "field": "close"
+            },
+            {
+                "type": "rsi",
+                "name": "rsi_60",
+                "source": "apples",
+                "period": 60,
+                "field": "close"
+            },
+            {
+                "type": "bollinger_bands",
+                "name": "bollinger_bands_20",
+                "source": "apples",
+                "period": 20,
+                "field": "close"
+            },
+            {
+                "type": "stochastic",
+                "name": "stochastic_20",
+                "period": 20
             }
         ]
     }

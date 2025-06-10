@@ -88,7 +88,6 @@ class AlpacaDataLoader(DataSource):
                 **request.kwargs,
             )
             df = pd.concat([df, client.get_stock_bars(request_params).df])
-            # df["ticker"] = request.tickers
             df.to_parquet(cache_file)
         return df
 
@@ -97,9 +96,13 @@ class DataLoader:
     def __init__(self, data_config: DataConfig, feature_config: FeatureConfig):
         self.data_config = data_config
         self.feature_config = feature_config
+
         self.df = pd.DataFrame()
+        self.features = pd.Series()
+        self.targets = pd.Series()
+
         for request in self.data_config.requests:
-            self.df = DataSource.factory(request.model_dump()).get_data(
+            data = DataSource.factory(request.model_dump()).get_data(
                 request,
                 self.df,
                 data_config.cache_path,
@@ -107,53 +110,40 @@ class DataLoader:
                 data_config.end_date,
                 data_config.time_step,
             )
-            rprint(self.df)
-            exit(0)
+            for feature in [
+                f
+                for f in self.feature_config.features
+                if f.source == request.dataset_name
+            ]:
+                feature.to_df(self.df, data)
 
-    # ---- FEATURE ENGINEERING ----
-    def add_features(self, df):
-        df = df.copy()
-        # for feature in self.feature_config.features:
-
-        # df["return"] = df["close"].pct_change()
-        # df["ma5"] = df["close"].rolling(window=5).mean()
-        # df["ma10"] = df["close"].rolling(window=10).mean()
-        # df["volatility"] = df["close"].rolling(window=5).std()
-        # df["target"] = (df["close"].shift(-1) > df["close"]).astype(
-        #     int
-        # )  # 1 if next day up, else 0
-        # df = df.dropna()
-        return df
-
-    # 0 = SELL, 1 = HOLD, 2 = BUY
-    def add_trading_signals(self, df, hold_threshold=0.002):
-        df = df.copy()
-        df["future_return"] = df["close"].shift(-1) / df["close"] - 1
-        # BUY if next day's return > hold_threshold, SELL if < -hold_threshold, else HOLD
-        df["signal"] = np.where(
-            df["future_return"] > hold_threshold,
-            2,
-            np.where(df["future_return"] < -hold_threshold, 0, 1),
+        self.df.dropna()
+        self.features = self.df.columns
+        rprint(
+            f"[green]Data Successfully loaded...\n[white]Current features: {[f for f in self.features]}"
         )
-        df = df.dropna()
-        return df
+        exit(0)
+        # add target from types
 
-    def load_df(self):
-        self.df = self.add_trading_signals(self.df, hold_threshold=0.002)
-        return self.df
+    # # 0 = SELL, 1 = HOLD, 2 = BUY
+    # def add_trading_signals(self, df, hold_threshold=0.002):
+    #     df = df.copy()
+    #     df["future_return"] = df["close"].shift(-1) / df["close"] - 1
+    #     # BUY if next day's return > hold_threshold, SELL if < -hold_threshold, else HOLD
+    #     df["signal"] = np.where(
+    #         df["future_return"] > hold_threshold,
+    #         2,
+    #         np.where(df["future_return"] < -hold_threshold, 0, 1),
+    #     )
+    #     df = df.dropna()
+    #     return df
+
+    # def load_df(self):
+    #     self.df = self.add_trading_signals(self.df, hold_threshold=0.002)
+    #     return self.df
 
     def get_train_test(self):
-        features = [
-            "open",
-            "high",
-            "low",
-            "close",
-            "volume",
-            "ma5",
-            "ma10",
-            "volatility",
-        ]
-        X = self.df[features].values
+        X = self.df[self.features].values
         y = self.df["signal"].values
 
         scaler = StandardScaler()

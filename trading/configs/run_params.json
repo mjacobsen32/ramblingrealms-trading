@@ -1,0 +1,21 @@
+{
+  "tickers": [
+    "AAPL"
+  ],
+  "start_date": "2000-01-01",
+  "end_date": "2023-01-01",
+  "features": [
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "ma5",
+    "ma10",
+    "volatility"
+  ],
+  "epochs": 100,
+  "batch_size": 16,
+  "overfitting_param": 0.01,
+  "test_accuracy": 0.5306122448979592
+}

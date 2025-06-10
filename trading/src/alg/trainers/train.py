@@ -21,7 +21,7 @@ class Trainer:
         self.alg_config = alg_config
         self.user_cache = user_cache
 
-        df = data_loader.load_df()
+        df = data_loader.df
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.loss_fn = ProfitLoss(df["close"].values)
@@ -122,4 +122,4 @@ class Trainer:
         )
         rprint(pf.stats())
         pf.plot().show()
-        print("[green]Backtest complete.")
+        rprint("[green]Backtest complete.")

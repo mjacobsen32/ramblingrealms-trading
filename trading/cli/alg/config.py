@@ -1,8 +1,8 @@
 from enum import Enum
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from alpaca.data.timeframe import TimeFrameUnit
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from trading.src.features.generic_features import Feature
 
@@ -16,7 +16,16 @@ class FeatureConfig(BaseModel):
     Configuration for features used in the algorithm.
     """
 
-    features: List[Feature] = Field(..., description="List of feature names")
+    @model_validator(mode="before")
+    @classmethod
+    def parse_features(cls, data: Any):
+        features_data = data.get("features", [])
+        data["features"] = [Feature.factory(f) for f in features_data]
+        return data
+
+    features: List[Feature] = Field(
+        default_factory=Feature, description="List of feature names"
+    )
     normalization: bool = Field(True, description="Whether to normalize features")
     missing_value_strategy: str = Field(
         "mean",
