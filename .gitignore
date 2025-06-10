@@ -15,3 +15,6 @@ trading/cli/configuration/prod.yml
 
 # logs
 logs
+# docs
+docs/_build
+docs/build

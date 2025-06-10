@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import ClassVar, Dict, Literal, Type
+from typing import ClassVar, Dict, Type
 
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field

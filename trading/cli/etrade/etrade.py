@@ -2,10 +2,10 @@ import pyetrade
 import typer
 from pydantic import SecretStr
 from rich import print as rprint
-
-from trading.src.user_cache.user_cache import UserCache as user
+from src.user_cache.user_cache import UserCache as user
 
 app = typer.Typer(name="etrade", help="E-Trade API commands")
+
 
 @app.command(help="Renew E-Trade OAuth tokens")
 def renew_oauth(
@@ -32,6 +32,7 @@ def renew_oauth(
         rprint("[green]OAuth tokens renewed successfully!")
     else:
         rprint("[red]Failed to renew OAuth tokens. Please authenticate again.")
+
 
 @app.command(help="Authenticate with E-Trade. Will set OAuth tokens")
 def authenticate(

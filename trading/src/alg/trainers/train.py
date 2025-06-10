@@ -1,15 +1,13 @@
+import cli.alg.config as rr_config
 import numpy as np
 import pandas as pd
+import src.alg.data_process.data_loader as rr_data_loader
+import src.user_cache.user_cache as rr_user_cache
 import torch
-import torch.optim as optim
 import vectorbt as vbt
 from rich import print as rprint
-
-import trading.cli.alg.config as rr_config
-import trading.src.alg.data_process.data_loader as rr_data_loader
-import trading.src.user_cache.user_cache as rr_user_cache
-from trading.src.alg.loss.profit_loss import ProfitLoss
-from trading.src.alg.models.hf_time_series import SimpleMLP3
+from src.alg.loss.profit_loss import ProfitLoss
+from src.alg.models.hf_time_series import SimpleMLP3
 
 
 class Trainer:
@@ -78,7 +76,7 @@ class Trainer:
     def test(self):
         self.model.eval()
         actions = ["SELL", "HOLD", "BUY"]
-        symbol = "AAPL"  # You can make this dynamic or configurable
+        # symbol = "AAPL"  # You can make this dynamic or configurable
 
         with torch.no_grad():
             X_test_tensor = torch.tensor(self.X_test, dtype=torch.float32).to(

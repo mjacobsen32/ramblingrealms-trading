@@ -34,18 +34,18 @@ class HuggingFaceTimeSeriesModel(nn.Module):
         batch_size, seq_len, input_size = x.shape
 
         # Required: dummy time features (all zeros for now)
-        past_time_features = torch.zeros(
-            batch_size, seq_len, input_size, device=x.device, dtype=x.dtype
-        )
+        # past_time_features = torch.zeros(
+        #     batch_size, seq_len, input_size, device=x.device, dtype=x.dtype
+        # )
 
         # Required: observed mask (all ones means all values are valid)
-        past_observed_mask = torch.ones(
-            batch_size, seq_len, device=x.device, dtype=x.dtype
-        )
+        # past_observed_mask = torch.ones(
+        #     batch_size, seq_len, device=x.device, dtype=x.dtype
+        # )
 
         # Call the transformer model with all required arguments
-        output = self.model(
-            past_values=x,
-            past_time_features=past_time_features,
-            past_observed_mask=past_observed_mask,
-        ).last_hidden_state
+        # output = self.model(
+        #     past_values=x,
+        #     past_time_features=past_time_features,
+        #     past_observed_mask=past_observed_mask,
+        # ).last_hidden_state

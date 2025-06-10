@@ -49,12 +49,22 @@ repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
 [project.scripts]
 rr_trading = "trading.cli.main:app"
 
-[tool.poetry.scripts]
-rr_trading = "trading.cli.main:app"
-
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 ipykernel = "^6.29.5"
+isort = "^6.0.1"
+ruff = "^0.11.13"
+mypy = "^1.16.0"
+pytest = "^8.4.0"
+coverage = "^7.8.2"
+pre-commit = "^4.2.0"
+
+
+[tool.poetry.group.docs.dependencies]
+sphinx = "^8.2.3"
+furo = "^2024.8.6"
+myst-parser = "^4.0.1"
+sphinx-rtd-theme = "^3.0.2"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -69,3 +79,9 @@ packages = [
 [tool.black]
 line-length = 88
 target-version = ["py312"]
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.poetry.requires-plugins]
+poetry-plugin-export = ">=1.8"
