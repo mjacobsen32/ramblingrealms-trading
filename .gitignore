@@ -13,3 +13,4 @@ dist
 trading/cli/configuration/prod.yml
 # docs
 docs/_build
+docs/build
