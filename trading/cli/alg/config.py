@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, model_validator
@@ -24,7 +24,7 @@ class FeatureConfig(BaseModel):
         return data
 
     features: List[Feature] = Field(
-        default_factory=Feature, description="List of feature names"
+        default_factory=List[Feature], description="List of feature names"
     )
     normalization: bool = Field(True, description="Whether to normalize features")
     missing_value_strategy: str = Field(
@@ -80,6 +80,24 @@ class TrainConfig(BaseModel):
     early_stopping_patience: int = Field(10, description="Patience for early stopping")
 
 
+class StockEnv(BaseModel):
+    starting_amount: int = Field(100000, description="Starting funds in state space")
+    hmax: int = Field(
+        10000, description="Maximum cash to be traded in each trade per asset"
+    )
+    buy_cost_pct: Union[float, List[float]] = Field(
+        0.00, description="Corresponding cost for all assets or array per symbol"
+    )
+    sell_cost_pct: Union[float, List[float]] = Field(
+        0.00, description="Corresponding cost for all assets or array per symbol"
+    )
+    turbulence_threshold: Union[float, None] = Field(
+        None,
+        description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
+    )
+    reward_scaling: float = Field(1e-4)
+
+
 class AlgConfig(BaseModel):
     """
     Configuration for the algorithm.
@@ -101,3 +119,7 @@ class AlgConfig(BaseModel):
         "models/",
         description="Path to save the trained model",
     )
+    stock_env: StockEnv = Field(
+        default_factory=StockEnv, description="Stock Trading Environment Config"
+    )
+    output_dir: str = Field("./logs")

@@ -95,7 +95,14 @@
             {
                 "type": "stochastic",
                 "name": "stochastic_20",
+                "source": "apples",
                 "period": 20
+            },
+            {
+                "type": "turbulence",
+                "name": "turbulence",
+                "source": "apples",
+                "lookback": 252
             }
         ]
     }

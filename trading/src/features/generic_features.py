@@ -1,9 +1,11 @@
 from enum import Enum
-from typing import Any, ClassVar, Dict, Type
+from typing import Any, ClassVar, Dict, List, Type
 
+import numpy as np
 import pandas as pd
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, model_validator
+from scipy.spatial.distance import mahalanobis
 
 
 class FeatureType(str, Enum):
@@ -18,6 +20,34 @@ class FeatureType(str, Enum):
     BOLLINGER_BANDS = "bollinger_bands"
     STOCHASTIC = "stochastic"
     PIOTROSKI = "piotroski"
+    TURBULENCE = "turbulence"
+
+
+class FillStrategy(str, Enum):
+    INTERPOLATE = "interpolate"
+    ZERO = "zero"
+    DROP = "drop"
+
+
+class OperationType(str, Enum):
+    MEAN = "mean"
+    STD = "std"
+
+    def __call__(self, df: pd.DataFrame, column: str, window: int) -> pd.Series:
+        """
+        Apply the rolling operation to a DataFrame column.
+
+        Args:
+            df (pd.DataFrame): Input DataFrame.
+            column (str): Name of the column to operate on.
+            window (int): Rolling window size.
+
+        Returns:
+            pd.Series: Result of the rolling operation.
+        """
+        if not hasattr(df[column].rolling(window=window), self.value):
+            raise ValueError(f"{self.value} is not a valid rolling method")
+        return getattr(df[column].rolling(window=window), self.value)()
 
 
 class Feature(BaseModel):
@@ -29,9 +59,35 @@ class Feature(BaseModel):
     name: str = Field(..., description="Name of the feature")
     enabled: bool = Field(True, description="Whether the feature is enabled or not")
     source: str = Field(..., description="Source file of the feature data")
+    fill_strategy: FillStrategy = Field(FillStrategy.DROP)
 
     # Registry for subclasses
     _registry: ClassVar[Dict[FeatureType, Type["Feature"]]] = {}
+
+    def clean_columns(self, cols: List[str], df: pd.DataFrame) -> pd.DataFrame:
+        if self.fill_strategy is FillStrategy.DROP:
+            df.dropna(axis=0, inplace=True, subset=cols)
+            return df
+
+        for col in cols:
+            first_valid = df[col].first_valid_index()
+            if first_valid is not None:
+                first_val = df.at[first_valid, col]
+                df[col] = df[col].ffill().fillna(first_val)
+
+            if self.fill_strategy is FillStrategy.INTERPOLATE:
+                interpolated = df[col].interpolate(
+                    method="linear", limit_direction="both"
+                )
+                # Only update rows where NaN originally existed
+                df[col] = df[col].where(~df[col].isna(), interpolated)
+            elif self.fill_strategy is FillStrategy.ZERO:
+                df[col] = df[col].fillna(0)
+
+        return df
+
+    def get_feature_names(self) -> List[str]:
+        return [self.name]
 
     def __init__(self, **data):
         if type(self) is Feature:
@@ -40,8 +96,10 @@ class Feature(BaseModel):
             )
         super().__init__(**data)
 
-    def to_df(self, df: pd.DataFrame, data: Any) -> None:
-        pass
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        raise TypeError(
+            "Feature is an abstract base class and cannot be instantiated directly."
+        )
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -66,12 +124,11 @@ class Candle(Feature):
     Represents a candle feature with OHLCV data.
     """
 
-    def to_df(self, df: pd.DataFrame, data: Any) -> None:
-        df["open"] = data["open"]
-        df["high"] = data["high"]
-        df["low"] = data["low"]
-        df["close"] = data["close"]
-        df["volume"] = data["volume"]
+    def get_feature_names(self) -> List[str]:
+        return ["open", "high", "low", "close", "volume"]
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        return self.clean_columns(self.get_feature_names(), data)
 
     TYPE: ClassVar[FeatureType] = FeatureType.CANDLE
     open: float = Field(default=0.0, description="Open price of the candle")
@@ -84,34 +141,14 @@ class Candle(Feature):
     )
 
 
-class OperationType(str, Enum):
-    MEAN = "mean"
-    STD = "std"
-
-    def __call__(self, df: pd.DataFrame, column: str, window: int) -> pd.Series:
-        """
-        Apply the rolling operation to a DataFrame column.
-
-        Args:
-            df (pd.DataFrame): Input DataFrame.
-            column (str): Name of the column to operate on.
-            window (int): Rolling window size.
-
-        Returns:
-            pd.Series: Result of the rolling operation.
-        """
-        if not hasattr(df[column].rolling(window=window), self.value):
-            raise ValueError(f"{self.value} is not a valid rolling method")
-        return getattr(df[column].rolling(window=window), self.value)()
-
-
 class MovingWindow(Feature):
     """
     Represents a moving average feature by Days.
     """
 
-    def to_df(self, df: pd.DataFrame, data: Any) -> None:
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         df[self.name] = self.operation(df, self.field, self.period)
+        return self.clean_columns(self.get_feature_names(), df)
 
     TYPE: ClassVar[FeatureType] = FeatureType.MOVING_WINDOW
     period: int = Field(
@@ -133,7 +170,7 @@ class RSI(Feature):
     period: int = Field(14, description="Period for RSI calculation")
     field: str = Field("close", description="Field to calculate RSI on")
 
-    def to_df(self, df: pd.DataFrame, data: Any) -> None:
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         delta = pd.to_numeric(df[self.field].diff(), errors="coerce")
         gain = delta.where(delta > 0, 0.0)
         loss = -delta.where(delta < 0, 0.0)
@@ -143,6 +180,7 @@ class RSI(Feature):
 
         rs = avg_gain / (avg_loss + 1e-10)
         df[self.name] = 100 - (100 / (1 + rs))
+        return self.clean_columns(self.get_feature_names(), df)
 
 
 class MACD(Feature):
@@ -156,7 +194,10 @@ class MACD(Feature):
     signal_period: int = Field(9)
     field: str = Field("close")
 
-    def to_df(self, df: pd.DataFrame, data: Any) -> None:
+    def get_feature_names(self) -> List[str]:
+        return [f"{self.name}_macd", f"{self.name}_signal", f"{self.name}_hist"]
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         ema_fast = df[self.field].ewm(span=self.fast_period, adjust=False).mean()
         ema_slow = df[self.field].ewm(span=self.slow_period, adjust=False).mean()
         macd = ema_fast - ema_slow
@@ -164,6 +205,7 @@ class MACD(Feature):
         df[f"{self.name}_macd"] = macd
         df[f"{self.name}_signal"] = signal
         df[f"{self.name}_hist"] = macd - signal
+        return self.clean_columns(self.get_feature_names(), df)
 
 
 class BollingerBands(Feature):
@@ -175,12 +217,16 @@ class BollingerBands(Feature):
     period: int = Field(20)
     field: str = Field("close")
 
-    def to_df(self, df: pd.DataFrame, data: Any) -> None:
+    def get_feature_names(self) -> List[str]:
+        return [f"{self.name}_upper", f"{self.name}_lower", f"{self.name}_mid"]
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         sma = df[self.field].rolling(window=self.period).mean()
         std = df[self.field].rolling(window=self.period).std()
         df[f"{self.name}_upper"] = sma + (2 * std)
         df[f"{self.name}_lower"] = sma - (2 * std)
         df[f"{self.name}_mid"] = sma
+        return self.clean_columns(self.get_feature_names(), df)
 
 
 class Stochastic(Feature):
@@ -194,9 +240,45 @@ class Stochastic(Feature):
     field_low: str = Field("low")
     field_close: str = Field("close")
 
-    def to_df(self, df: pd.DataFrame, data: Any) -> None:
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         low_min = df[self.field_low].rolling(window=self.period).min()
         high_max = df[self.field_high].rolling(window=self.period).max()
         df[self.name] = 100 * (
             (df[self.field_close] - low_min) / (high_max - low_min + 1e-10)
         )
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+class Turbulence(Feature):
+    """
+    Computes a 'turbulence index' indicating how unusual current returns are
+    compared to the recent historical return distribution.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType("turbulence")
+    lookback: int = Field(20, description="Lookback window for calculating turbulence")
+    field: str = Field("close", description="Field to use for return computation")
+
+    def to_df(self, df: pd.DataFrame, data: Any = None) -> pd.DataFrame:
+        returns = df[self.field].pct_change().dropna()
+        turbulence_values = [np.nan] * self.lookback  # Start with NaNs
+
+        for i in range(self.lookback, len(returns)):
+            window = returns[i - self.lookback : i]
+            current = returns.iloc[i]
+
+            # Avoid degenerate case
+            if window.std() == 0 or len(window) < 2:
+                turbulence_values.append(0)
+                continue
+
+            mu = window.mean()
+            cov = window.std() ** 2
+
+            # Mahalanobis distance with 1D standard deviation as denominator
+            dist = (current - mu) / np.sqrt(cov)
+            turbulence_values.append(dist**2)  # Squared distance
+
+        # Add to df
+        df[self.name] = [np.nan] + turbulence_values  # Align with df index
+        return self.clean_columns(self.get_feature_names(), df)

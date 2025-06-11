@@ -86,3 +86,7 @@ def setup():
         user.alpaca_api_secret = SecretStr(
             read_key(Prompt.ask("Enter your Alpaca API secret path"))
         )
+
+
+if __name__ == "__main__":
+    app()

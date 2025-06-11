@@ -115,32 +115,17 @@ class DataLoader:
                 for f in self.feature_config.features
                 if f.source == request.dataset_name
             ]:
-                feature.to_df(self.df, data)
+                self.df = feature.to_df(self.df, data)
 
-        self.df.dropna()
         self.features = self.df.columns
+        self.df.sort_index(level=["timestamp", "symbol"], inplace=True)
+        self.df = self.df.reset_index()  # Moves MultiIndex levels to columns
+        self.df = self.df.rename(columns={"datetime": "date", "symbol": "tic"})
+        self.df.dropna()
+
         rprint(
             f"[green]Data Successfully loaded...\n[white]Current features: {[f for f in self.features]}"
         )
-        exit(0)
-        # add target from types
-
-    # # 0 = SELL, 1 = HOLD, 2 = BUY
-    # def add_trading_signals(self, df, hold_threshold=0.002):
-    #     df = df.copy()
-    #     df["future_return"] = df["close"].shift(-1) / df["close"] - 1
-    #     # BUY if next day's return > hold_threshold, SELL if < -hold_threshold, else HOLD
-    #     df["signal"] = np.where(
-    #         df["future_return"] > hold_threshold,
-    #         2,
-    #         np.where(df["future_return"] < -hold_threshold, 0, 1),
-    #     )
-    #     df = df.dropna()
-    #     return df
-
-    # def load_df(self):
-    #     self.df = self.add_trading_signals(self.df, hold_threshold=0.002)
-    #     return self.df
 
     def get_train_test(self):
         X = self.df[self.features].values
