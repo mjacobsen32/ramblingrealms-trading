@@ -64,6 +64,9 @@ class DataConfig(BaseModel):
         description="Path to cache the downloaded data",
     )
     requests: List[DataRequests] = Field(..., description="List of data requests")
+    validation_split: float = Field(
+        0.2, description="Fraction of data to use for validation"
+    )
 
 
 class TrainConfig(BaseModel):
@@ -74,9 +77,6 @@ class TrainConfig(BaseModel):
     epochs: int = Field(100, description="Number of training epochs")
     batch_size: int = Field(32, description="Batch size for training")
     learning_rate: float = Field(0.001, description="Learning rate for the optimizer")
-    validation_split: float = Field(
-        0.2, description="Fraction of data to use for validation"
-    )
     early_stopping_patience: int = Field(10, description="Patience for early stopping")
 
 
