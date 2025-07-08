@@ -36,12 +36,14 @@ dependencies = [
     "fastparquet (>=2024.11.0,<2025.0.0)",
     "alpaca-py (>=0.37,<0.41.0)",
     "torch (>=2.7.0,<3.0.0)",
-    "transformers (>=4.52.4,<5.0.0)",
     "scikit-learn (>=1.6.1,<2.0.0)",
     "matplotlib (>=3.10.3,<4.0.0)",
     "vectorbt (>=0.27.3,<0.28.0)",
-    "finrl @ git+https://github.com/AI4Finance-Foundation/FinRL.git",
     "pandas-market-calendars (>=5.1.0,<6.0.0)",
+    "gymnasium (>=1.2.0,<2.0.0)",
+    "stable-baselines3 (>=2.6.0,<3.0.0)",
+    "transformers (>=4.53.1,<5.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
 
 ]
 [project.urls]

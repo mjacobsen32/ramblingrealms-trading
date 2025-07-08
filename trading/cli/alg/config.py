@@ -81,9 +81,9 @@ class TrainConfig(BaseModel):
 
 
 class StockEnv(BaseModel):
-    starting_amount: int = Field(100000, description="Starting funds in state space")
+    initial_cash: int = Field(100_000, description="Starting funds in state space")
     hmax: int = Field(
-        10000, description="Maximum cash to be traded in each trade per asset"
+        10_000, description="Maximum cash to be traded in each trade per asset"
     )
     buy_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"

@@ -120,7 +120,7 @@ class DataLoader:
         self.features = self.df.columns
         self.df.sort_index(level=["timestamp", "symbol"], inplace=True)
         self.df = self.df.reset_index()  # Moves MultiIndex levels to columns
-        self.df = self.df.rename(columns={"datetime": "date", "symbol": "tic"})
+        self.df = self.df.rename(columns={"symbol": "tic"})
         self.df.dropna()
 
         rprint(
