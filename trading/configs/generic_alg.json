@@ -1,6 +1,6 @@
 {
-    "name": "Generic",
-    "description": "A generic trading algorithm configuration.",
+    "name": "ppo",
+    "description": "A generic ppo trading algorithm configuration.",
     "version": "1.0",
     "data_config": {
         "start_date": "2020-01-01",

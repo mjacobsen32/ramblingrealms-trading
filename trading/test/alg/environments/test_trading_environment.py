@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import trading.src.alg.agents
@@ -24,6 +25,24 @@ def test_env():
         features=alg_config.feature_config.features,
     )
     train_env.reset()
+    # initial state
     train_env.render()
-    train_env.step([1 for _ in range(train_env.stock_dimension)])
+
+    # buy 10% of each
+    train_env.step(np.ones(train_env.stock_dimension))
+    train_env.render()
+
+    # hold for a few weeks
+    [
+        train_env.step(np.array([0 for _ in range(train_env.stock_dimension)]))
+        for _ in range(20)
+    ]
+    train_env.render()
+
+    # sell 10% of each
+    train_env.step(np.array([-1 for _ in range(train_env.stock_dimension)]))
+    train_env.render()
+
+    # attempt to sell more than we own
+    train_env.step(np.array([-1 for _ in range(train_env.stock_dimension)]))
     train_env.render()

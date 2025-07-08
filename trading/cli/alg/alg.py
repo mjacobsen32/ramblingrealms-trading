@@ -1,9 +1,10 @@
 from pathlib import Path
 
 import typer
-from finrl.agents.stablebaselines3.models import DRLAgent
 from rich import print as rprint
-from stable_baselines3.common.logger import configure
+from stable_baselines3 import PPO
+from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines3.common.vec_env import DummyVecEnv
 from typing_extensions import Annotated
 
 from trading.cli.alg.config import AlgConfig
@@ -44,21 +45,57 @@ def train(
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
     )
-    agent = DRLAgent(env=train_env.gym)
-    model_a2c = agent.get_model("a2c", model_kwargs={"device": "cpu"})
+    train_env.reset()
 
-    tmp_path = alg_config.output_dir + "/a2c"
-    new_logger_a2c = configure(tmp_path, ["stdout", "csv", "tensorboard"])
-    import stable_baselines3.common.logger as log
+    rprint("[blue]Environment Initialized.[/blue]")
+    model = PPO(
+        "MlpPolicy",
+        DummyVecEnv([lambda: train_env]),
+        verbose=1,
+        tensorboard_log=alg_config.output_dir,
+    ).learn(10_000)
 
-    # new_logger_a2c.set_level(log.DISABLED)
-    # model_a2c.set_logger(new_logger_a2c)
-    # print(new_logger_a2c.level)
+    model.save(alg_config.save_path + alg_config.name + "_model")
 
-    trained_a2c = agent.train_model(
-        model=model_a2c, tb_log_name="a2c", total_timesteps=5000
+
+@app.command(help="Run backtesting on the trained model.")
+def backtest(
+    config: Annotated[
+        str, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ],
+):
+    rprint("[blue]Starting backtesting process...[/blue]")
+    # Load configuration
+    with Path.open(Path(config)) as f:
+        alg_config = AlgConfig.model_validate_json(f.read())
+    data_loader = DataLoader(
+        data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    # trainer = Trainer(alg_config, UserCache().load(), data_loader)
-    # trainer.train()
-    # if not no_test:
-    # trainer.test()
+    train_env = TradingEnv(
+        data=data_loader.df,
+        cfg=alg_config.stock_env,
+        features=alg_config.feature_config.features,
+    )
+    train_env.reset()
+
+    rprint("[blue]Environment Initialized.[/blue]")
+    obs, _ = train_env.reset()
+    done = False
+    total_reward = 0
+
+    model = PPO.load(alg_config.save_path + alg_config.name + "_model.zip", train_env)
+
+    while not done:
+        action, _states = model.predict(obs)
+        obs, reward, done, truncated, info = train_env.step(action)
+        total_reward += reward
+
+    print(f"Final Portfolio Value: {train_env.total_assets:.2f}")
+    import matplotlib.pyplot as plt
+
+    plt.plot(train_env.asset_memory)
+    plt.title("Portfolio Value Over Time")
+    plt.xlabel("Step")
+    plt.ylabel("Value")
+    plt.grid(True)
+    plt.savefig(alg_config.output_dir + "/portfolio_value.png")

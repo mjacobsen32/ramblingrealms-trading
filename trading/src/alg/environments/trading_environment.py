@@ -16,6 +16,8 @@ class TradingEnv(gym.Env):
         self.stock_dimension = len(self.unique_symbols)
         self.feature_cols = feature_utils.get_feature_cols(features=features)
         self.data = data.copy()
+        self.trade_limit_pct = 0.1  # max 10% of total assets per trade
+        self.hmax = 10_000  # absolute max trade size in dollars
 
         # Environment state space
         self.state_space = (
@@ -49,6 +51,8 @@ class TradingEnv(gym.Env):
         # Trading parameters
         self.initial_cash = cfg.initial_cash
         self.max_steps = len(data["timestamp"].unique())
+        # historical data
+        self.asset_memory = [self.initial_cash]
 
         self._reset_internal_states()
 
@@ -57,7 +61,7 @@ class TradingEnv(gym.Env):
         self.cash = self.initial_cash
         self.stock_owned = np.zeros(self.stock_dimension, dtype=np.float32)
         self.terminal = False
-        self.total_asset = self.initial_cash
+        self.total_assets = self.initial_cash
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
         super().reset(seed=seed)
@@ -72,9 +76,13 @@ class TradingEnv(gym.Env):
         return df_day["close"].values
 
     def _get_observation(self):
-        df_day = self.data[self.data["timestamp"] == self._get_current_date()]
-        prices = df_day["close"].values
-        indicators = df_day[self.feature_cols].values.flatten()
+        current_date = self._get_current_date()
+        df_day = self.data[self.data["timestamp"] == current_date]
+        df_day = df_day.set_index("tic").reindex(self.unique_symbols)
+
+        prices = df_day["close"].fillna(0).values
+        indicators = df_day[self.feature_cols].fillna(0).values.flatten()
+
         obs = np.concatenate([[self.cash], self.stock_owned, prices, indicators])
         return obs.astype(np.float32)
 
@@ -82,48 +90,50 @@ class TradingEnv(gym.Env):
         print(f"Day: {self.day}")
         print(f"Cash: {self.cash:.2f}")
         print(f"Stock Owned: {self.stock_owned}")
-        print(f"Total Assets: {self.total_asset:.2f}")
+        print(f"Total Assets: {self.total_assets:.2f}")
 
     def step(self, actions):
         if self.terminal:
             return self._get_observation(), 0, self.terminal, False, {}
 
-        df_day = self.data[self.data["timestamp"] == self._get_current_date()]
-        prices = df_day["close"].values
+        current_date = self._get_current_date()
+        df_day = self.data[self.data["timestamp"] == current_date]
+        available_tics = df_day["tic"].values
+        prices = df_day.set_index("tic")["close"].reindex(self.unique_symbols).values
 
-        # Scale actions to dollar value trades
-        actions = actions * self.cash  # scale by available cash
-        transaction_cost = 0
-
-        for i in range(self.stock_dimension):
-            action = actions[i]
+        # Apply actions only to available tickers
+        trade_limit = self.trade_limit_pct * self.total_assets
+        scaled_actions = actions * trade_limit
+        scaled_actions = np.clip(scaled_actions, -self.hmax, self.hmax)
+        for i, symbol in enumerate(self.unique_symbols):
             price = prices[i]
+            action = scaled_actions[i]
+
+            if np.isnan(price):  # Ticker not available on this day
+                continue
 
             if action < 0:  # Sell
                 num_shares_to_sell = min(abs(action) // price, self.stock_owned[i])
                 proceeds = num_shares_to_sell * price
-                transaction_cost += proceeds * self.sell_cost[i]
-                self.cash += proceeds - proceeds * self.sell_cost[i]
+                cost = proceeds * self.sell_cost[i]
+                self.cash += proceeds - cost
                 self.stock_owned[i] -= num_shares_to_sell
 
             elif action > 0:  # Buy
                 num_shares_to_buy = action // price
                 cost = num_shares_to_buy * price
-                if cost + cost * self.buy_cost[i] <= self.cash:
-                    transaction_cost += cost * self.buy_cost[i]
-                    self.cash -= cost + cost * self.buy_cost[i]
+                fee = cost * self.buy_cost[i]
+                if cost + fee <= self.cash:
+                    self.cash -= cost + fee
                     self.stock_owned[i] += num_shares_to_buy
-
-            else:  # Hold
-                continue
 
         self.day += 1
         self.terminal = self.day >= self.max_steps - 1
 
-        # Calculate portfolio value
-        new_prices = self._get_day_prices()
-        portfolio_value = self.cash + np.sum(new_prices * self.stock_owned)
-        reward = portfolio_value - self.total_asset
-        self.total_asset = portfolio_value
-
+        # Portfolio value: use available prices only
+        valid_prices = np.nan_to_num(prices)
+        portfolio_value = self.cash + np.sum(valid_prices * self.stock_owned)
+        reward = portfolio_value - self.total_assets
+        self.total_assets = portfolio_value
+        self.asset_memory.append(self.total_assets)
         return self._get_observation(), reward, self.terminal, False, {}
