@@ -8,6 +8,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from typing_extensions import Annotated
 
 from trading.cli.alg.config import AlgConfig
+from trading.src.alg.agents.agents import Agent
 from trading.src.alg.backtest.backtesting import BackTesting
 from trading.src.alg.data_process.data_loader import DataLoader
 from trading.src.alg.environments.trading_environment import TradingEnv
@@ -41,22 +42,17 @@ def train(
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    train_env = TradingEnv(
+    trade_env = TradingEnv(
         data=data_loader.df,
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
     )
-    train_env.reset()
 
     rprint("[blue]Environment Initialized.[/blue]")
-    model = PPO(
-        "MlpPolicy",
-        DummyVecEnv([lambda: train_env]),
-        verbose=1,
-        tensorboard_log=alg_config.output_dir,
-    ).learn(10_000)
 
-    model.save(alg_config.save_path + alg_config.name + "_model")
+    model = Agent(alg_config.agent_config, trade_env)
+    model.learn()
+    model.save()
 
     if not no_test:
         backtest(config=config)
@@ -75,18 +71,18 @@ def backtest(
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    train_env = TradingEnv(
+    trade_env = TradingEnv(
         data=data_loader.get_train_test()[0],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
         backtest=True,
     )
-    train_env.reset()
+    trade_env.reset()
 
     rprint("[blue]Environment Initialized.[/blue]")
-    model = PPO.load(alg_config.save_path + alg_config.name + "_model", train_env)
+    model = Agent(alg_config.agent_config, trade_env).load()
 
-    bt = BackTesting(model=model, data=data_loader.get_train_test()[1], env=train_env)
+    bt = BackTesting(model=model, data=data_loader.get_train_test()[1], env=trade_env)
     bt.run()
     print(bt.stats())
     bt.plot()

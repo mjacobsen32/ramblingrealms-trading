@@ -98,6 +98,26 @@ class StockEnv(BaseModel):
     reward_scaling: float = Field(1e-4)
 
 
+class AgentConfig(BaseModel):
+    """
+    Configuration for the agent used in the algorithm.
+    """
+
+    algo: str = Field(
+        "ppo", description="Algorithm to use (e.g., 'ppo', 'a2c', 'dqn', etc.)"
+    )
+    save_path: str = Field(
+        "models/",
+        description="Path to save the trained agent model",
+    )
+    deterministic: bool = Field(
+        True, description="Whether to use deterministic actions during inference"
+    )
+    kwargs: Dict[str, Any] = Field(
+        default_factory=dict, description="Hyperparameters for the agent"
+    )
+
+
 class AlgConfig(BaseModel):
     """
     Configuration for the algorithm.
@@ -108,6 +128,9 @@ class AlgConfig(BaseModel):
     version: str = Field("1.0.0", description="Version of the algorithm")
     train_config: TrainConfig = Field(
         default_factory=TrainConfig, description="Training configuration"
+    )
+    agent_config: AgentConfig = Field(
+        default_factory=AgentConfig, description="Agent configuration"
     )
     data_config: DataConfig = Field(
         default_factory=DataConfig, description="Data configuration"
