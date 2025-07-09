@@ -23,14 +23,27 @@ class Agent:
 
         return AgentClass(env=env, **config.kwargs)
 
-    def __init__(self, config: AgentConfig, env: TradingEnv):
+    @classmethod
+    def load_agent(cls, config: AgentConfig, env: TradingEnv):
+        algo = config.algo.lower()
+        if algo not in AGENT_REGISTRY:
+            raise ValueError(f"Unsupported algorithm: {algo}")
+        AgentClass = AGENT_REGISTRY[algo]
+
+        return AgentClass.load(config.save_path, env=env)
+
+    def __init__(self, config: AgentConfig, env: TradingEnv, load: bool = False):
         """Initializes the agent with the given configuration and environment.
         Args:
             config (AgentConfig): Configuration for the agent.
             env (TradingEnv): The trading environment in which the agent will operate.
         """
         self.config = config
-        self.model = Agent.make_agent(config, env)
+        if load:
+            self.model = Agent.load_agent(config, env)
+        else:
+            self.model = Agent.make_agent(config, env)
+        self.env = env
 
     def learn(self, timesteps: Optional[int] = None):
         return self.model.learn(
@@ -43,8 +56,4 @@ class Agent:
 
     def save(self, path: Optional[str] = None):
         self.model.save(path if path else self.config.save_path)
-        return self.model
-
-    def load(self, path: Optional[str] = None):
-        self.model.load(path if path else self.config.save_path)
         return self.model

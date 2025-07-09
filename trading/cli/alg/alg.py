@@ -47,6 +47,7 @@ def train(
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
     )
+    trade_env.reset()
 
     rprint("[blue]Environment Initialized.[/blue]")
 
@@ -80,7 +81,7 @@ def backtest(
     trade_env.reset()
 
     rprint("[blue]Environment Initialized.[/blue]")
-    model = Agent(alg_config.agent_config, trade_env).load()
+    model = Agent(config=alg_config.agent_config, env=trade_env, load=True)
 
     bt = BackTesting(model=model, data=data_loader.get_train_test()[1], env=trade_env)
     bt.run()

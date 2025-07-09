@@ -18,7 +18,7 @@ class BackTesting:
         total_reward = 0
 
         while not terminated and not truncated:
-            action, _states = self.model.predict(obs, deterministic=True)
+            action, _states = self.model.predict(obs)
             obs, reward, terminated, truncated, info = self.env.step(action)
 
         close_df = self.env.data.pivot(index="timestamp", columns="tic", values="close")
