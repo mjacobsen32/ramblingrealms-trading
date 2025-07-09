@@ -128,10 +128,5 @@ class DataLoader:
         )
 
     def get_train_test(self):
-        X = self.df[self.features].values
-        y = self.df["signal"].values
-
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-
-        return train_test_split(X_scaled, y, test_size=0.2, shuffle=False)
+        split_idx = int(len(self.df) * (1 - self.data_config.validation_split))
+        return self.df.iloc[:split_idx], self.df.iloc[split_idx:]

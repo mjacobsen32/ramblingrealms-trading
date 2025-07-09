@@ -8,6 +8,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from typing_extensions import Annotated
 
 from trading.cli.alg.config import AlgConfig
+from trading.src.alg.backtest.backtesting import BackTesting
 from trading.src.alg.data_process.data_loader import DataLoader
 from trading.src.alg.environments.trading_environment import TradingEnv
 from trading.src.alg.trainers.train import Trainer
@@ -57,6 +58,9 @@ def train(
 
     model.save(alg_config.save_path + alg_config.name + "_model")
 
+    if not no_test:
+        backtest(config=config)
+
 
 @app.command(help="Run backtesting on the trained model.")
 def backtest(
@@ -72,30 +76,17 @@ def backtest(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
     train_env = TradingEnv(
-        data=data_loader.df,
+        data=data_loader.get_train_test()[0],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
+        backtest=True,
     )
     train_env.reset()
 
     rprint("[blue]Environment Initialized.[/blue]")
-    obs, _ = train_env.reset()
-    done = False
-    total_reward = 0
+    model = PPO.load(alg_config.save_path + alg_config.name + "_model", train_env)
 
-    model = PPO.load(alg_config.save_path + alg_config.name + "_model.zip", train_env)
-
-    while not done:
-        action, _states = model.predict(obs)
-        obs, reward, done, truncated, info = train_env.step(action)
-        total_reward += reward
-
-    print(f"Final Portfolio Value: {train_env.total_assets:.2f}")
-    import matplotlib.pyplot as plt
-
-    plt.plot(train_env.asset_memory)
-    plt.title("Portfolio Value Over Time")
-    plt.xlabel("Step")
-    plt.ylabel("Value")
-    plt.grid(True)
-    plt.savefig(alg_config.output_dir + "/portfolio_value.png")
+    bt = BackTesting(model=model, data=data_loader.get_train_test()[1], env=train_env)
+    bt.run()
+    print(bt.stats())
+    bt.plot()

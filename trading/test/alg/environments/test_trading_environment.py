@@ -4,9 +4,16 @@ import numpy as np
 import pytest
 
 import trading.src.alg.agents
+from trading.cli.alg.alg import backtest
 from trading.cli.alg.config import AlgConfig
 from trading.src.alg.data_process.data_loader import DataLoader
 from trading.src.alg.environments.trading_environment import TradingEnv
+
+
+def test_backtesting():
+    backtest(
+        "/home/matthew-jacobsen/dev/ramblingrealms-trading/trading/configs/generic_alg.json"
+    )
 
 
 def test_env():
