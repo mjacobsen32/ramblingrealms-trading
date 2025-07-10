@@ -42,7 +42,6 @@ dependencies = [
     "pandas-market-calendars (>=5.1.0,<6.0.0)",
     "gymnasium (>=1.2.0,<2.0.0)",
     "stable-baselines3 (>=2.6.0,<3.0.0)",
-    "transformers (>=4.53.1,<5.0.0)",
     "tqdm (>=4.67.1,<5.0.0)",
     "nbformat (>=5.10.4,<6.0.0)",
 
