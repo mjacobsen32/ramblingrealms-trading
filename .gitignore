@@ -15,12 +15,16 @@ trading/cli/configuration/prod.yml
 
 # logs
 logs
+
 # docs
 docs/_build
 docs/build
 
 # trained models
 models
+
+# test
+.coverage
 
 # test data
 !trading/test/data/TEST_APPLE.parquet
