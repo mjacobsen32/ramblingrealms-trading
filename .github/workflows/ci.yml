@@ -47,6 +47,4 @@ jobs:
           poetry install
 
       - name: Run test suite
-        run: |
-          # Update this once your test suite is ready
-          echo "No tests yet!" && exit 0
+        run: pytest --cov --cov-fail-under=90
