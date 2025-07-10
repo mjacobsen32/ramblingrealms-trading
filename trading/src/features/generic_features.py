@@ -24,12 +24,20 @@ class FeatureType(str, Enum):
 
 
 class FillStrategy(str, Enum):
+    """
+    Enum for fill strategies used in Feature cleaning.
+    """
+
     INTERPOLATE = "interpolate"
     ZERO = "zero"
     DROP = "drop"
 
 
 class OperationType(str, Enum):
+    """
+    Enum for rolling operations.
+    """
+
     MEAN = "mean"
     STD = "std"
 
@@ -45,6 +53,7 @@ class OperationType(str, Enum):
         Returns:
             pd.Series: Result of the rolling operation.
         """
+
         if not hasattr(df[column].rolling(window=window), self.value):
             raise ValueError(f"{self.value} is not a valid rolling method")
         return getattr(df[column].rolling(window=window), self.value)()
@@ -53,6 +62,14 @@ class OperationType(str, Enum):
 class Feature(BaseModel):
     """
     Represents a single feature with its name and value.
+    This is an abstract base class for all features.
+    Subclasses should implement the `to_df` method to convert feature data into a DataFrame.
+    It also provides methods for cleaning columns, getting feature names, and a factory method
+    to create instances based on a dictionary input.
+    The `Feature` class is not meant to be instantiated directly; instead, it serves as a base class
+    for specific feature implementations like `Candle`, `MovingWindow`, `RSI`, etc.
+    Subclasses must define the `TYPE` class variable to specify their feature type.
+    Subclasses can also define additional fields specific to their feature type.
     """
 
     type: FeatureType
@@ -65,6 +82,15 @@ class Feature(BaseModel):
     _registry: ClassVar[Dict[FeatureType, Type["Feature"]]] = {}
 
     def clean_columns(self, cols: List[str], df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Clean the DataFrame by filling NaN values in specified columns with given strategy.
+        Args:
+            cols (List[str]): List of column names to clean.
+            df (pd.DataFrame): DataFrame to clean.
+        Returns:
+            pd.DataFrame: Cleaned DataFrame with NaN values handled according to the fill strategy.
+        """
+
         if self.fill_strategy is FillStrategy.DROP:
             df.dropna(axis=0, inplace=True, subset=cols)
             return df
@@ -87,9 +113,23 @@ class Feature(BaseModel):
         return df
 
     def get_feature_names(self) -> List[str]:
+        """
+        Get the names of the features provided by this instance.
+        Returns:
+            List[str]: List of feature names.
+        """
         return [self.name]
 
     def __init__(self, **data):
+        """
+        Initialize the Feature instance.
+        Args:
+            **data: Keyword arguments to initialize the feature.
+        Raises:
+            TypeError: If the Feature class is instantiated directly.
+        Raises:
+            TypeError: If the Feature class is instantiated directly.
+        """
         if type(self) is Feature:
             raise TypeError(
                 "Feature is an abstract base class and cannot be instantiated directly."
@@ -97,11 +137,26 @@ class Feature(BaseModel):
         super().__init__(**data)
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        """
+        Convert the feature data to a DataFrame.
+        Args:
+            df (pd.DataFrame): DataFrame to which the feature will be added.
+            data (Any): Data to convert into a DataFrame.
+        Returns:
+            pd.DataFrame: DataFrame with the feature data added.
+        Raises:
+            NotImplementedError: If the method is not implemented in the subclass.
+        """
+
         raise TypeError(
             "Feature is an abstract base class and cannot be instantiated directly."
         )
 
     def __init_subclass__(cls, **kwargs):
+        """
+        Register subclasses of Feature in the _registry dictionary.
+        """
+
         super().__init_subclass__(**kwargs)
         type_val = getattr(cls, "TYPE", None)
         if type_val is not None:
@@ -109,6 +164,16 @@ class Feature(BaseModel):
 
     @classmethod
     def factory(cls, data: dict) -> "Feature":
+        """
+        Factory method to create a Feature instance from a dictionary.
+        Args:
+            data (dict): Dictionary containing feature data, must include 'type'.
+        Returns:
+            Feature: An instance of a subclass of Feature based on the 'type' field.
+        Raises:
+            ValueError: If 'type' is missing or if the type is unknown.
+        """
+
         feature_type = data.get("type")
         if not feature_type:
             raise ValueError("Missing 'type' field in feature data")

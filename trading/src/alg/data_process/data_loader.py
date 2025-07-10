@@ -20,6 +20,12 @@ from trading.src.user_cache import user_cache
 
 
 class DataSource:
+    """
+    Base class for all data sources in the Rambling Realms trading system.
+    This class provides a common interface for fetching and processing data from various sources.
+    Subclasses should implement the `get_data` method to fetch data from their respective sources.
+    """
+
     def __init__(self, **kwargs):
         pass
 
@@ -45,6 +51,12 @@ class DataSource:
 
     @classmethod
     def factory(cls, data: dict) -> "DataSource":
+        """
+        Factory method to create an instance of a DataSource subclass based on the provided data.
+        The data dictionary must contain a 'source' key that matches one of the DataSourceType enum values.
+        Raises ValueError if the 'source' key is missing or if the type is
+        """
+
         datasource_type = data.get("source")
         if not datasource_type:
             raise ValueError("Missing 'type' field in feature data")
@@ -67,6 +79,10 @@ class AlpacaDataLoader(DataSource):
         end_date: str,
         time_step: TimeFrameUnit = TimeFrameUnit.Day,
     ) -> pd.DataFrame:
+        """
+        Fetches data from Alpaca and caches it locally.
+        """
+
         cache_file = os.path.join(
             cache_path,
             request.dataset_name + ".parquet",
@@ -93,6 +109,12 @@ class AlpacaDataLoader(DataSource):
 
 
 class DataLoader:
+    """
+    DataLoader class for loading and processing data from various sources.
+    It initializes with a DataConfig and FeatureConfig, fetches data from the specified sources,
+    and applies the specified features to the data.
+    """
+
     def __init__(self, data_config: DataConfig, feature_config: FeatureConfig):
         self.data_config = data_config
         self.feature_config = feature_config
@@ -128,5 +150,9 @@ class DataLoader:
         )
 
     def get_train_test(self):
+        """
+        Splits the DataFrame into training and validation sets based on the validation split ratio.
+        """
+
         split_idx = int(len(self.df) * (1 - self.data_config.validation_split))
         return self.df.iloc[:split_idx], self.df.iloc[split_idx:]

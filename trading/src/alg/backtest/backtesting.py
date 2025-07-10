@@ -3,7 +3,9 @@ import vectorbt as vbt
 
 
 class BackTesting:
-    """Backtesting class for trading strategies using vectorbt."""
+    """
+    Backtesting class for trading strategies using vectorbt.
+    """
 
     def __init__(self, model, data, env):
         self.model = model
@@ -12,7 +14,9 @@ class BackTesting:
         self.records = []
 
     def run(self):
-        """Run the backtest using the provided model and environment."""
+        """
+        Run the backtest using the provided model and environment.
+        """
         obs, _ = self.env.reset()
         terminated, truncated = False, False
         total_reward = 0
@@ -29,10 +33,14 @@ class BackTesting:
         )
 
     def plot(self):
-        """Plot the results of the backtest."""
+        """
+        Plot the results of the backtest.
+        """
         for c in self.data.tic.unique():
             self.pf[c].plot().show()
 
     def stats(self):
-        """Return the statistics of the backtest."""
+        """
+        Return the statistics of the backtest.
+        """
         return self.pf.stats()

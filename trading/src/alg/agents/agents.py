@@ -16,6 +16,9 @@ class Agent:
 
     @classmethod
     def make_agent(cls, config: AgentConfig, env: TradingEnv):
+        """
+        Creates an agent based on the provided configuration and environment.
+        """
         algo = config.algo.lower()
         if algo not in AGENT_REGISTRY:
             raise ValueError(f"Unsupported algorithm: {algo}")
@@ -25,6 +28,10 @@ class Agent:
 
     @classmethod
     def load_agent(cls, config: AgentConfig, env: TradingEnv):
+        """
+        Loads an agent from a saved model file.
+        """
+
         algo = config.algo.lower()
         if algo not in AGENT_REGISTRY:
             raise ValueError(f"Unsupported algorithm: {algo}")
@@ -33,10 +40,12 @@ class Agent:
         return AgentClass.load(config.save_path, env=env)
 
     def __init__(self, config: AgentConfig, env: TradingEnv, load: bool = False):
-        """Initializes the agent with the given configuration and environment.
+        """
+        Initializes the agent with the given configuration and environment.
         Args:
             config (AgentConfig): Configuration for the agent.
             env (TradingEnv): The trading environment in which the agent will operate.
+            load (bool): Whether to load an existing agent or create a new one.
         """
         self.config = config
         if load:

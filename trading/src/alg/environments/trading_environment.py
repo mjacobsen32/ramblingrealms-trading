@@ -11,6 +11,10 @@ from trading.src.features.generic_features import Feature
 
 
 class TradingEnv(gym.Env):
+    """
+    Trading environment for reinforcement learning agents.
+    """
+
     def __init__(
         self,
         data: pd.DataFrame,
@@ -72,8 +76,11 @@ class TradingEnv(gym.Env):
         self.terminal = False
         self.total_assets = self.initial_cash
 
-    def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
-        super().reset(seed=seed)
+    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+        """
+        Reset the environment to its initial state.
+        """
+        super().reset(seed=seed, options=options)
         self._reset_internal_states()
         return self._get_observation(), {}
 
@@ -160,7 +167,19 @@ class TradingEnv(gym.Env):
 
         return reward + np.mean(normalized_profits)
 
-    def step(self, actions):
+    def step(self, action):
+        """
+        Execute one time step within the environment.
+        Args:
+            action: The action to be taken by the agent, which is a vector of size equal to the number of stocks.
+        Returns:
+            observation: The new state of the environment after taking the action.
+            reward: The reward received after taking the action.
+            done: A boolean indicating whether the episode has ended.
+            truncated: A boolean indicating whether the episode was truncated.
+            info: Additional information about the environment.
+        """
+
         if self.terminal:
             return self._get_observation(), 0, self.terminal, False, {}
 
@@ -170,26 +189,26 @@ class TradingEnv(gym.Env):
 
         # Apply actions only to available tickers
         trade_limit = self.trade_limit_pct * self.total_assets
-        scaled_actions = actions * trade_limit
+        scaled_actions = action * trade_limit
         scaled_actions = np.clip(scaled_actions, -self.hmax, self.hmax)
         for i, symbol in enumerate(self.unique_symbols):
             price = prices[i]
-            action = scaled_actions[i]
+            act = scaled_actions[i]
             dt_shares = 0
 
             if np.isnan(price):  # Ticker not available on this day
                 continue
 
-            if action < 0:  # Sell
-                dt_shares = min(abs(action) // price, self.stock_owned[i])
+            if act < 0:  # Sell
+                dt_shares = min(abs(act) // price, self.stock_owned[i])
                 proceeds = dt_shares * price
                 cost = proceeds * self.sell_cost[i]
                 self.cash += proceeds - cost
                 self.stock_owned[i] -= dt_shares
                 dt_shares = -dt_shares  # Negative for selling
 
-            elif action > 0:  # Buy
-                dt_shares = action // price
+            elif act > 0:  # Buy
+                dt_shares = act // price
                 cost = dt_shares * price
                 fee = cost * self.buy_cost[i]
                 self.position_queues[symbol].append((dt_shares, price, fee))
