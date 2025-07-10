@@ -56,7 +56,7 @@ jobs:
             poetry run coverage report
 
       - name: Commit coverage badge
-        if: github.ref == 'refs/heads/update_docs'
+        if: github.ref_name == 'update_docs'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
