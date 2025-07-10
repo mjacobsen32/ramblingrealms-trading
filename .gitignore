@@ -26,6 +26,7 @@ models
 # test
 .coverage
 coverage_html_report
+reports
 
 # test data
 !trading/test/data/TEST_APPLE.parquet
