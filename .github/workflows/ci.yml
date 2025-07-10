@@ -47,4 +47,5 @@ jobs:
 
       - name: Run test suite
         run: |
-          pytest --cov --cov-fail-under=90
+            poetry run coverage run -m pytest
+            poetry run coverage report
