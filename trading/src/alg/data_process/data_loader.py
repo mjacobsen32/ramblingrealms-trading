@@ -39,7 +39,9 @@ class DataSource:
         cache_path: str,
         start_date: str,
         end_date: str,
-        time_step: TimeFrameUnit = TimeFrameUnit.Day,
+        time_step_unit: TimeFrameUnit = TimeFrameUnit("Day"),
+        cache_enabled: bool = True,
+        time_step_period: int = 1,
     ) -> pd.DataFrame:
         return pd.DataFrame()
 
@@ -77,7 +79,9 @@ class AlpacaDataLoader(DataSource):
         cache_path: str,
         start_date: str,
         end_date: str,
-        time_step: TimeFrameUnit = TimeFrameUnit.Day,
+        time_step_unit: str = TimeFrameUnit.Day,
+        cache_enabled: bool = True,
+        time_step_period: int = 1,
     ) -> pd.DataFrame:
         """
         Fetches data from Alpaca and caches it locally.
@@ -88,7 +92,7 @@ class AlpacaDataLoader(DataSource):
             request.dataset_name + ".parquet",
         )
         user = user_cache.UserCache().load()
-        if os.path.exists(cache_file):
+        if os.path.exists(cache_file) and cache_enabled:
             rprint("Loading data from cache...")
             df = pd.concat([pd.read_parquet(cache_file), df])
         else:
@@ -98,13 +102,14 @@ class AlpacaDataLoader(DataSource):
                 user.alpaca_api_secret.get_secret_value(),
             )
             request_params = StockBarsRequest(
-                timeframe=TimeFrame(1, time_step),
+                timeframe=TimeFrame(time_step_period, time_step_unit),
                 start=pd.to_datetime(start_date),
                 end=pd.to_datetime(end_date),
                 **request.kwargs,
             )
             df = pd.concat([df, client.get_stock_bars(request_params).df])
-            df.to_parquet(cache_file)
+            if cache_enabled:
+                df.to_parquet(cache_file)
         return df
 
 
@@ -130,7 +135,9 @@ class DataLoader:
                 data_config.cache_path,
                 data_config.start_date,
                 data_config.end_date,
-                data_config.time_step,
+                TimeFrameUnit(data_config.time_step_unit),
+                data_config.cache_enabled,
+                data_config.time_step_period,
             )
             for feature in [
                 f

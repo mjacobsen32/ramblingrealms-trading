@@ -26,14 +26,15 @@
     "data_config": {
         "start_date": "1995-06-05",
         "end_date": "2025-06-05",
-        "time_step": "Day",
+        "time_step_unit": "Day",
+        "time_step_period": 1,
         "cache_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/data",
+        "cache_enabled": true,
         "requests": [
             {
                 "dataset_name": "AAPL_30_years",
                 "source": "alpaca",
                 "endpoint": "StockBarsRequest",
-                "cache_enabled": true,
                 "kwargs": {
                     "symbol_or_symbols": ["AAPL"],
                     "adjustment": "split"

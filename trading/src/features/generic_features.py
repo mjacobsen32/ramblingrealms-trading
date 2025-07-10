@@ -201,7 +201,7 @@ class Candle(Feature):
     low: float = Field(default=0.0, description="Low price of the candle")
     close: float = Field(default=0.0, description="Close price of the candle")
     volume: float = Field(default=0.0, description="Volume of the candle")
-    period: TimeFrameUnit = Field(
+    period: str = Field(
         TimeFrameUnit.Day, description="Time period of the candle (e.g., '1d', '1h')"
     )
 

@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Any, Dict, List, Union
 
 from alpaca.data.timeframe import TimeFrameUnit
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from trading.src.features.generic_features import Feature
 
@@ -20,13 +20,14 @@ class FeatureConfig(BaseModel):
     @classmethod
     def parse_features(cls, data: Any):
         features_data = data.get("features", [])
-        data["features"] = [Feature.factory(f) for f in features_data]
+        data["features"] = [
+            Feature.factory(f) if isinstance(f, dict) else f for f in features_data
+        ]
         return data
 
     features: List[Feature] = Field(
         default_factory=List[Feature], description="List of feature names"
     )
-    normalization: bool = Field(True, description="Whether to normalize features")
     missing_value_strategy: str = Field(
         "mean",
         description="Strategy for handling missing values (e.g., 'mean', 'median', 'drop')",
@@ -41,9 +42,6 @@ class DataRequests(BaseModel):
     dataset_name: str = Field("Generic", description="Name of the dataset")
     source: DataSourceType = Field(..., description="DataSourceType Enum")
     endpoint: str = Field(..., description="Endpoint of API")
-    cache_enabled: bool = Field(
-        True, description="Whether to cache the downloaded data"
-    )
     kwargs: Dict = Field(..., description="Kwargs to pass in to the endpoint")
 
 
@@ -56,17 +54,34 @@ class DataConfig(BaseModel):
         "2020-01-01", description="Start date for the data collection"
     )
     end_date: str = Field("2023-01-01", description="End date for the data collection")
-    time_step: TimeFrameUnit = Field(
-        TimeFrameUnit.Day, description="Time step of the data"
+    time_step_unit: str = Field(TimeFrameUnit.Day, description="Time step of the data")
+    time_step_period: int = Field(
+        1, description="Period of the time step (e.g., 1 for daily, 5 for 5-minute)"
     )
     cache_path: str = Field(
         "cache/",
         description="Path to cache the downloaded data",
     )
+    cache_enabled: bool = Field(
+        True, description="Whether to cache the downloaded data"
+    )
     requests: List[DataRequests] = Field(..., description="List of data requests")
     validation_split: float = Field(
         0.2, description="Fraction of data to use for validation"
     )
+
+    @field_validator("time_step_unit")
+    @classmethod
+    def validate_time_step_unit(cls, value: str) -> TimeFrameUnit:
+        """
+        Validate the time_step_unit field to ensure it is a valid TimeFrameUnit.
+        """
+        try:
+            return TimeFrameUnit(value)
+        except ValueError:
+            raise ValueError(
+                f"Invalid time step: {value}. Must be a valid TimeFrameUnit: {', '.join([unit.value for unit in TimeFrameUnit])}"
+            )
 
 
 class TrainConfig(BaseModel):

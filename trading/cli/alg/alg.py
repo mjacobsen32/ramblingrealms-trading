@@ -2,9 +2,6 @@ from pathlib import Path
 
 import typer
 from rich import print as rprint
-from stable_baselines3 import PPO
-from stable_baselines3.common.base_class import BaseAlgorithm
-from stable_baselines3.common.vec_env import DummyVecEnv
 from typing_extensions import Annotated
 
 from trading.cli.alg.config import AlgConfig
@@ -12,8 +9,6 @@ from trading.src.alg.agents.agents import Agent
 from trading.src.alg.backtest.backtesting import BackTesting
 from trading.src.alg.data_process.data_loader import DataLoader
 from trading.src.alg.environments.trading_environment import TradingEnv
-from trading.src.alg.trainers.train import Trainer
-from trading.src.user_cache.user_cache import UserCache
 
 app = typer.Typer(
     name="alg", help="Algorithm training, testing, and evaluation commands."
