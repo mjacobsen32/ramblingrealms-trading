@@ -44,9 +44,9 @@ jobs:
           python-version: '3.12'
       
       - name: Test
-        if: github.ref_name == 'update_docs'
         run: |
-          echo "HELLO WORLD"
+          echo "github.ref: ${{ github.ref }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
       - name: Test2
         if: github.ref_name == 'main'
         run: |
