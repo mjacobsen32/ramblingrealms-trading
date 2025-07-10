@@ -2,7 +2,8 @@ import pyetrade
 import typer
 from pydantic import SecretStr
 from rich import print as rprint
-from src.user_cache.user_cache import UserCache as user
+
+from trading.src.user_cache.user_cache import UserCache as user
 
 app = typer.Typer(name="etrade", help="E-Trade API commands")
 

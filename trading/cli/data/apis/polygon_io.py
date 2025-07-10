@@ -6,8 +6,9 @@ import typer
 from polygon import RESTClient
 from polygon.rest.models import Agg
 from rich import print as print
-from src.user_cache.user_cache import UserCache as user
 from typing_extensions import Annotated
+
+from trading.src.user_cache.user_cache import UserCache as user
 
 app = typer.Typer(name="polygon_io", help="Trading CLI commands")
 

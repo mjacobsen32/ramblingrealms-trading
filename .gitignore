@@ -1,5 +1,5 @@
 # data
-data
+./data
 
 # builds
 dist
@@ -7,9 +7,28 @@ dist
 # cache files
 **/__pycache__
 **/*.parquet
+
 # user-specific files
 .project
 .vscode
 trading/cli/configuration/prod.yml
+
+# logs
+logs
+
 # docs
 docs/_build
+docs/build
+
+# trained models
+models
+
+# test
+.coverage
+coverage_html_report
+
+# test data
+!trading/test/data/TEST_APPLE.parquet
+!trading/test/data/TEST_MULTI_TICKERS.parquet
+!trading/test/data/TEST_TIME_STEP.parquet
+!trading/test/data/TEST_SET.parquet

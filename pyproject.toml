@@ -34,11 +34,16 @@ dependencies = [
     "polygon-api-client (>=1.14.5,<2.0.0)",
     "pydantic (>=2.11.4,<3.0.0)",
     "fastparquet (>=2024.11.0,<2025.0.0)",
-    "alpaca-py (>=0.40.1,<0.41.0)",
+    "alpaca-py (>=0.37,<0.41.0)",
     "torch (>=2.7.0,<3.0.0)",
-    "transformers (>=4.52.4,<5.0.0)",
     "scikit-learn (>=1.6.1,<2.0.0)",
     "matplotlib (>=3.10.3,<4.0.0)",
+    "vectorbt (>=0.27.3,<0.28.0)",
+    "pandas-market-calendars (>=5.1.0,<6.0.0)",
+    "gymnasium (>=1.2.0,<2.0.0)",
+    "stable-baselines3 (>=2.6.0,<3.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "nbformat (>=5.10.4,<6.0.0)",
 
 ]
 [project.urls]
@@ -56,6 +61,8 @@ mypy = "^1.16.0"
 pytest = "^8.4.0"
 coverage = "^7.8.2"
 pre-commit = "^4.2.0"
+tensorboard = "^2.19.0"
+pytest-cov = "^6.2.1"
 
 
 [tool.poetry.group.docs.dependencies]
@@ -78,8 +85,46 @@ packages = [
 line-length = 88
 target-version = ["py312"]
 
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
 [tool.mypy]
 ignore_missing_imports = true
 
 [tool.poetry.requires-plugins]
 poetry-plugin-export = ">=1.8"
+
+[tool.coverage.run]
+branch = true
+omit = ["**/tests/**", "**/test/**", "**/user_cache/**"]
+source = [
+    "trading",
+]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 90
+# Regexes for lines to exclude from consideration
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "raise ValueError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+    ]
+
+ignore_errors = true
+
+[tool.coverage.html]
+directory = "coverage_html_report"

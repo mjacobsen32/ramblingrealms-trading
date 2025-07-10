@@ -1,17 +1,20 @@
 from pathlib import Path
 
 import typer
-from cli.data import data
-from cli.etrade import etrade
 from pydantic import SecretStr
 from rich import print
 from rich.prompt import Prompt
-from src.user_cache.user_cache import UserCache as User
-from src.utility.utils import read_key
+
+from trading.cli.alg import alg
+from trading.cli.data import data
+from trading.cli.etrade import etrade
+from trading.src.user_cache.user_cache import UserCache as User
+from trading.src.utility.utils import read_key
 
 app = typer.Typer(name="rr_trading", help="rr_trading CLI commands")
 app.add_typer(etrade.app, name="etrade", help="E-Trade API commands")
 app.add_typer(data.app, name="data", help="Data CLI commands")
+app.add_typer(alg.app, name="alg", help="Algorithmic commands")
 
 
 @app.command(help="Print the current user configuration")
@@ -46,7 +49,7 @@ def setup():
         )
         if etrade_authenticate.lower() == "y":
             # E-Trade authentication
-            from cli.etrade.etrade import authenticate
+            from trading.cli.etrade.etrade import authenticate
 
             authenticate(False)
     etrade = Prompt.ask("Do you want to set up E-Trade Sandbox?", default="n")
@@ -65,7 +68,7 @@ def setup():
         )
         if etrade_authenticate.lower() == "y":
             # E-Trade authentication
-            from cli.etrade.etrade import authenticate
+            from trading.cli.etrade.etrade import authenticate
 
             authenticate(True)
     polygon = Prompt.ask("Do you want to set up Polygon?", default="n")
@@ -83,3 +86,7 @@ def setup():
         user.alpaca_api_secret = SecretStr(
             read_key(Prompt.ask("Enter your Alpaca API secret path"))
         )
+
+
+if __name__ == "__main__":
+    app()
