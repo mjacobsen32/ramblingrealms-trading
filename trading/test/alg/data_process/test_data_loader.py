@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 import trading.src.alg.data_process.data_loader
+from trading.cli.alg.config import ProjectPath
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def data_config(single_apple_ticker_request):
         start_date="2023-01-01",
         end_date="2023-12-31",
         time_step_unit=TimeFrameUnit.Day,
-        cache_path="/home/matthew-jacobsen/dev/ramblingrealms-trading/trading/test/data/",
+        cache_path="{PROJECT_ROOT}/trading/test/data/",
         requests=[single_apple_ticker_request],
         validation_split=0.2,
         cache_enabled=True,

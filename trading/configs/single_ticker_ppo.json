@@ -1,11 +1,11 @@
 {
     "name": "ppo",
     "description": "A generic ppo trading algorithm configuration.",
-    "save_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/models/",
     "version": "1.0",
+    "log_dir": "{PROJECT_ROOT}/logs/",
     "agent_config": {
         "algo": "ppo",
-        "save_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/models/ppo",
+        "save_path": "{PROJECT_ROOT}/models/ppo",
             "kwargs": {
                 "policy": "MlpPolicy",
                 "learning_rate": 0.0003,
@@ -28,7 +28,7 @@
         "end_date": "2025-06-05",
         "time_step_unit": "Day",
         "time_step_period": 1,
-        "cache_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/data",
+        "cache_path": "{PROJECT_ROOT}/data",
         "cache_enabled": true,
         "requests": [
             {
@@ -43,7 +43,6 @@
         ]
     },
     "feature_config": {
-        "cache_path": "/home/matthew-jacobsen/dev/ramblingrealms-trading/data",
         "features": [
             {
                 "type": "candle",

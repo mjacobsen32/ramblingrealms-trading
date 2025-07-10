@@ -14,6 +14,21 @@ class Agent:
     This class provides a common interface and basic functionality for all agents.
     """
 
+    def __init__(self, config: AgentConfig, env: TradingEnv, load: bool = False):
+        """
+        Initializes the agent with the given configuration and environment.
+        Args:
+            config (AgentConfig): Configuration for the agent.
+            env (TradingEnv): The trading environment in which the agent will operate.
+            load (bool): Whether to load an existing agent or create a new one.
+        """
+        self.config = config
+        if load:
+            self.model = Agent.load_agent(config, env)
+        else:
+            self.model = Agent.make_agent(config, env)
+        self.env = env
+
     @classmethod
     def make_agent(cls, config: AgentConfig, env: TradingEnv):
         """
@@ -38,21 +53,6 @@ class Agent:
         AgentClass = AGENT_REGISTRY[algo]
 
         return AgentClass.load(config.save_path, env=env)
-
-    def __init__(self, config: AgentConfig, env: TradingEnv, load: bool = False):
-        """
-        Initializes the agent with the given configuration and environment.
-        Args:
-            config (AgentConfig): Configuration for the agent.
-            env (TradingEnv): The trading environment in which the agent will operate.
-            load (bool): Whether to load an existing agent or create a new one.
-        """
-        self.config = config
-        if load:
-            self.model = Agent.load_agent(config, env)
-        else:
-            self.model = Agent.make_agent(config, env)
-        self.env = env
 
     def learn(self, timesteps: Optional[int] = None):
         return self.model.learn(

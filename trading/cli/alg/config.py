@@ -1,10 +1,34 @@
 from enum import Enum
-from typing import Any, Dict, List, Union
+from pathlib import Path
+from typing import Any, ClassVar, Dict, List, Self, Union
 
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from trading.src.features.generic_features import Feature
+
+
+class ProjectPath(BaseModel):
+    PROJECT_ROOT: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
+    path: str = Field(str(), description="Path to the project root")
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_path(cls, data):
+        # Accept both dict and str
+        if isinstance(data, dict):
+            value = data.get("path", "")
+        else:
+            value = str(data)
+        if "{PROJECT_ROOT}" in value:
+            value = value.replace("{PROJECT_ROOT}", str(cls.PROJECT_ROOT))
+        return {"path": value}
+
+    def __str__(self) -> str:
+        return self.path
+
+    def as_path(self) -> Path:
+        return Path(self.path)
 
 
 class DataSourceType(str, Enum):
@@ -58,8 +82,8 @@ class DataConfig(BaseModel):
     time_step_period: int = Field(
         1, description="Period of the time step (e.g., 1 for daily, 5 for 5-minute)"
     )
-    cache_path: str = Field(
-        "cache/",
+    cache_path: ProjectPath = Field(
+        default_factory=ProjectPath,
         description="Path to cache the downloaded data",
     )
     cache_enabled: bool = Field(
@@ -121,8 +145,8 @@ class AgentConfig(BaseModel):
     algo: str = Field(
         "ppo", description="Algorithm to use (e.g., 'ppo', 'a2c', 'dqn', etc.)"
     )
-    save_path: str = Field(
-        "models/",
+    save_path: ProjectPath = Field(
+        default_factory=ProjectPath,
         description="Path to save the trained agent model",
     )
     deterministic: bool = Field(
@@ -153,11 +177,7 @@ class AlgConfig(BaseModel):
     feature_config: FeatureConfig = Field(
         default_factory=FeatureConfig, description="Feature configuration"
     )
-    save_path: str = Field(
-        "models/",
-        description="Path to save the trained model",
-    )
     stock_env: StockEnv = Field(
         default_factory=StockEnv, description="Stock Trading Environment Config"
     )
-    output_dir: str = Field("./logs")
+    log_dir: ProjectPath = Field(default_factory=ProjectPath)

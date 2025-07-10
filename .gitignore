@@ -22,6 +22,7 @@ docs/build
 # trained models
 models
 
+# test data
 !trading/test/data/TEST_APPLE.parquet
 !trading/test/data/TEST_MULTI_TICKERS.parquet
 !trading/test/data/TEST_TIME_STEP.parquet

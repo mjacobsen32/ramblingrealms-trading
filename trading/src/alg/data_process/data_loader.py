@@ -132,7 +132,7 @@ class DataLoader:
             data = DataSource.factory(request.model_dump()).get_data(
                 request,
                 self.df,
-                data_config.cache_path,
+                str(data_config.cache_path),
                 data_config.start_date,
                 data_config.end_date,
                 TimeFrameUnit(data_config.time_step_unit),
