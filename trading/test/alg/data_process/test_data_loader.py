@@ -4,69 +4,7 @@ import pytest
 
 import trading.src.alg.data_process.data_loader
 from trading.cli.alg.config import ProjectPath
-
-
-@pytest.fixture
-def single_apple_ticker_request():
-    from trading.cli.alg.config import DataRequests, DataSourceType
-
-    return DataRequests(
-        dataset_name="TEST_APPLE",
-        source=DataSourceType.ALPACA,
-        endpoint="StockBarRequest",
-        kwargs={"symbol_or_symbols": ["AAPL"], "adjustment": "split"},
-    )
-
-
-@pytest.fixture
-def data_config(single_apple_ticker_request):
-    from alpaca.data.timeframe import TimeFrameUnit
-
-    from trading.cli.alg.config import DataConfig
-
-    return DataConfig(
-        start_date="2023-01-01",
-        end_date="2023-12-31",
-        time_step_unit=TimeFrameUnit.Day,
-        cache_path="{PROJECT_ROOT}/trading/test/data/",
-        requests=[single_apple_ticker_request],
-        validation_split=0.2,
-        cache_enabled=True,
-        time_step_period=1,
-    )
-
-
-@pytest.fixture
-def feature_config():
-    from alpaca.data.timeframe import TimeFrameUnit
-
-    from trading.cli.alg.config import FeatureConfig
-    from trading.src.features.generic_features import (
-        Candle,
-        Feature,
-        FeatureType,
-        FillStrategy,
-    )
-
-    c = Candle(
-        type=FeatureType.CANDLE,
-        name="candle",
-        source="TEST_APPLE",
-        fill_strategy=FillStrategy.DROP,
-        enabled=True,
-        period=TimeFrameUnit.Day,
-    )
-    return FeatureConfig(
-        features=[c],
-        missing_value_strategy="mean",
-    )
-
-
-@pytest.fixture
-def data_loader(data_config, feature_config):
-    from trading.src.alg.data_process.data_loader import DataLoader
-
-    return DataLoader(data_config=data_config, feature_config=feature_config)
+from trading.test.alg.test_fixtures import *
 
 
 def test_data_loader(data_loader):

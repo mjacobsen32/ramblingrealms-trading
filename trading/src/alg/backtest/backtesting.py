@@ -13,13 +13,12 @@ class BackTesting:
         self.env = env
         self.records = []
 
-    def run(self):
+    def run(self) -> vbt.Portfolio:
         """
         Run the backtest using the provided model and environment.
         """
         obs, _ = self.env.reset()
         terminated, truncated = False, False
-        total_reward = 0
 
         while not terminated and not truncated:
             action, _states = self.model.predict(obs)
@@ -31,6 +30,7 @@ class BackTesting:
         self.pf = vbt.Portfolio.from_orders(
             close=close_df, size=size_df, init_cash=self.env.initial_cash
         )
+        return self.pf
 
     def plot(self):
         """

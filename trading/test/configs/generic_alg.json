@@ -3,20 +3,41 @@
     "description": "A generic ppo trading algorithm configuration.",
     "version": "1.0",
     "log_dir": "{PROJECT_ROOT}/logs/",
+    "agent_config": {
+        "algo": "ppo",
+        "save_path": "{PROJECT_ROOT}/trading/test/models/ppo",
+            "kwargs": {
+                "policy": "MlpPolicy",
+                "learning_rate": 0.0003,
+                "n_steps": 10000,
+                "batch_size": 64,
+                "n_epochs": 10,
+                "gamma": 0.99,
+                "gae_lambda": 0.95,
+                "ent_coef": 0.01,
+                "clip_range": 0.2,
+                "vf_coef": 0.5,
+                "max_grad_norm": 0.5,
+                "use_sde": false,
+                "sde_sample_freq": -1,
+                "device": "cpu"
+        }
+    },
     "data_config": {
-        "start_date": "2020-01-01",
+        "start_date": "2024-06-05",
         "end_date": "2025-06-05",
         "time_step_unit": "Day",
         "time_step_period": 1,
-        "cache_path": "{PROJECT_ROOT}/data",
+        "cache_path": "{PROJECT_ROOT}/trading/test/data",
         "cache_enabled": true,
         "requests": [
             {
-                "dataset_name": "SP10_daily_5_years",
+                "dataset_name": "TEST_SET",
                 "source": "alpaca",
                 "endpoint": "StockBarsRequest",
                 "kwargs": {
-                    "symbol_or_symbols": ["AAPL", "MSFT", "NVDA", "AMZN", "META", "NFLX", "TSLA", "AVGO", "WMT", "JPM"]
+                    "symbol_or_symbols": ["AAPL"],
+                    "adjustment": "split"
                 }
             }
         ]
@@ -26,46 +47,21 @@
             {
                 "type": "candle",
                 "name": "candle",
-                "source": "SP10_daily_5_years",
+                "source": "TEST_SET",
                 "enabled": true
             },
             {
                 "type": "moving_window",
-                "name": "ma100_close",
-                "source": "SP10_daily_5_years",
-                "enabled": true,
-                "field": "close",
-                "period": 100
-            },
-            {
-                "type": "moving_window",
                 "name": "ma50_close",
-                "source": "SP10_daily_5_years",
+                "source": "TEST_SET",
                 "enabled": true,
                 "field": "close",
                 "period": 50
             },
             {
-                "type": "moving_window",
-                "name": "ma100_volume",
-                "source": "SP10_daily_5_years",
-                "enabled": true,
-                "field": "volume",
-                "period": 100
-            },
-            {
-                "type": "moving_window",
-                "name": "volatility100",
-                "source": "SP10_daily_5_years",
-                "enabled": true,
-                "field": "close",
-                "period": 100,
-                "operation": "std"
-            },
-            {
                 "type": "macd",
                 "name": "macd_small",
-                "source": "SP10_daily_5_years",
+                "source": "TEST_SET",
                 "enabled": true,
                 "fast_period": 12,
                 "slow_period": 26,
@@ -75,35 +71,35 @@
             {
                 "type": "rsi",
                 "name": "rsi_15",
-                "source": "SP10_daily_5_years",
+                "source": "TEST_SET",
                 "period": 15,
                 "field": "close"
             },
             {
                 "type": "rsi",
                 "name": "rsi_60",
-                "source": "SP10_daily_5_years",
+                "source": "TEST_SET",
                 "period": 60,
                 "field": "close"
             },
             {
                 "type": "bollinger_bands",
                 "name": "bollinger_bands_20",
-                "source": "SP10_daily_5_years",
+                "source": "TEST_SET",
                 "period": 20,
                 "field": "close"
             },
             {
                 "type": "stochastic",
                 "name": "stochastic_20",
-                "source": "SP10_daily_5_years",
+                "source": "TEST_SET",
                 "period": 20
             },
             {
                 "type": "turbulence",
                 "name": "turbulence",
-                "source": "SP10_daily_5_years",
-                "lookback": 252
+                "source": "TEST_SET",
+                "lookback": 60
             }
         ]
     }

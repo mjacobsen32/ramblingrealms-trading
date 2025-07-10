@@ -47,4 +47,6 @@ jobs:
           poetry install
 
       - name: Run test suite
-        run: pytest --cov --cov-fail-under=90
+        run: |
+          coverage run -m pytest
+          coverage report

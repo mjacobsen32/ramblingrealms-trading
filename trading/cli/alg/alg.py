@@ -48,10 +48,15 @@ def train(
 
     model = Agent(alg_config.agent_config, trade_env)
     model.learn()
-    model.save()
+
+    if not dry_run:
+        model.save()
 
     if not no_test:
-        backtest(config=config)
+        bt = BackTesting(model, data_loader.get_train_test()[1], trade_env)
+        bt.run()
+        print(bt.stats())
+        bt.plot()
 
 
 @app.command(help="Run backtesting on the trained model.")

@@ -52,7 +52,7 @@ class Agent:
             raise ValueError(f"Unsupported algorithm: {algo}")
         AgentClass = AGENT_REGISTRY[algo]
 
-        return AgentClass.load(config.save_path, env=env)
+        return AgentClass.load(str(config.save_path), env=env)
 
     def learn(self, timesteps: Optional[int] = None):
         return self.model.learn(
@@ -64,5 +64,5 @@ class Agent:
         return self.model.predict(obs, self.config.deterministic)
 
     def save(self, path: Optional[str] = None):
-        self.model.save(path if path else self.config.save_path)
+        self.model.save(path if path else str(self.config.save_path))
         return self.model
