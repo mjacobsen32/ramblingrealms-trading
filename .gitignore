@@ -31,3 +31,4 @@ coverage_html_report
 !trading/test/data/TEST_APPLE.parquet
 !trading/test/data/TEST_MULTI_TICKERS.parquet
 !trading/test/data/TEST_TIME_STEP.parquet
+!trading/test/data/TEST_SET.parquet
