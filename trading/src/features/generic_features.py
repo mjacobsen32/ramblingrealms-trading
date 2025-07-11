@@ -414,34 +414,78 @@ class Stochastic(Feature):
 
 class Turbulence(Feature):
     """
-    Computes a 'turbulence index' indicating how unusual current returns are
-    compared to the recent historical return distribution.
+    Computes a market turbulence index using multiple return periods and proper covariance calculation.
+    This measures how unusual current market conditions are compared to historical patterns.
     """
 
     TYPE: ClassVar[FeatureType] = FeatureType("turbulence")
     lookback: int = Field(20, description="Lookback window for calculating turbulence")
     field: str = Field("close", description="Field to use for return computation")
+    return_periods: List[int] = Field(
+        [1, 5, 10], description="Return periods to use for multivariate analysis"
+    )
 
     def to_df(self, df: pd.DataFrame, data: Any = None) -> pd.DataFrame:
-        returns = df[self.field].pct_change().dropna()
-        turbulence_values = [np.nan] * self.lookback  # Start with NaNs
+        # Calculate returns for multiple periods
+        returns_matrix = []
+        for period in self.return_periods:
+            returns = df[self.field].pct_change(periods=period).dropna()
+            returns_matrix.append(returns)
 
-        for i in range(self.lookback, len(returns)):
-            window = returns[i - self.lookback : i]
-            current = returns.iloc[i]
+        # Align all return series to the same length
+        min_length = min(len(r) for r in returns_matrix)
+        returns_df = pd.DataFrame(
+            {
+                f"return_{period}d": r.iloc[-min_length:].values
+                for period, r in zip(self.return_periods, returns_matrix)
+            }
+        )
 
-            # Avoid degenerate case
-            if window.std() == 0 or len(window) < 2:
+        turbulence_values = []
+
+        for i in range(len(returns_df)):
+            if i < self.lookback:
+                turbulence_values.append(np.nan)
+                continue
+
+            # Historical window for covariance calculation
+            start_idx = max(0, i - self.lookback)
+            historical_returns = returns_df.iloc[start_idx:i]
+            current_returns = returns_df.iloc[i].values
+
+            # Skip if insufficient data
+            if len(historical_returns) < 3:
                 turbulence_values.append(0)
                 continue
 
-            mu = window.mean()
-            cov = window.std() ** 2
+            try:
+                # Calculate mean and covariance matrix
+                mean_returns = historical_returns.mean().values
+                cov_matrix = historical_returns.cov().values
 
-            # Mahalanobis distance with 1D standard deviation as denominator
-            dist = (current - mu) / np.sqrt(cov)
-            turbulence_values.append(dist**2)  # Squared distance
+                # Add small regularization to avoid singular matrix
+                cov_matrix += np.eye(len(cov_matrix)) * 1e-8
 
-        # Add to df
-        df[self.name] = [np.nan] + turbulence_values  # Align with df index
+                # Calculate Mahalanobis distance (turbulence index)
+                diff = np.array(current_returns) - np.array(mean_returns)
+                inv_cov = np.linalg.pinv(cov_matrix)  # Use pseudo-inverse for stability
+                turbulence = np.dot(np.dot(diff.T, inv_cov), diff)
+                turbulence_values.append(float(turbulence))
+
+            except (np.linalg.LinAlgError, ValueError):
+                # Fallback to simple standardized distance if matrix issues
+                mean_returns = np.array(historical_returns.mean().values)
+                std_returns = np.array(historical_returns.std().values)
+                std_returns = np.where(std_returns == 0, 1e-8, std_returns)
+                normalized_diff = (
+                    np.array(current_returns) - mean_returns
+                ) / std_returns
+                turbulence_values.append(float(np.sum(normalized_diff**2)))
+
+        # Align turbulence values with original dataframe
+        result_values = [np.nan] * (
+            len(df) - len(turbulence_values)
+        ) + turbulence_values
+        df[self.name] = result_values
+
         return self.clean_columns(self.get_feature_names(), df)

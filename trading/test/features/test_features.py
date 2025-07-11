@@ -236,3 +236,29 @@ def test_feature_stochastic(sin_wave_time_series, stochastic):
     assert "stochastic_d" in res.columns
     assert res["stochastic_k"].isnull().sum() == 0
     assert res["stochastic_d"].isnull().sum() == 0
+
+
+@pytest.fixture
+def turbulence():
+    return Turbulence(
+        type=FeatureType.TURBULENCE,
+        name="turbulence",
+        enabled=True,
+        source="test",
+        fill_strategy=FillStrategy.BACKWARD_FILL,
+        lookback=10,
+        field="close",
+    )
+
+
+def test_feature_turbulence(sin_wave_time_series, turbulence):
+    res = turbulence.to_df(sin_wave_time_series, None)
+    assert len(res) == 100
+    assert "turbulence" in res.columns
+    assert res["turbulence"].isnull().sum() == 0
+    assert (res["turbulence"] >= 0).all()  # Turbulence should be non-negative
+
+    assert res["turbulence"].std() > 0, "Turbulence should vary for sine wave"
+    assert (
+        res["turbulence"].max() < 100
+    ), "Turbulence shouldn't be extremely high for smooth sine wave"
