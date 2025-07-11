@@ -243,13 +243,12 @@ class ATR(Feature):
     field_close: str = Field("close", description="Field for close prices")
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        atr = vbt.ATR.run(
+        df[self.name] = vbt.ATR.run(
             high=df[self.field_high],
             low=df[self.field_low],
             close=df[self.field_close],
             window=self.period,
         ).atr
-        df[self.name] = atr
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -358,7 +357,7 @@ class MSTD(Feature):
             close=df[self.field],
             window=self.window,
             ewm=self.ewm,
-        )
+        ).mstd
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -375,7 +374,7 @@ class OBV(Feature):
         df[self.name] = vbt.OBV.run(
             close=df[self.field_close],
             volume=df[self.field_volume],
-        )
+        ).obv
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -394,6 +393,9 @@ class Stochastic(Feature):
     ewm: bool = Field(
         False, description="Use Exponential Weighted Moving Average for %K and %D"
     )
+
+    def get_feature_names(self) -> List[str]:
+        return [f"{self.name}_k", f"{self.name}_d", self.name]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         kd = vbt.STOCH.run(

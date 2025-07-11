@@ -5,14 +5,6 @@ from trading.src.features.generic_features import FillStrategy, OperationType
 
 
 @pytest.fixture
-def simple_time_series():
-    import pandas as pd
-
-    df = pd.DataFrame()
-    df["close"] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-
-
-@pytest.fixture
 def sin_wave_time_series():
     import matplotlib.pyplot as plt
     import pandas as pd
@@ -54,6 +46,7 @@ def moving_average():
 def test_feature_rolling_mean_drop(sin_wave_time_series, moving_average):
     res = moving_average.to_df(sin_wave_time_series, None)
     assert len(res) == 51
+    assert res["rolling_mean_50"].isnull().sum() == 0
 
 
 def test_feature_rolling_mean_backward_fill(sin_wave_time_series, moving_average):
@@ -61,6 +54,7 @@ def test_feature_rolling_mean_backward_fill(sin_wave_time_series, moving_average
     res = moving_average.to_df(sin_wave_time_series, None)
     assert (res["rolling_mean_50"][0:48] == res["rolling_mean_50"][49]).all()
     assert len(res) == 100
+    assert res["rolling_mean_50"].isnull().sum() == 0
 
 
 def test_feature_rolling_mean_zero(sin_wave_time_series, moving_average):
@@ -68,6 +62,7 @@ def test_feature_rolling_mean_zero(sin_wave_time_series, moving_average):
     res = moving_average.to_df(sin_wave_time_series, None)
     assert (res["rolling_mean_50"][0:48] == 0).all()
     assert len(res) == 100
+    assert res["rolling_mean_50"].isnull().sum() == 0
 
 
 def test_feature_rolling_mean_interpolate(sin_wave_time_series, moving_average):
@@ -76,6 +71,7 @@ def test_feature_rolling_mean_interpolate(sin_wave_time_series, moving_average):
     assert len(res) == 100
     assert res["rolling_mean_50"][0] == res["rolling_mean_50"][49]
     assert res["rolling_mean_50"][0] > res["rolling_mean_50"][50]
+    assert res["rolling_mean_50"].isnull().sum() == 0
 
 
 @pytest.fixture
@@ -94,6 +90,7 @@ def rsi():
 
 def test_feature_rsi(sin_wave_time_series, rsi):
     res = rsi.to_df(sin_wave_time_series, None)
+    assert res["rsi"].isnull().sum() == 0
     assert len(res) == 100
 
 
@@ -116,6 +113,7 @@ def test_feature_atr(sin_wave_time_series, atr):
     res = atr.to_df(sin_wave_time_series, None)
     assert len(res) == 100
     assert res["atr"][0] == res["atr"][13]
+    assert res["atr"].isnull().sum() == 0
 
 
 @pytest.fixture
@@ -139,6 +137,8 @@ def test_feature_bollinger_bands(sin_wave_time_series, bollinger_bands):
     assert "bollinger_bands_upper" in res.columns
     assert "bollinger_bands_lower" in res.columns
     assert (res["bollinger_bands_upper"] >= res["bollinger_bands_lower"]).all()
+    assert res["bollinger_bands_upper"].isnull().sum() == 0
+    assert res["bollinger_bands_lower"].isnull().sum() == 0
 
 
 @pytest.fixture
@@ -153,6 +153,8 @@ def macd():
         slow_period=26,
         signal_period=9,
         field="close",
+        ewm=False,
+        signal_ewm=False,
     )
 
 
@@ -165,6 +167,7 @@ def test_feature_macd(sin_wave_time_series, macd):
     assert (res["macd"] >= res["macd_signal"]).any() or (
         res["macd"] < res["macd_signal"]
     ).any()
+    assert res["macd"].isnull().sum() == 0
 
 
 @pytest.fixture
@@ -175,14 +178,16 @@ def mstd():
         enabled=True,
         source="test",
         fill_strategy=FillStrategy.BACKWARD_FILL,
-        period=20,
         field="close",
         ewm=False,
+        window=20,
     )
 
 
 def test_feature_mstd(sin_wave_time_series, mstd):
     res = mstd.to_df(sin_wave_time_series, None)
+    assert "mstd" in res.columns
+    assert res["mstd"].isnull().sum() == 0
     assert len(res) == 100
 
 
@@ -203,7 +208,7 @@ def test_feature_obv(sin_wave_time_series, obv):
     res = obv.to_df(sin_wave_time_series, None)
     assert len(res) == 100
     assert "obv" in res.columns
-    assert res["obv"].isnull().sum() == 0  # Ensure no NaN values in OBV
+    assert res["obv"].isnull().sum() == 0
 
 
 @pytest.fixture
@@ -229,3 +234,5 @@ def test_feature_stochastic(sin_wave_time_series, stochastic):
     assert len(res) == 100
     assert "stochastic_k" in res.columns
     assert "stochastic_d" in res.columns
+    assert res["stochastic_k"].isnull().sum() == 0
+    assert res["stochastic_d"].isnull().sum() == 0
