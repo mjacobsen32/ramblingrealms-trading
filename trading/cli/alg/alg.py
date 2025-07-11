@@ -4,7 +4,7 @@ import typer
 from rich import print as rprint
 from typing_extensions import Annotated
 
-from trading.cli.alg.config import AlgConfig
+from trading.cli.alg.config import RRConfig
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.backtest.backtesting import BackTesting
 from trading.src.alg.data_process.data_loader import DataLoader
@@ -33,7 +33,7 @@ def train(
     rprint("[blue]Starting training process...[/blue]")
     # Load configuration
     with Path.open(Path(config)) as f:
-        alg_config = AlgConfig.model_validate_json(f.read())
+        alg_config = RRConfig.model_validate_json(f.read())
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
@@ -68,7 +68,7 @@ def backtest(
     rprint("[blue]Starting backtesting process...[/blue]")
     # Load configuration
     with Path.open(Path(config)) as f:
-        alg_config = AlgConfig.model_validate_json(f.read())
+        alg_config = RRConfig.model_validate_json(f.read())
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )

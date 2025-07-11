@@ -1,0 +1,61 @@
+{
+    "features": [
+        {
+            "type": "candle",
+            "name": "candle",
+            "source": "TEST_SET",
+            "enabled": true
+        },
+        {
+            "type": "moving_window",
+            "name": "ma50_close",
+            "source": "TEST_SET",
+            "enabled": true,
+            "field": "close",
+            "period": 50
+        },
+        {
+            "type": "macd",
+            "name": "macd_small",
+            "source": "TEST_SET",
+            "enabled": true,
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+            "field": "close"
+        },
+        {
+            "type": "rsi",
+            "name": "rsi_15",
+            "source": "TEST_SET",
+            "period": 15,
+            "field": "close"
+        },
+        {
+            "type": "rsi",
+            "name": "rsi_60",
+            "source": "TEST_SET",
+            "period": 60,
+            "field": "close"
+        },
+        {
+            "type": "bollinger_bands",
+            "name": "bollinger_bands_20",
+            "source": "TEST_SET",
+            "period": 20,
+            "field": "close"
+        },
+        {
+            "type": "stochastic",
+            "name": "stochastic_20",
+            "source": "TEST_SET",
+            "period": 20
+        },
+        {
+            "type": "turbulence",
+            "name": "turbulence",
+            "source": "TEST_SET",
+            "lookback": 60
+        }
+    ]
+}

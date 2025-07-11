@@ -1,0 +1,19 @@
+{
+    "start_date": "2024-06-05",
+    "end_date": "2025-06-05",
+    "time_step_unit": "Day",
+    "time_step_period": 1,
+    "cache_path": "{PROJECT_ROOT}/trading/test/data",
+    "cache_enabled": true,
+    "requests": [
+        {
+            "dataset_name": "TEST_SET",
+            "source": "alpaca",
+            "endpoint": "StockBarsRequest",
+            "kwargs": {
+                "symbol_or_symbols": ["AAPL"],
+                "adjustment": "split"
+            }
+        }
+    ]
+}

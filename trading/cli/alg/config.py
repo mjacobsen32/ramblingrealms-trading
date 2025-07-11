@@ -1,9 +1,11 @@
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Self, Union
 
 from alpaca.data.timeframe import TimeFrameUnit
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic_core.core_schema import ValidationInfo
 
 from trading.src.features.generic_features import Feature
 
@@ -157,7 +159,7 @@ class AgentConfig(BaseModel):
     )
 
 
-class AlgConfig(BaseModel):
+class RRConfig(BaseModel):
     """
     Configuration for the algorithm.
     """
@@ -165,19 +167,52 @@ class AlgConfig(BaseModel):
     name: str = Field(..., description="Name of the algorithm")
     description: str = Field("", description="Description of the algorithm")
     version: str = Field("1.0.0", description="Version of the algorithm")
-    train_config: TrainConfig = Field(
+    train_config: TrainConfig | ProjectPath = Field(
         default_factory=TrainConfig, description="Training configuration"
     )
-    agent_config: AgentConfig = Field(
+    agent_config: AgentConfig | ProjectPath = Field(
         default_factory=AgentConfig, description="Agent configuration"
     )
-    data_config: DataConfig = Field(
+    data_config: DataConfig | ProjectPath = Field(
         default_factory=DataConfig, description="Data configuration"
     )
-    feature_config: FeatureConfig = Field(
+    feature_config: FeatureConfig | ProjectPath = Field(
         default_factory=FeatureConfig, description="Feature configuration"
     )
-    stock_env: StockEnv = Field(
+    stock_env: StockEnv | ProjectPath = Field(
         default_factory=StockEnv, description="Stock Trading Environment Config"
     )
     log_dir: ProjectPath = Field(default_factory=ProjectPath)
+
+    @field_validator(
+        "train_config",
+        "agent_config",
+        "data_config",
+        "feature_config",
+        "stock_env",
+        mode="before",
+    )
+    @classmethod
+    def validate_config(
+        cls, value: Union[ProjectPath, BaseModel], info: ValidationInfo
+    ) -> BaseModel:
+        string_map: dict[str, type[BaseModel]] = {
+            "train_config": TrainConfig,
+            "agent_config": AgentConfig,
+            "data_config": DataConfig,
+            "feature_config": FeatureConfig,
+            "stock_env": StockEnv,
+        }
+        try:
+            value = ProjectPath.model_validate(value)
+            if isinstance(value, ProjectPath):
+                return string_map[str(info.field_name)].model_validate_json(
+                    value.as_path().read_text()
+                )
+        except ValidationError as _:
+            if isinstance(value, BaseModel):
+                try:
+                    return string_map[str(info.field_name)].model_validate(value)
+                except ValidationError as e:
+                    print("Validation error:", e)
+        return value

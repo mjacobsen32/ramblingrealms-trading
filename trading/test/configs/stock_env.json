@@ -1,0 +1,7 @@
+{
+    "initial_cash": 1000000,
+    "buy_cost_pct": 0.001,
+    "sell_cost_pct": 0.001,
+    "turbulence_threshold": null,
+    "reward_scaling": 1e-4
+}
