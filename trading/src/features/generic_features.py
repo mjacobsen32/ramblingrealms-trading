@@ -3,6 +3,7 @@ from typing import Any, ClassVar, Dict, List, Type
 
 import numpy as np
 import pandas as pd
+import vectorbt as vbt
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, model_validator
 from scipy.spatial.distance import mahalanobis
@@ -21,6 +22,9 @@ class FeatureType(str, Enum):
     STOCHASTIC = "stochastic"
     PIOTROSKI = "piotroski"
     TURBULENCE = "turbulence"
+    ATR = "atr"
+    MSTD = "mstd"
+    OBV = "obv"
 
 
 class FillStrategy(str, Enum):
@@ -31,6 +35,7 @@ class FillStrategy(str, Enum):
     INTERPOLATE = "interpolate"
     ZERO = "zero"
     DROP = "drop"
+    BACKWARD_FILL = "bfill"
 
 
 class OperationType(str, Enum):
@@ -76,7 +81,9 @@ class Feature(BaseModel):
     name: str = Field(..., description="Name of the feature")
     enabled: bool = Field(True, description="Whether the feature is enabled or not")
     source: str = Field(..., description="Source file of the feature data")
-    fill_strategy: FillStrategy = Field(FillStrategy.DROP)
+    fill_strategy: FillStrategy = Field(
+        FillStrategy.BACKWARD_FILL, description="Strategy for filling missing values"
+    )
 
     # Registry for subclasses
     _registry: ClassVar[Dict[FeatureType, Type["Feature"]]] = {}
@@ -96,19 +103,15 @@ class Feature(BaseModel):
             return df
 
         for col in cols:
-            first_valid = df[col].first_valid_index()
-            if first_valid is not None:
-                first_val = df.at[first_valid, col]
-                df[col] = df[col].ffill().fillna(first_val)
-
-            if self.fill_strategy is FillStrategy.INTERPOLATE:
+            if self.fill_strategy is FillStrategy.BACKWARD_FILL:
+                df[col] = df[col].bfill()
+            elif self.fill_strategy is FillStrategy.INTERPOLATE:
                 interpolated = df[col].interpolate(
                     method="linear", limit_direction="both"
                 )
-                # Only update rows where NaN originally existed
                 df[col] = df[col].where(~df[col].isna(), interpolated)
             elif self.fill_strategy is FillStrategy.ZERO:
-                df[col] = df[col].fillna(0)
+                df[col] = df[col].fillna(0.0)
 
         return df
 
@@ -209,6 +212,8 @@ class Candle(Feature):
 class MovingWindow(Feature):
     """
     Represents a moving average feature by Days.
+    Note: This feature is readily available in vectorbt, but this implementation
+    allows for custom operations and fields.
     """
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
@@ -226,6 +231,27 @@ class MovingWindow(Feature):
     )
 
 
+class ATR(Feature):
+    """
+    Average True Range (ATR) feature.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.ATR
+    period: int = Field(14, description="Period for ATR calculation")
+    field_high: str = Field("high", description="Field for high prices")
+    field_low: str = Field("low", description="Field for low prices")
+    field_close: str = Field("close", description="Field for close prices")
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        df[self.name] = vbt.ATR.run(
+            high=df[self.field_high],
+            low=df[self.field_low],
+            close=df[self.field_close],
+            window=self.period,
+        ).atr
+        return self.clean_columns(self.get_feature_names(), df)
+
+
 class RSI(Feature):
     """
     Relative Strength Index (RSI) feature.
@@ -234,17 +260,14 @@ class RSI(Feature):
     TYPE: ClassVar[FeatureType] = FeatureType.RSI
     period: int = Field(14, description="Period for RSI calculation")
     field: str = Field("close", description="Field to calculate RSI on")
+    ewm: bool = Field(False, description="Use Exponential Weighted Average for RSI")
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        delta = pd.to_numeric(df[self.field].diff(), errors="coerce")
-        gain = delta.where(delta > 0, 0.0)
-        loss = -delta.where(delta < 0, 0.0)
-
-        avg_gain = gain.rolling(window=self.period).mean()
-        avg_loss = loss.rolling(window=self.period).mean()
-
-        rs = avg_gain / (avg_loss + 1e-10)
-        df[self.name] = 100 - (100 / (1 + rs))
+        df[self.name] = vbt.RSI.run(
+            close=df[self.field],
+            window=self.period,
+            ewm=self.ewm,
+        ).rsi
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -258,18 +281,29 @@ class MACD(Feature):
     slow_period: int = Field(26)
     signal_period: int = Field(9)
     field: str = Field("close")
+    ewm: bool = Field(
+        False, description="Use Exponential Weighted Moving Average for MACD"
+    )
+    signal_ewm: bool = Field(
+        False,
+        description="Use Exponential Weighted Moving Average for MACD signal line",
+    )
 
     def get_feature_names(self) -> List[str]:
-        return [f"{self.name}_macd", f"{self.name}_signal", f"{self.name}_hist"]
+        return [f"{self.name}", f"{self.name}_signal", f"{self.name}_hist"]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        ema_fast = df[self.field].ewm(span=self.fast_period, adjust=False).mean()
-        ema_slow = df[self.field].ewm(span=self.slow_period, adjust=False).mean()
-        macd = ema_fast - ema_slow
-        signal = macd.ewm(span=self.signal_period, adjust=False).mean()
-        df[f"{self.name}_macd"] = macd
-        df[f"{self.name}_signal"] = signal
-        df[f"{self.name}_hist"] = macd - signal
+        macd = vbt.MACD.run(
+            close=df[self.field],
+            fast_window=self.fast_period,
+            slow_window=self.slow_period,
+            signal_window=self.signal_period,
+            macd_ewm=self.ewm,
+            signal_ewm=self.signal_ewm,
+        )
+        df[f"{self.name}"] = macd.macd
+        df[f"{self.name}_signal"] = macd.signal
+        df[f"{self.name}_hist"] = macd.macd - macd.signal
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -281,16 +315,66 @@ class BollingerBands(Feature):
     TYPE: ClassVar[FeatureType] = FeatureType.BOLLINGER_BANDS
     period: int = Field(20)
     field: str = Field("close")
+    ewm: bool = Field(False, description="Use Exponential Weighted Moving Average")
+    alpha: float = Field(
+        2.0, description="Standard deviation multiplier for Bollinger Bands"
+    )
 
     def get_feature_names(self) -> List[str]:
         return [f"{self.name}_upper", f"{self.name}_lower", f"{self.name}_mid"]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        sma = df[self.field].rolling(window=self.period).mean()
-        std = df[self.field].rolling(window=self.period).std()
-        df[f"{self.name}_upper"] = sma + (2 * std)
-        df[f"{self.name}_lower"] = sma - (2 * std)
-        df[f"{self.name}_mid"] = sma
+        bbands = vbt.BBANDS.run(
+            close=df[self.field],
+            window=self.period,
+            ewm=self.ewm,
+            alpha=self.alpha,
+        )
+        df[f"{self.name}_upper"] = bbands.upper
+        df[f"{self.name}_lower"] = bbands.lower
+        df[f"{self.name}_mid"] = bbands.middle
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+class MSTD(Feature):
+    """
+    Moving Standard Deviation feature.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.MSTD
+    field: str = Field(
+        "close", description="Field to calculate moving standard deviation on"
+    )
+    window: int = Field(
+        20, description="Window size for moving standard deviation calculation"
+    )
+    ewm: bool = Field(
+        False, description="Use Exponential Weighted Moving Standard Deviation"
+    )
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        df[self.name] = vbt.MSTD.run(
+            close=df[self.field],
+            window=self.window,
+            ewm=self.ewm,
+        ).mstd
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+class OBV(Feature):
+    """
+    On-Balance Volume (OBV) feature.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.OBV
+    field_close: str = Field("close", description="Field for close prices")
+    field_volume: str = Field("volume", description="Field for volume")
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        df[self.name] = vbt.OBV.run(
+            close=df[self.field_close],
+            volume=df[self.field_volume],
+        ).obv
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -304,46 +388,104 @@ class Stochastic(Feature):
     field_high: str = Field("high")
     field_low: str = Field("low")
     field_close: str = Field("close")
+    k_window: int = Field(14, description="Window for %K smoothing")
+    d_window: int = Field(3, description="Window for %D smoothing")
+    ewm: bool = Field(
+        False, description="Use Exponential Weighted Moving Average for %K and %D"
+    )
+
+    def get_feature_names(self) -> List[str]:
+        return [f"{self.name}_k", f"{self.name}_d", self.name]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        low_min = df[self.field_low].rolling(window=self.period).min()
-        high_max = df[self.field_high].rolling(window=self.period).max()
-        df[self.name] = 100 * (
-            (df[self.field_close] - low_min) / (high_max - low_min + 1e-10)
+        kd = vbt.STOCH.run(
+            high=df[self.field_high],
+            low=df[self.field_low],
+            close=df[self.field_close],
+            k_window=self.k_window,
+            d_window=self.d_window,
+            d_ewm=self.ewm,
         )
+        df[self.name + "_k"] = kd.percent_k
+        df[self.name + "_d"] = kd.percent_d
+        df[self.name] = kd.percent_k - kd.percent_d  # Stochastic Oscillator value
         return self.clean_columns(self.get_feature_names(), df)
 
 
 class Turbulence(Feature):
     """
-    Computes a 'turbulence index' indicating how unusual current returns are
-    compared to the recent historical return distribution.
+    Computes a market turbulence index using multiple return periods and proper covariance calculation.
+    This measures how unusual current market conditions are compared to historical patterns.
     """
 
     TYPE: ClassVar[FeatureType] = FeatureType("turbulence")
     lookback: int = Field(20, description="Lookback window for calculating turbulence")
     field: str = Field("close", description="Field to use for return computation")
+    return_periods: List[int] = Field(
+        [1, 5, 10], description="Return periods to use for multivariate analysis"
+    )
 
     def to_df(self, df: pd.DataFrame, data: Any = None) -> pd.DataFrame:
-        returns = df[self.field].pct_change().dropna()
-        turbulence_values = [np.nan] * self.lookback  # Start with NaNs
+        # Calculate returns for multiple periods
+        returns_matrix = []
+        for period in self.return_periods:
+            returns = df[self.field].pct_change(periods=period).dropna()
+            returns_matrix.append(returns)
 
-        for i in range(self.lookback, len(returns)):
-            window = returns[i - self.lookback : i]
-            current = returns.iloc[i]
+        # Align all return series to the same length
+        min_length = min(len(r) for r in returns_matrix)
+        returns_df = pd.DataFrame(
+            {
+                f"return_{period}d": r.iloc[-min_length:].values
+                for period, r in zip(self.return_periods, returns_matrix)
+            }
+        )
 
-            # Avoid degenerate case
-            if window.std() == 0 or len(window) < 2:
+        turbulence_values = []
+
+        for i in range(len(returns_df)):
+            if i < self.lookback:
+                turbulence_values.append(np.nan)
+                continue
+
+            # Historical window for covariance calculation
+            start_idx = max(0, i - self.lookback)
+            historical_returns = returns_df.iloc[start_idx:i]
+            current_returns = returns_df.iloc[i].values
+
+            # Skip if insufficient data
+            if len(historical_returns) < 3:
                 turbulence_values.append(0)
                 continue
 
-            mu = window.mean()
-            cov = window.std() ** 2
+            try:
+                # Calculate mean and covariance matrix
+                mean_returns = historical_returns.mean().values
+                cov_matrix = historical_returns.cov().values
 
-            # Mahalanobis distance with 1D standard deviation as denominator
-            dist = (current - mu) / np.sqrt(cov)
-            turbulence_values.append(dist**2)  # Squared distance
+                # Add small regularization to avoid singular matrix
+                cov_matrix += np.eye(len(cov_matrix)) * 1e-8
 
-        # Add to df
-        df[self.name] = [np.nan] + turbulence_values  # Align with df index
+                # Calculate Mahalanobis distance (turbulence index)
+                diff = np.array(current_returns) - np.array(mean_returns)
+                inv_cov = np.linalg.pinv(cov_matrix)  # Use pseudo-inverse for stability
+                turbulence = np.dot(np.dot(diff.T, inv_cov), diff)
+                turbulence_values.append(float(turbulence))
+
+            except (np.linalg.LinAlgError, ValueError):
+                # Fallback to simple standardized distance if matrix issues
+                mean_returns = np.array(historical_returns.mean().values)
+                std_returns = np.array(historical_returns.std().values)
+                std_returns = np.where(std_returns == 0, 1e-8, std_returns)
+                normalized_diff = (
+                    np.array(current_returns) - mean_returns
+                ) / std_returns
+                turbulence_values.append(float(np.sum(normalized_diff**2)))
+
+        # Align turbulence values with original dataframe
+        result_values = [np.nan] * (
+            len(df) - len(turbulence_values)
+        ) + turbulence_values
+        df[self.name] = result_values
+
         return self.clean_columns(self.get_feature_names(), df)
