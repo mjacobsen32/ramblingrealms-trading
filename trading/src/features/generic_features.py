@@ -81,7 +81,9 @@ class Feature(BaseModel):
     name: str = Field(..., description="Name of the feature")
     enabled: bool = Field(True, description="Whether the feature is enabled or not")
     source: str = Field(..., description="Source file of the feature data")
-    fill_strategy: FillStrategy = Field(FillStrategy.DROP)
+    fill_strategy: FillStrategy = Field(
+        FillStrategy.BACKWARD_FILL, description="Strategy for filling missing values"
+    )
 
     # Registry for subclasses
     _registry: ClassVar[Dict[FeatureType, Type["Feature"]]] = {}
