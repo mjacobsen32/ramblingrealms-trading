@@ -6,7 +6,7 @@ from typing_extensions import Annotated
 
 from trading.cli.alg.config import RRConfig
 from trading.src.alg.agents.agents import Agent
-from trading.src.alg.backtest.backtesting import BackTesting
+from trading.src.alg.backtest.backtesting import BackTesting, Portfolio
 from trading.src.alg.data_process.data_loader import DataLoader
 from trading.src.alg.environments.trading_environment import TradingEnv
 
@@ -53,10 +53,15 @@ def train(
         model.save()
 
     if not no_test:
-        bt = BackTesting(model, data_loader.get_train_test()[1], trade_env)
-        bt.run()
-        print(bt.stats())
-        bt.plot()
+        bt = BackTesting(
+            model,
+            data_loader.get_train_test()[1],
+            trade_env,
+            alg_config.backtest_config,
+        )
+        pf = bt.run()
+        print(pf.stats())
+        pf.plot()
 
 
 @app.command(help="Run backtesting on the trained model.")
@@ -83,7 +88,26 @@ def backtest(
     rprint("[blue]Environment Initialized.[/blue]")
     model = Agent(config=alg_config.agent_config, env=trade_env, load=True)
 
-    bt = BackTesting(model=model, data=data_loader.get_train_test()[1], env=trade_env)
-    bt.run()
-    print(bt.stats())
-    bt.plot()
+    bt = BackTesting(
+        model=model,
+        data=data_loader.get_train_test()[0],
+        env=trade_env,
+        backtest_config=alg_config.backtest_config,
+    )
+    pf = bt.run()
+    print(pf.stats())
+    pf.plot()
+
+
+@app.command(help="Run analysis on the backtest results.")
+def analysis(
+    alg_config: Annotated[
+        str, typer.Option("--config", "-c", help="Path to the configuration file.")
+    ],
+):
+    rprint("[blue]Starting analysis process...[/blue]")
+    with Path.open(Path(alg_config)) as f:
+        config = RRConfig.model_validate_json(f.read())
+    pf = Portfolio.load(config.backtest_config.results_path.as_path())
+    print(pf.stats())
+    pf.plot()

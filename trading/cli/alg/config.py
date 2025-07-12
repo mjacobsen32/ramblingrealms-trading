@@ -47,14 +47,19 @@ class FeatureConfig(BaseModel):
     def parse_features(cls, data: Any):
         features_data = data.get("features", [])
         data["features"] = [
-            Feature.factory(f) if isinstance(f, dict) else f for f in features_data
+            (
+                Feature.factory(f, fill_strategy=data.get("fill_strategy"))
+                if isinstance(f, dict)
+                else f
+            )
+            for f in features_data
         ]
         return data
 
     features: List[Feature] = Field(
         default_factory=List[Feature], description="List of feature names"
     )
-    missing_value_strategy: str = Field(
+    fill_strategy: str = Field(
         "mean",
         description="Strategy for handling missing values (e.g., 'mean', 'median', 'drop')",
     )
@@ -110,17 +115,6 @@ class DataConfig(BaseModel):
             )
 
 
-class TrainConfig(BaseModel):
-    """
-    Configuration for training the algorithm.
-    """
-
-    epochs: int = Field(100, description="Number of training epochs")
-    batch_size: int = Field(32, description="Batch size for training")
-    learning_rate: float = Field(0.001, description="Learning rate for the optimizer")
-    early_stopping_patience: int = Field(10, description="Patience for early stopping")
-
-
 class StockEnv(BaseModel):
     initial_cash: int = Field(100_000, description="Starting funds in state space")
     hmax: int = Field(
@@ -137,6 +131,10 @@ class StockEnv(BaseModel):
         description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
     )
     reward_scaling: float = Field(1e-4)
+    trade_limit_percent: float = Field(
+        0.1,
+        description="Maximum percentage of cash to be used in a single trade relative to the current asset value",
+    )
 
 
 class AgentConfig(BaseModel):
@@ -154,8 +152,29 @@ class AgentConfig(BaseModel):
     deterministic: bool = Field(
         True, description="Whether to use deterministic actions during inference"
     )
+    total_timesteps: int = Field(
+        1_000_000, description="Total number of timesteps for training the agent"
+    )
     kwargs: Dict[str, Any] = Field(
         default_factory=dict, description="Hyperparameters for the agent"
+    )
+    log_dir: ProjectPath | None = Field(
+        None,
+        description="Directory to save logs and model checkpoints",
+    )
+
+
+class BackTestConfig(BaseModel):
+    """
+    Configuration for backtesting the algorithm.
+    """
+
+    save_results: bool = Field(
+        False, description="Whether to save the backtesting results"
+    )
+    results_path: ProjectPath = Field(
+        default_factory=ProjectPath,
+        description="Path to save the backtesting results",
     )
 
 
@@ -167,9 +186,6 @@ class RRConfig(BaseModel):
     name: str = Field(..., description="Name of the algorithm")
     description: str = Field("", description="Description of the algorithm")
     version: str = Field("1.0.0", description="Version of the algorithm")
-    train_config: TrainConfig | ProjectPath = Field(
-        default_factory=TrainConfig, description="Training configuration"
-    )
     agent_config: AgentConfig | ProjectPath = Field(
         default_factory=AgentConfig, description="Agent configuration"
     )
@@ -183,9 +199,11 @@ class RRConfig(BaseModel):
         default_factory=StockEnv, description="Stock Trading Environment Config"
     )
     log_dir: ProjectPath = Field(default_factory=ProjectPath)
+    backtest_config: BackTestConfig | ProjectPath = Field(
+        default_factory=BackTestConfig, description="Backtesting configuration"
+    )
 
     @field_validator(
-        "train_config",
         "agent_config",
         "data_config",
         "feature_config",
@@ -197,7 +215,6 @@ class RRConfig(BaseModel):
         cls, value: Union[ProjectPath, BaseModel], info: ValidationInfo
     ) -> BaseModel:
         string_map: dict[str, type[BaseModel]] = {
-            "train_config": TrainConfig,
             "agent_config": AgentConfig,
             "data_config": DataConfig,
             "feature_config": FeatureConfig,
@@ -209,10 +226,10 @@ class RRConfig(BaseModel):
                 return string_map[str(info.field_name)].model_validate_json(
                     value.as_path().read_text()
                 )
-        except ValidationError as _:
+        except ValidationError as e_one:
             if isinstance(value, BaseModel):
                 try:
                     return string_map[str(info.field_name)].model_validate(value)
-                except ValidationError as e:
-                    print("Validation error:", e)
+                except ValidationError as e_two:
+                    print("Validation error two:", e_two)
         return value

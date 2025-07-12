@@ -53,7 +53,7 @@ def feature_config():
     )
     return FeatureConfig(
         features=[c],
-        missing_value_strategy="mean",
+        fill_strategy="mean",
     )
 
 
@@ -123,10 +123,12 @@ def backtest(agent, data_loader, trade_env):
     """
     Fixture to create a backtest instance.
     """
+    from trading.cli.alg.config import BackTestConfig
     from trading.src.alg.backtest.backtesting import BackTesting
 
     return BackTesting(
         model=agent.model,
         data=data_loader.get_train_test()[1],
         env=trade_env,
+        backtest_config=BackTestConfig(),
     )

@@ -39,7 +39,11 @@ class Agent:
             raise ValueError(f"Unsupported algorithm: {algo}")
         AgentClass = AGENT_REGISTRY[algo]
 
-        return AgentClass(env=env, **config.kwargs)
+        return AgentClass(
+            env=env,
+            tensorboard_log=config.log_dir.as_path() if config.log_dir else None,
+            **config.kwargs,
+        )
 
     @classmethod
     def load_agent(cls, config: AgentConfig, env: TradingEnv):
@@ -56,7 +60,9 @@ class Agent:
 
     def learn(self, timesteps: Optional[int] = None):
         return self.model.learn(
-            total_timesteps=timesteps if timesteps else self.config.kwargs["n_steps"],
+            total_timesteps=(
+                self.config.total_timesteps if timesteps is None else timesteps
+            ),
             progress_bar=True,
         )
 

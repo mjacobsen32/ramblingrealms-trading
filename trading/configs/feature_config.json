@@ -1,0 +1,67 @@
+{
+    "features": [
+        {
+            "type": "candle",
+            "name": "candle",
+            "enabled": true
+        },
+        {
+            "type": "moving_window",
+            "name": "ma50",
+            "enabled": true,
+            "field": "close",
+            "period": 50
+        },
+        {
+            "type": "atr",
+            "name": "atr_14",
+            "enabled": true,
+            "period": 14
+        },
+        {
+            "type": "macd",
+            "name": "macd",
+            "enabled": true,
+            "fast_period": 12,
+            "slow_period": 26,
+            "signal_period": 9,
+            "field": "close"
+        },
+        {
+            "type": "rsi",
+            "name": "rsi_15",
+            "period": 15,
+            "field": "close"
+        },
+        {
+            "type": "rsi",
+            "name": "rsi_60",
+            "period": 60,
+            "field": "close"
+        },
+        {
+            "type": "bollinger_bands",
+            "name": "bollinger_bands_20",
+            "period": 20
+        },
+        {
+            "type": "mstd",
+            "name": "mstd_20",
+            "window": 20
+        },
+        {
+            "type": "obv",
+            "name": "obv"
+        },
+        {
+            "type": "stochastic",
+            "name": "stochastic_20",
+            "period": 20
+        },
+        {
+            "type": "turbulence",
+            "name": "turbulence",
+            "lookback": 60
+        }
+    ]
+}
