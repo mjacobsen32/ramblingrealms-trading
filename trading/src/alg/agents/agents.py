@@ -60,7 +60,9 @@ class Agent:
 
     def learn(self, timesteps: Optional[int] = None):
         return self.model.learn(
-            total_timesteps=self.config.total_timesteps,
+            total_timesteps=(
+                self.config.total_timesteps if timesteps is None else timesteps
+            ),
             progress_bar=True,
         )
 

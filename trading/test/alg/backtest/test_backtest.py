@@ -4,8 +4,8 @@ from trading.test.alg.test_fixtures import *
 
 
 def test_backtest_run(backtest):
-    backtest.run()
-    stats = backtest.stats()
+    pf = backtest.run()
+    stats = pf.stats()
 
     assert str(stats["Start"]) == "2023-01-03 05:00:00+00:00"
     assert str(stats["End"]) == "2023-10-18 04:00:00+00:00"
