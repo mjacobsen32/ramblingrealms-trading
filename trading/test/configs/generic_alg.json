@@ -6,6 +6,5 @@
     "agent_config": "{PROJECT_ROOT}/trading/test/configs/agent_config.json",
     "feature_config": "{PROJECT_ROOT}/trading/test/configs/feature_config.json",
     "data_config": "{PROJECT_ROOT}/trading/test/configs/data_config.json",
-    "train_config": "{PROJECT_ROOT}/trading/test/configs/train_config.json",
     "stock_env": "{PROJECT_ROOT}/trading/test/configs/stock_env.json"
 }

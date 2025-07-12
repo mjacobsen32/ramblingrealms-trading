@@ -26,9 +26,8 @@ class TradingEnv(gym.Env):
         self.stock_dimension = len(self.unique_symbols)
         self.feature_cols = feature_utils.get_feature_cols(features=features)
         self.data = data.copy()
-        self.trade_limit_pct = 0.1  # max 10% of total assets per trade
-        self.hmax = 10_000  # absolute max trade size in dollars
         self.backtest = backtest
+        self.cfg = cfg
 
         # Environment state space
         self.state_space = (
@@ -188,9 +187,9 @@ class TradingEnv(gym.Env):
         prices = df_day.set_index("tic")["close"].reindex(self.unique_symbols).values
 
         # Apply actions only to available tickers
-        trade_limit = self.trade_limit_pct * self.total_assets
+        trade_limit = self.cfg.trade_limit_percent * self.total_assets
         scaled_actions = action * trade_limit
-        scaled_actions = np.clip(scaled_actions, -self.hmax, self.hmax)
+        scaled_actions = np.clip(scaled_actions, -self.cfg.hmax, self.cfg.hmax)
         for i, symbol in enumerate(self.unique_symbols):
             price = prices[i]
             act = scaled_actions[i]

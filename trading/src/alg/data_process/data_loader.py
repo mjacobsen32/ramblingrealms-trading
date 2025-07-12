@@ -142,7 +142,7 @@ class DataLoader:
             for feature in [
                 f
                 for f in self.feature_config.features
-                if f.source == request.dataset_name
+                if f.source == request.dataset_name or f.source is None
             ]:
                 self.df = feature.to_df(self.df, data)
 
@@ -155,6 +155,7 @@ class DataLoader:
         rprint(
             f"[green]Data Successfully loaded...\n[white]Current features: {[f for f in self.features]}"
         )
+        rprint(f"[white]Current tickers: {self.df['tic'].unique().tolist()}")
 
     def get_train_test(self):
         """

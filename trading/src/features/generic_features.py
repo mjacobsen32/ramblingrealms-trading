@@ -80,7 +80,7 @@ class Feature(BaseModel):
     type: FeatureType
     name: str = Field(..., description="Name of the feature")
     enabled: bool = Field(True, description="Whether the feature is enabled or not")
-    source: str = Field(..., description="Source file of the feature data")
+    source: str | None = Field(None, description="Source file of the feature data")
     fill_strategy: FillStrategy = Field(
         FillStrategy.BACKWARD_FILL, description="Strategy for filling missing values"
     )
@@ -166,7 +166,7 @@ class Feature(BaseModel):
             cls._registry[type_val] = cls
 
     @classmethod
-    def factory(cls, data: dict) -> "Feature":
+    def factory(cls, data: dict, fill_strategy: FillStrategy) -> "Feature":
         """
         Factory method to create a Feature instance from a dictionary.
         Args:
@@ -184,7 +184,10 @@ class Feature(BaseModel):
         subclass = cls._registry.get(feature_type_enum)
         if not subclass:
             raise ValueError(f"Unknown feature type: {feature_type_enum}")
-        return subclass(**data)
+        sub = subclass(**data)
+        if sub.fill_strategy is None:
+            sub.fill_strategy = fill_strategy
+        return sub
 
 
 class Candle(Feature):
