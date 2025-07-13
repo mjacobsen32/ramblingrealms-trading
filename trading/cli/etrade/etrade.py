@@ -32,9 +32,9 @@ def renew_oauth(
         etrade_secrets.oauth_token_secret.get_secret_value(),
     )
     if oauth.renew_access_token():
-        rprint("[green]OAuth tokens renewed successfully!")
+        logging.info("[green]OAuth tokens renewed successfully!")
     else:
-        rprint("[red]Failed to renew OAuth tokens. Please authenticate again.")
+        logging.info("[red]Failed to renew OAuth tokens. Please authenticate again.")
 
 
 @app.command(help="Authenticate with E-Trade. Will set OAuth tokens")
@@ -56,14 +56,14 @@ def authenticate(
         etrade_secrets.api_key.get_secret_value(),
         etrade_secrets.api_secret.get_secret_value(),
     )  # Use the printed URL
-    rprint(
+    logging.info(
         "[yellow]Please visit the following URL to authenticate: {}".format(
             oauth.get_request_token()
         )
     )
     verifier_code = input("Enter verification code: ")
     tokens = oauth.get_access_token(verifier_code)
-    rprint("[green]Authentication successful!")
+    logging.info("[green]Authentication successful!")
 
     etrade_secrets.oauth_token = SecretStr(tokens["oauth_token"])
     etrade_secrets.oauth_token_secret = SecretStr(tokens["oauth_token_secret"])
@@ -94,4 +94,4 @@ def list_accounts(
         "Account"
     ]
     for account in accounts:
-        rprint(etrade_accounts.get_account_balance(account["accountIdKey"]))
+        logging.info(etrade_accounts.get_account_balance(account["accountIdKey"]))
