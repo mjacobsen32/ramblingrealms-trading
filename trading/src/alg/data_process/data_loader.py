@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import ClassVar, Dict, Type
 
@@ -93,10 +94,10 @@ class AlpacaDataLoader(DataSource):
         )
         user = user_cache.UserCache().load()
         if os.path.exists(cache_file) and cache_enabled:
-            rprint("Loading data from cache...")
+            logging.info("Loading data from cache...")
             df = pd.concat([pd.read_parquet(cache_file), df])
         else:
-            rprint("Fetching data from Alpaca...")
+            logging.info("Fetching data from Alpaca...")
             client = StockHistoricalDataClient(
                 user.alpaca_api_key.get_secret_value(),
                 user.alpaca_api_secret.get_secret_value(),
@@ -148,14 +149,14 @@ class DataLoader:
 
         self.features = self.df.columns
         self.df.sort_index(level=["timestamp", "symbol"], inplace=True)
-        self.df = self.df.reset_index()  # Moves MultiIndex levels to columns
-        self.df = self.df.rename(columns={"symbol": "tic"})
         self.df.dropna()
 
-        rprint(
+        logging.info(
             f"[green]Data Successfully loaded...\n[white]Current features: {[f for f in self.features]}"
         )
-        rprint(f"[white]Current tickers: {self.df['tic'].unique().tolist()}")
+        logging.info(
+            f"[white]Current tickers: {self.df.index.get_level_values('symbol').unique().tolist()}"
+        )
 
     def get_train_test(self):
         """

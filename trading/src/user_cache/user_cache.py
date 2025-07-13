@@ -61,7 +61,7 @@ class UserCache(BaseModel):
     def __getattribute__(self, name):
         attr = super().__getattribute__(name)
         if attr is None:
-            Console().print(
+            Console().logging.info(
                 f"[bold red]Attribute {name} not found. Please run the setup command."
             )
         return attr

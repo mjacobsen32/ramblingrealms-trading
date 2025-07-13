@@ -1,3 +1,4 @@
+import logging
 import os
 from enum import Enum
 from pathlib import Path
@@ -115,6 +116,17 @@ class DataConfig(BaseModel):
             )
 
 
+class RewardConfig(BaseModel):
+    """
+    Configuration for the reward function used in the trading environment.
+    """
+
+    type: str = Field("basic_profit_max", description="Type of reward function to use")
+    reward_scaling: float = Field(
+        1e4, description="Scaling factor for the reward function"
+    )
+
+
 class StockEnv(BaseModel):
     initial_cash: int = Field(100_000, description="Starting funds in state space")
     hmax: int = Field(
@@ -130,10 +142,12 @@ class StockEnv(BaseModel):
         None,
         description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
     )
-    reward_scaling: float = Field(1e-4)
     trade_limit_percent: float = Field(
         0.1,
         description="Maximum percentage of cash to be used in a single trade relative to the current asset value",
+    )
+    reward_config: RewardConfig = Field(
+        default_factory=RewardConfig, description="Reward function configuration"
     )
 
 
@@ -231,5 +245,5 @@ class RRConfig(BaseModel):
                 try:
                     return string_map[str(info.field_name)].model_validate(value)
                 except ValidationError as e_two:
-                    print("Validation error two:", e_two)
+                    logging.info("Validation error two:", e_two)
         return value

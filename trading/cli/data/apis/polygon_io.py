@@ -1,3 +1,4 @@
+import logging
 from dataclasses import asdict
 from enum import Enum
 
@@ -60,4 +61,4 @@ def pull_data(
         elif file_type is FileType.csv:
             df.to_csv(output_file, index=False)
     else:
-        print(df)
+        logging.info(df)

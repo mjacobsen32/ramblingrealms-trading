@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC
@@ -59,12 +60,15 @@ class Agent:
         return AgentClass.load(str(config.save_path), env=env)
 
     def learn(self, timesteps: Optional[int] = None):
-        return self.model.learn(
+        logging.debug(f"Starting training for {self.config.algo} agent.")
+        ret = self.model.learn(
             total_timesteps=(
                 self.config.total_timesteps if timesteps is None else timesteps
             ),
             progress_bar=True,
         )
+        logging.debug(f"Training completed for {self.config.algo} agent.")
+        return ret
 
     def predict(self, obs):
         return self.model.predict(obs, self.config.deterministic)
