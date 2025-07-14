@@ -4,6 +4,7 @@ from pathlib import Path
 import typer
 from pydantic import SecretStr
 from rich import print
+from rich.logging import RichHandler
 from rich.prompt import Prompt
 
 from trading.cli.alg import alg
@@ -18,13 +19,57 @@ app.add_typer(data.app, name="data", help="Data CLI commands")
 app.add_typer(alg.app, name="alg", help="Algorithmic commands")
 
 
+@app.callback()
+def main(
+    ctx: typer.Context,
+    log_level_console: str = typer.Option(
+        "INFO",
+        "--log-level-console",
+        help="Logging level for console (e.g., DEBUG, INFO, WARNING)",
+    ),
+    log_level_file: str = typer.Option(
+        "NOTSET",
+        "--log-level-file",
+        help="Logging level for file log (e.g., DEBUG, INFO, WARNING)",
+    ),
+):
+    """Initialize logging before any command runs."""
+    # Allow options to be parsed from anywhere in the command line
+    ctx.resilient_parsing = True
+
+    FORMAT = "%(message)s"
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  # Capture all logs, handlers will filter
+
+    if log_level_file.upper() != "NOTSET":
+        # File handler for DEBUG and above
+        file_handler = logging.FileHandler("./logs/rr_trading.log")
+        file_handler.setLevel(log_level_file.upper())
+        file_handler.setFormatter(logging.Formatter(FORMAT))
+        logger.addHandler(file_handler)
+
+    # Console handler for INFO and above
+    console_handler = RichHandler(markup=True)
+    console_handler.setLevel(log_level_console.upper())
+    console_handler.setFormatter(logging.Formatter(FORMAT))
+    logger.addHandler(console_handler)
+
+    # Remove default handlers if any (optional, but avoids duplicate logs)
+    logger.propagate = False
+
+    logger.debug(
+        f"Initialized logger with console={log_level_console}, file={log_level_file}"
+    )
+
+
 @app.command(help="Print the current user configuration")
 def print_config():
     """
     Print the current user configuration.
     """
     config = User.load()
-    logging.info(config)
+    rprint(config)
 
 
 @app.command(help="Run the setup wizard")

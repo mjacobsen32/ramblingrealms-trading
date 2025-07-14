@@ -1,6 +1,5 @@
 import logging
 import os
-from pyexpat import features
 from typing import ClassVar, Dict, Type
 
 import numpy as np

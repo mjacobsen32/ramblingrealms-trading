@@ -6,7 +6,7 @@ import pandas as pd
 import typer
 from polygon import RESTClient
 from polygon.rest.models import Agg
-from rich import print as print
+from rich import print as rprint
 from typing_extensions import Annotated
 
 from trading.src.user_cache.user_cache import UserCache as user
@@ -61,4 +61,4 @@ def pull_data(
         elif file_type is FileType.csv:
             df.to_csv(output_file, index=False)
     else:
-        logging.info(df)
+        rprint(df)
