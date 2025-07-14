@@ -11,5 +11,10 @@ from unittest.mock import patch
 
 
 def test_train_backtest():
-    train(config=str(CONFIG_DIR / "generic_alg.json"), dry_run=False, no_test=False)
+    train(
+        config=str(CONFIG_DIR / "generic_alg.json"),
+        dry_run=False,
+        no_test=False,
+        fetch_data=False,
+    )
     backtest(config=str(CONFIG_DIR / "generic_alg.json"))

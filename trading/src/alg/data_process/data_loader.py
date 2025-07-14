@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import ClassVar, Dict, Type
 
@@ -34,6 +35,7 @@ class DataSource:
 
     def get_data(
         self,
+        fetch_data: bool,
         request: DataRequests,
         df: pd.DataFrame,
         cache_path: str,
@@ -74,6 +76,7 @@ class AlpacaDataLoader(DataSource):
 
     def get_data(
         self,
+        fetch_data: bool,
         request: DataRequests,
         df: pd.DataFrame,
         cache_path: str,
@@ -92,11 +95,11 @@ class AlpacaDataLoader(DataSource):
             request.dataset_name + ".parquet",
         )
         user = user_cache.UserCache().load()
-        if os.path.exists(cache_file) and cache_enabled:
-            rprint("Loading data from cache...")
+        if os.path.exists(cache_file) and cache_enabled and not fetch_data:
+            logging.info("Loading data from cache...")
             df = pd.concat([pd.read_parquet(cache_file), df])
         else:
-            rprint("Fetching data from Alpaca...")
+            logging.info("Fetching data from Alpaca...")
             client = StockHistoricalDataClient(
                 user.alpaca_api_key.get_secret_value(),
                 user.alpaca_api_secret.get_secret_value(),
@@ -120,7 +123,15 @@ class DataLoader:
     and applies the specified features to the data.
     """
 
-    def __init__(self, data_config: DataConfig, feature_config: FeatureConfig):
+    def __init__(
+        self,
+        data_config: DataConfig,
+        feature_config: FeatureConfig,
+        fetch_data: bool = False,
+    ):
+        """
+        Initializes the DataLoader with the given configurations.
+        """
         self.data_config = data_config
         self.feature_config = feature_config
 
@@ -130,6 +141,7 @@ class DataLoader:
 
         for request in self.data_config.requests:
             data = DataSource.factory(request.model_dump()).get_data(
+                fetch_data,
                 request,
                 self.df,
                 str(data_config.cache_path),
@@ -148,14 +160,21 @@ class DataLoader:
 
         self.features = self.df.columns
         self.df.sort_index(level=["timestamp", "symbol"], inplace=True)
-        self.df = self.df.reset_index()  # Moves MultiIndex levels to columns
-        self.df = self.df.rename(columns={"symbol": "tic"})
         self.df.dropna()
 
-        rprint(
+        logging.info(
             f"[green]Data Successfully loaded...\n[white]Current features: {[f for f in self.features]}"
         )
-        rprint(f"[white]Current tickers: {self.df['tic'].unique().tolist()}")
+        logging.info(
+            f"Current tickers: {self.df.index.get_level_values('symbol').unique().tolist()}"
+        )
+
+    @classmethod
+    def data_info(cls, df: pd.DataFrame) -> str:
+        """
+        Returns a string representation of the dataframe.
+        """
+        return f"start_date: {df.index.get_level_values('timestamp').min()}, end_date: {df.index.get_level_values('timestamp').max()}, rows: {len(df)}, features: {len(df.columns)}"
 
     def get_train_test(self):
         """
@@ -163,4 +182,10 @@ class DataLoader:
         """
 
         split_idx = int(len(self.df) * (1 - self.data_config.validation_split))
-        return self.df.iloc[:split_idx], self.df.iloc[split_idx:]
+        train = self.df.iloc[:split_idx]
+        test = self.df.iloc[split_idx:]
+        logging.info(
+            f"Train data: {self.data_info(train)}\nTest data: {self.data_info(test)}"
+        )
+
+        return train, test

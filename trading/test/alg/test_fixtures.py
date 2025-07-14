@@ -128,7 +128,7 @@ def backtest(agent, data_loader, trade_env):
 
     return BackTesting(
         model=agent.model,
-        data=data_loader.get_train_test()[1],
         env=trade_env,
         backtest_config=BackTestConfig(),
+        data=data_loader.get_train_test()[1],
     )

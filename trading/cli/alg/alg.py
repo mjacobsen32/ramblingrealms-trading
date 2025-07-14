@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import typer
@@ -29,22 +30,30 @@ def train(
     no_test: bool = typer.Option(
         False, "--no_test", "-t", help="Run the backtesting suite via the new model"
     ),
+    fetch_data: bool = typer.Option(
+        False,
+        "--fetch-data",
+        "-f",
+        help="Fetch the latest data before training. Do not use Cache.",
+    ),
 ):
-    rprint("[blue]Starting training process...[/blue]")
+    logging.info("Starting training process...")
     # Load configuration
     with Path.open(Path(config)) as f:
         alg_config = RRConfig.model_validate_json(f.read())
     data_loader = DataLoader(
-        data_config=alg_config.data_config, feature_config=alg_config.feature_config
+        data_config=alg_config.data_config,
+        feature_config=alg_config.feature_config,
+        fetch_data=fetch_data,
     )
     trade_env = TradingEnv(
-        data=data_loader.df,
+        data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
     )
     trade_env.reset()
 
-    rprint("[blue]Environment Initialized.[/blue]")
+    logging.info("Environment Initialized.")
 
     model = Agent(alg_config.agent_config, trade_env)
     model.learn()
@@ -54,13 +63,13 @@ def train(
 
     if not no_test:
         bt = BackTesting(
-            model,
-            data_loader.get_train_test()[1],
-            trade_env,
-            alg_config.backtest_config,
+            model=model,
+            env=trade_env,
+            backtest_config=alg_config.backtest_config,
+            data=data_loader.get_train_test()[1],
         )
         pf = bt.run()
-        print(pf.stats())
+        logging.info(pf.stats())
         pf.plot()
 
 
@@ -69,8 +78,13 @@ def backtest(
     config: Annotated[
         str, typer.Option("--config", "-c", help="Path to the configuration file.")
     ],
+    on_train: bool = typer.Option(
+        False,
+        "--on-train",
+        help="Run backtesting on the training data instead of test data.",
+    ),
 ):
-    rprint("[blue]Starting backtesting process...[/blue]")
+    logging.info("Starting backtesting process...")
     # Load configuration
     with Path.open(Path(config)) as f:
         alg_config = RRConfig.model_validate_json(f.read())
@@ -78,24 +92,28 @@ def backtest(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
     trade_env = TradingEnv(
-        data=data_loader.get_train_test()[0],
+        data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
         backtest=True,
     )
     trade_env.reset()
 
-    rprint("[blue]Environment Initialized.[/blue]")
+    logging.info("Environment Initialized.")
     model = Agent(config=alg_config.agent_config, env=trade_env, load=True)
 
     bt = BackTesting(
         model=model,
-        data=data_loader.get_train_test()[0],
         env=trade_env,
         backtest_config=alg_config.backtest_config,
+        data=(
+            data_loader.get_train_test()[1]
+            if not on_train
+            else data_loader.get_train_test()[0]
+        ),
     )
     pf = bt.run()
-    print(pf.stats())
+    logging.info(pf.stats())
     pf.plot()
 
 
@@ -104,10 +122,14 @@ def analysis(
     alg_config: Annotated[
         str, typer.Option("--config", "-c", help="Path to the configuration file.")
     ],
+    no_plot: bool = typer.Option(
+        False, "--no-plot", "-n", help="Do not plot the backtesting results."
+    ),
 ):
-    rprint("[blue]Starting analysis process...[/blue]")
+    logging.info(f"Starting analysis process...")
     with Path.open(Path(alg_config)) as f:
         config = RRConfig.model_validate_json(f.read())
     pf = Portfolio.load(config.backtest_config.results_path.as_path())
-    print(pf.stats())
-    pf.plot()
+    rprint(f"\n[green]Stats:[/green]\n{pf.stats()}")
+    if not no_plot:
+        pf.plot()

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 import trading.src.alg.data_process.data_loader
@@ -20,18 +21,24 @@ def test_data_loader(data_loader):
     assert (
         "volume" in data_loader.df.columns
     ), "DataFrame should contain 'volume' column"
-    assert (
-        "timestamp" in data_loader.df.columns
-    ), "DataFrame should contain 'timestamp' column"
-    assert "tic" in data_loader.df.columns, "Data"
 
+    # Check MultiIndex levels
+    assert "timestamp" in data_loader.df.index.names, "Index should contain 'timestamp'"
+    assert "symbol" in data_loader.df.index.names, "Index should contain 'symbol'"
+
+    # Check only one ticker
     assert (
-        data_loader.df["tic"].nunique() == 1
+        data_loader.df.index.get_level_values("symbol").nunique() == 1
     ), "DataFrame should contain only one ticker"
-    assert data_loader.df["tic"].iloc[0] == "AAPL", "Ticker should be 'AAPL'"
-    assert data_loader.df[
-        "timestamp"
-    ].is_monotonic_increasing, "Timestamp should be in increasing order"
+    assert (
+        data_loader.df.index.get_level_values("symbol")[0] == "AAPL"
+    ), "Ticker should be 'AAPL'"
+
+    # Check timestamp monotonicity
+    timestamps = data_loader.df.index.get_level_values("timestamp")
+    assert timestamps.is_monotonic_increasing, "Timestamp should be in increasing order"
+
+    # Check for NaNs
     assert (
         data_loader.df.isnull().sum().sum() == 0
     ), "DataFrame should not contain NaN values"
@@ -50,15 +57,17 @@ def test_data_loader_split(data_loader):
         data_loader.df
     ), "Split should cover all data"
 
+    train_timestamps = train_df.index.get_level_values("timestamp")
+    test_timestamps = test_df.index.get_level_values("timestamp")
     assert (
-        train_df["timestamp"].max() < test_df["timestamp"].min()
+        train_timestamps.max() < test_timestamps.min()
     ), "Training data should end before testing data starts"
 
     assert (
-        train_df["tic"].nunique() == 1
+        train_df.index.get_level_values("symbol").nunique() == 1
     ), "Training DataFrame should contain only one ticker"
     assert (
-        test_df["tic"].nunique() == 1
+        test_df.index.get_level_values("symbol").nunique() == 1
     ), "Testing DataFrame should contain only one ticker"
 
 
@@ -75,10 +84,9 @@ def test_multi_ticker(data_config, feature_config):
     data_loader = DataLoader(data_config=data_config, feature_config=feature_config)
 
     assert data_loader.df.shape[0] > 0, "DataFrame should not be empty"
-    assert (
-        data_loader.df["tic"].nunique() == 3
-    ), "DataFrame should contain three tickers"
-    assert set(data_loader.df["tic"].unique()) == {
+    symbols = data_loader.df.index.get_level_values("symbol")
+    assert symbols.nunique() == 3, "DataFrame should contain three tickers"
+    assert set(symbols.unique()) == {
         "AAPL",
         "MSFT",
         "GOOGL",
@@ -97,11 +105,12 @@ def test_unit_period_pull(data_config, feature_config):
     data_loader = DataLoader(data_config=data_config, feature_config=feature_config)
 
     assert data_loader.df.shape[0] > 0, "DataFrame should not be empty"
+    timestamps = data_loader.df.index.get_level_values("timestamp")
     assert (
-        data_loader.df["timestamp"].dt.minute % 5 == 0
+        timestamps.minute % 5 == 0
     ).all(), "All timestamps should be on 5-minute intervals"
     assert (
-        data_loader.df["timestamp"].dt.date.nunique() == 1
+        pd.Series(timestamps).dt.date.nunique() == 1
     ), "DataFrame should contain data for only 1 day"
     assert (
         len(data_loader.df) == 97

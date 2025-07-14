@@ -1,11 +1,18 @@
+import logging
 from typing import Dict, List, Optional
 
 import gymnasium as gym
 import numpy as np
 import pandas as pd
+import vectorbt as vbt
 from gymnasium import spaces
+from stable_baselines3.common.vec_env import VecNormalize
 
 from trading.cli.alg.config import StockEnv
+from trading.src.alg.environments.reward_functions.reward_function_factory import (
+    factory_method,
+)
+from trading.src.alg.portfolio.portfolio import Portfolio
 from trading.src.features import utils as feature_utils
 from trading.src.features.generic_features import Feature
 
@@ -22,12 +29,16 @@ class TradingEnv(gym.Env):
         features: List[Feature],
         backtest: bool = False,
     ):
-        self.unique_symbols = data["tic"].unique()
+        self.unique_symbols = data.index.get_level_values("symbol").unique().unique()
         self.stock_dimension = len(self.unique_symbols)
         self.feature_cols = feature_utils.get_feature_cols(features=features)
-        self.data = data.copy()
+        self.init_data(data)
         self.backtest = backtest
         self.cfg = cfg
+        self.reward_function = factory_method(cfg.reward_config)
+        self.pf: Portfolio = Portfolio(
+            initial_cash=cfg.initial_cash,
+        )
 
         # Environment state space
         self.state_space = (
@@ -60,13 +71,21 @@ class TradingEnv(gym.Env):
 
         # Trading parameters
         self.initial_cash = cfg.initial_cash
-        self.max_steps = len(data["timestamp"].unique())
         # historical data
         self.asset_memory = [self.initial_cash]
-        self.position_queues: Dict = {
-            symbol: [] for symbol in self.data["tic"].unique()
-        }
         self._reset_internal_states()
+
+    def init_data(self, data: pd.DataFrame):
+        """
+        Set the data for the environment.
+        Args:
+            data: DataFrame containing the trading data.
+        """
+        self.data = data.copy()
+        self.data = self.data.reorder_levels(["timestamp", "symbol"])
+        self.data["size"] = 0
+        self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
+        self.max_steps = len(self.timestamps) - 1
 
     def _reset_internal_states(self):
         self.day = 0
@@ -74,6 +93,8 @@ class TradingEnv(gym.Env):
         self.stock_owned = np.zeros(self.stock_dimension, dtype=np.float32)
         self.terminal = False
         self.total_assets = self.initial_cash
+        self.pf.reset()
+        logging.debug(f"Environment reset: {self.initial_cash=}, {self.stock_owned=}")
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         """
@@ -84,17 +105,14 @@ class TradingEnv(gym.Env):
         return self._get_observation(), {}
 
     def _get_current_date(self):
-        return self.data["timestamp"].unique()[self.day]
+        return self.timestamps[self.day]
 
     def _get_day_prices(self):
-        df_day = self.data[self.data["timestamp"] == self._get_current_date()]
-        return df_day["close"].values
+        return self.data.xs(self._get_current_date(), level="timestamp")["close"].values
 
     def _get_observation(self):
         current_date = self._get_current_date()
-        df_day = self.data[self.data["timestamp"] == current_date]
-        df_day = df_day.set_index("tic").reindex(self.unique_symbols)
-
+        df_day = self.data.loc[[current_date]]
         prices = df_day["close"].fillna(0).values
         indicators = df_day[self.feature_cols].fillna(0).values.flatten()
 
@@ -102,69 +120,10 @@ class TradingEnv(gym.Env):
         return obs.astype(np.float32)
 
     def render(self):
-        print(f"Day: {self.day}")
-        print(f"Cash: {self.cash:.2f}")
-        print(f"Stock Owned: {self.stock_owned}")
-        print(f"Total Assets: {self.total_assets:.2f}")
-
-    def calculate_normalized_profit(self, shares, price, tic):
-        """
-        Calculate normalized profit for a given trade.
-        """
-        if shares == 0:
-            return 0.0
-        # Calculate profit by matching shares from the position queue (FIFO)
-        queue = self.position_queues[tic]
-        shares_to_match = shares
-        total_cost = 0.0
-        total_initial_value = 0.0
-        for idx, (s, p, f) in enumerate(queue):
-            if shares_to_match <= 0:
-                break
-            matched_shares = min(s, shares_to_match)
-            total_cost += matched_shares * price
-            total_initial_value += matched_shares * p
-            shares_to_match -= matched_shares
-        if total_initial_value == 0 or shares_to_match > 0:
-            return 0.0
-        profit = total_cost - total_initial_value
-        return profit / total_initial_value if total_initial_value != 0 else 0.0
-
-    def reward_function(self):
-        """
-        Calculate the reward based on the current portfolio value.
-        """
-        current_date = self._get_current_date()
-        df_day = self.data[self.data["timestamp"] == current_date]
-        prices = df_day.set_index("tic")["close"].reindex(self.unique_symbols).values
-
-        # Calculate portfolio value
-        valid_prices = np.nan_to_num(prices)
-        portfolio_value = self.cash + np.sum(valid_prices * self.stock_owned)
-
-        # Calculate normalized profit for each stock
-        normalized_profits = [
-            self.calculate_normalized_profit(shares, price, symbol)
-            for shares, price, symbol in zip(
-                self.stock_owned, valid_prices, self.unique_symbols
-            )
-        ]
-
-        # Reward is the change in portfolio value from the last step
-        if len(self.asset_memory) > 1:
-            previous_value = self.asset_memory[-2]
-            reward = (
-                (portfolio_value - previous_value) / previous_value
-                if previous_value != 0
-                else 0.0
-            )
-        else:
-            reward = 0.0
-
-        # Update asset memory
-        self.asset_memory.append(portfolio_value)
-
-        return reward + np.mean(normalized_profits)
+        logging.info(f"Day: {self.day}")
+        logging.info(f"Cash: {self.cash:.2f}")
+        logging.info(f"Stock Owned: {self.stock_owned}")
+        logging.info(f"Total Assets: {self.total_assets:.2f}")
 
     def step(self, action):
         """
@@ -183,11 +142,8 @@ class TradingEnv(gym.Env):
             return self._get_observation(), 0, self.terminal, False, {}
 
         current_date = self._get_current_date()
-        df_day = self.data[self.data["timestamp"] == current_date]
-        prices = df_day.set_index("tic")["close"].reindex(self.unique_symbols).values
-
-        # Apply actions only to available tickers
-        trade_limit = self.cfg.trade_limit_percent * self.total_assets
+        prices = self._get_day_prices()
+        trade_limit = self.cfg.trade_limit_percent * self.pf.total_value
         scaled_actions = action * trade_limit
         scaled_actions = np.clip(scaled_actions, -self.cfg.hmax, self.cfg.hmax)
         for i, symbol in enumerate(self.unique_symbols):
@@ -210,23 +166,20 @@ class TradingEnv(gym.Env):
                 dt_shares = act // price
                 cost = dt_shares * price
                 fee = cost * self.buy_cost[i]
-                self.position_queues[symbol].append((dt_shares, price, fee))
                 if cost + fee <= self.cash:
                     self.cash -= cost + fee
                     self.stock_owned[i] += dt_shares
 
-            self.data.loc[
-                (self.data["timestamp"] == current_date) & (self.data["tic"] == symbol),
-                "size",
-            ] = dt_shares
-
+            self.data.loc[(current_date, symbol), "size"] = dt_shares
         self.day += 1
         self.terminal = self.day >= self.max_steps - 1
 
-        # Portfolio value: use available prices only
-        valid_prices = np.nan_to_num(prices)
-        portfolio_value = self.cash + np.sum(valid_prices * self.stock_owned)
-
-        self.total_assets = portfolio_value
-
-        return self._get_observation(), self.reward_function(), self.terminal, False, {}
+        self.pf.update_position_batch(self.data.loc[[current_date]])
+        ret_info = {"net_value": self.pf.net_value(current_date)}
+        return (
+            self._get_observation(),
+            self.reward_function.compute_reward(self.pf, current_date),
+            self.terminal,
+            False,
+            ret_info,
+        )

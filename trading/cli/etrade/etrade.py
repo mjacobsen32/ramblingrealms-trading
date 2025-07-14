@@ -1,3 +1,5 @@
+import logging
+
 import pyetrade
 import typer
 from pydantic import SecretStr

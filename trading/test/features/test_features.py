@@ -248,6 +248,7 @@ def turbulence():
         fill_strategy=FillStrategy.BACKWARD_FILL,
         lookback=10,
         field="close",
+        return_periods=[1, 5, 10],
     )
 
 
