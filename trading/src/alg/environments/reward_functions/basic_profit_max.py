@@ -12,6 +12,7 @@ from trading.src.alg.portfolio.portfolio import Portfolio
 class BasicProfitMax(RewardFunction):
     def __init__(self, cfg: RewardConfig):
         self.previous_profit = 0.0
+        self.previous_net = None
         super().__init__(cfg)
 
     def reset(self):
