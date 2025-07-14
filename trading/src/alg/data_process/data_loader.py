@@ -1,5 +1,6 @@
 import logging
 import os
+from pyexpat import features
 from typing import ClassVar, Dict, Type
 
 import numpy as np
@@ -158,10 +159,23 @@ class DataLoader:
             f"[white]Current tickers: {self.df.index.get_level_values('symbol').unique().tolist()}"
         )
 
+    @classmethod
+    def data_info(cls, df: pd.DataFrame) -> str:
+        """
+        Returns a string representation of the dataframe.
+        """
+        return f"start_date: {df.index.get_level_values('timestamp').min()}, end_date: {df.index.get_level_values('timestamp').max()}, rows: {len(df)}, features: {len(df.columns)}"
+
     def get_train_test(self):
         """
         Splits the DataFrame into training and validation sets based on the validation split ratio.
         """
 
         split_idx = int(len(self.df) * (1 - self.data_config.validation_split))
-        return self.df.iloc[:split_idx], self.df.iloc[split_idx:]
+        train = self.df.iloc[:split_idx]
+        test = self.df.iloc[split_idx:]
+        logging.info(
+            f"Train data: {self.data_info(train)}\nTest data: {self.data_info(test)}"
+        )
+
+        return train, test

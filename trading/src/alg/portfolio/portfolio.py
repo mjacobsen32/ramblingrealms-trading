@@ -31,7 +31,7 @@ class Portfolio:
         self.vbt_pf = vbt.Portfolio.from_orders(
             close=self.df["close"],
             size=self.df["size"],
-            init_cash=self.initial_cash,
+            init_cash=100_000,
             log=True,
         )
         return self.vbt_pf
@@ -75,8 +75,10 @@ class Portfolio:
         Reset the portfolio to an empty state.
         """
         self.total_value = self.initial_cash
+        self.cash = self.initial_cash
+        self.nav = 0
         self.df = pd.DataFrame()
-        logging.debug("Portfolio has been reset.")
+        logging.info(f"Portfolio has been reset.\n{self}")
 
     def set_vbt(self, pf: vbt.Portfolio):
         """
@@ -89,7 +91,19 @@ class Portfolio:
         Plot the results of the backtest.
         """
         # for asset in self.as_vbt_pf().assets().columns.tolist():
-        self.as_vbt_pf().plot(title="Portfolio").show()
+        print(self.as_vbt_pf().subplots)
+        self.as_vbt_pf().plot(
+            title="Portfolio",
+            subplots=[
+                "cash",
+                "asset_flow",
+                "trades",
+                "trade_pnl",
+                "cum_returns",
+                "orders",
+            ],
+        ).show()
+        # self.as_vbt_pf().plot_cash().show()
 
     def stats(self):
         """
@@ -101,7 +115,7 @@ class Portfolio:
         """
         Return the orders of the backtest.
         """
-        return self.as_vbt_pf().orders.order_records
+        return self.as_vbt_pf().orders
 
     def __repr__(self) -> str:
         """

@@ -26,6 +26,6 @@
             "stats_window_size": null,
             "policy_kwargs": {},
             "verbose": 2,
-            "seed": null
+            "seed": 42
     }
 }

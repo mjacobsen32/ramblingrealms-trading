@@ -87,6 +87,7 @@ class TradingEnv(gym.Env):
         self.terminal = False
         self.total_assets = self.initial_cash
         self.pf.reset()
+        logging.debug(f"Environment reset: {self.initial_cash=}, {self.stock_owned=}")
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         """

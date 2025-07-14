@@ -39,7 +39,7 @@ def train(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
     trade_env = TradingEnv(
-        data=data_loader.get_train_test()[0],
+        data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
     )
@@ -56,7 +56,6 @@ def train(
     if not no_test:
         bt = BackTesting(
             model,
-            data_loader.get_train_test()[1],
             trade_env,
             alg_config.backtest_config,
         )
@@ -79,7 +78,7 @@ def backtest(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
     trade_env = TradingEnv(
-        data=data_loader.get_train_test()[0],
+        data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
         backtest=True,
@@ -91,7 +90,6 @@ def backtest(
 
     bt = BackTesting(
         model=model,
-        data=data_loader.get_train_test()[1],
         env=trade_env,
         backtest_config=alg_config.backtest_config,
     )

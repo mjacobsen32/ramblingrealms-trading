@@ -13,9 +13,8 @@ class BackTesting:
     Backtesting class for trading strategies using vectorbt.
     """
 
-    def __init__(self, model, data, env, backtest_config: BackTestConfig):
+    def __init__(self, model, env, backtest_config: BackTestConfig):
         self.model = model
-        self.data = data
         self.env = env
         self.backtest_config = backtest_config
 
