@@ -15,6 +15,11 @@ class BasicProfitMax(RewardFunction):
         self.previous_net = None
         super().__init__(cfg)
 
+    def reset(self):
+        self.previous_profit = 0.0
+        self.previous_net = None
+        return super().reset()
+
     def compute_reward(self, pf: Portfolio, current_date: str | None = None) -> float:
         if current_date is None:
             current_date = pf.df.index.get_level_values("timestamp")[-1]

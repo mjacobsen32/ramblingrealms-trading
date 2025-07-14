@@ -55,9 +55,10 @@ def train(
 
     if not no_test:
         bt = BackTesting(
-            model,
-            trade_env,
-            alg_config.backtest_config,
+            model=model,
+            env=trade_env,
+            backtest_config=alg_config.backtest_config,
+            data=data_loader.get_train_test()[1],
         )
         pf = bt.run()
         logging.info(pf.stats())
@@ -92,6 +93,7 @@ def backtest(
         model=model,
         env=trade_env,
         backtest_config=alg_config.backtest_config,
+        data=data_loader.get_train_test()[1],
     )
     pf = bt.run()
     logging.info(pf.stats())

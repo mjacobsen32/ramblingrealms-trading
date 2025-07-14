@@ -74,10 +74,12 @@ class Portfolio:
         """
         Reset the portfolio to an empty state.
         """
+        self.initial_cash = self.initial_cash
         self.total_value = self.initial_cash
         self.cash = self.initial_cash
         self.nav = 0
         self.df = pd.DataFrame()
+        self.vbt_pf: vbt.Portfolio | None = None
         logging.info(f"Portfolio has been reset.\n{self}")
 
     def set_vbt(self, pf: vbt.Portfolio):

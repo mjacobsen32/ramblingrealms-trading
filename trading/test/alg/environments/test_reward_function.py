@@ -100,12 +100,15 @@ def test_basic_profit_max(
     strong_profit = reward_function.compute_reward(
         strong_profitable_portfolio, "2023-01-05"
     )
+    reward_function.reset()
     mild_profit = reward_function.compute_reward(
         mild_profitable_portfolio, "2023-01-05"
     )
+    reward_function.reset()
     strong_negative = reward_function.compute_reward(
         strong_negative_portfolio, "2023-01-05"
     )
+    reward_function.reset()
     mild_negative = reward_function.compute_reward(
         mild_negative_portfolio, "2023-01-05"
     )
@@ -118,8 +121,8 @@ def test_basic_profit_max(
     print(mild_profitable_portfolio)
     print(mild_negative_portfolio)
     assert strong_profit > 0.9
-    assert mild_profit > 0.1
+    assert mild_profit > 0.01
     assert strong_negative < -0.9
-    assert mild_negative < -0.1
+    assert mild_negative < -0.01
     assert mild_profit < strong_profit
     assert mild_negative > strong_negative

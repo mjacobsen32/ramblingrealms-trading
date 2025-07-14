@@ -32,9 +32,7 @@ class TradingEnv(gym.Env):
         self.unique_symbols = data.index.get_level_values("symbol").unique().unique()
         self.stock_dimension = len(self.unique_symbols)
         self.feature_cols = feature_utils.get_feature_cols(features=features)
-        self.data = data.copy()
-        self.data = self.data.reorder_levels(["timestamp", "symbol"])
-        self.data["size"] = 0  # Initialize size column for trades
+        self.init_data(data)
         self.backtest = backtest
         self.cfg = cfg
         self.reward_function = factory_method(cfg.reward_config)
@@ -73,12 +71,21 @@ class TradingEnv(gym.Env):
 
         # Trading parameters
         self.initial_cash = cfg.initial_cash
-        self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
-        # self.timestamps = pd.Index(self.data.index.get_level_values("timestamp"))
-        self.max_steps = len(self.timestamps) - 1
         # historical data
         self.asset_memory = [self.initial_cash]
         self._reset_internal_states()
+
+    def init_data(self, data: pd.DataFrame):
+        """
+        Set the data for the environment.
+        Args:
+            data: DataFrame containing the trading data.
+        """
+        self.data = data.copy()
+        self.data = self.data.reorder_levels(["timestamp", "symbol"])
+        self.data["size"] = 0
+        self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
+        self.max_steps = len(self.timestamps) - 1
 
     def _reset_internal_states(self):
         self.day = 0
