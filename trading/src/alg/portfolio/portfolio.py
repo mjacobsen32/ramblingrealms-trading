@@ -93,7 +93,7 @@ class Portfolio:
         Plot the results of the backtest.
         """
         # for asset in self.as_vbt_pf().assets().columns.tolist():
-        print(self.as_vbt_pf().subplots)
+        #     print(self.as_vbt_pf().subplots) available subplots
         self.as_vbt_pf().plot(
             title="Portfolio",
             subplots=[
@@ -105,7 +105,6 @@ class Portfolio:
                 "orders",
             ],
         ).show()
-        # self.as_vbt_pf().plot_cash().show()
 
     def stats(self):
         """

@@ -50,15 +50,15 @@ def multi_tic_data(dates):
     return df
 
 
-# def test_portfolio(single_tic_data):
-#     pf = Portfolio(["AAPL"], initial_cash=1000)
-#     pf.update_position_batch(single_tic_data)
-
-#     pf.update_position_batch(single_tic_data)
-
-
 def test_portfolio_multi(multi_tic_data, dates):
     pf = Portfolio(initial_cash=1000)
+    assert pf.cash == 1000, "Initial cash should be set to 1000"
+    assert pf.total_value == 1000, "Total value should be equal to initial cash"
+    assert pf.nav == 0, "NAV should be initialized to 0"
+
     for i, date in enumerate(dates):
         pf.update_position_batch(multi_tic_data.loc[[date]])
-    logging.info(pf.as_vbt_pf().stats())
+
+    assert pf.as_vbt_pf() is not None, "VectorBT portfolio should be created"
+    assert pf.total_value > 1000, "Total value should increase with positive trades"
+    assert pf.nav > 0, "NAV should be greater than 0 after trades"

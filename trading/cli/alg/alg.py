@@ -30,13 +30,21 @@ def train(
     no_test: bool = typer.Option(
         False, "--no_test", "-t", help="Run the backtesting suite via the new model"
     ),
+    fetch_data: bool = typer.Option(
+        False,
+        "--fetch-data",
+        "-f",
+        help="Fetch the latest data before training. Do not use Cache.",
+    ),
 ):
     logging.info("Starting training process...")
     # Load configuration
     with Path.open(Path(config)) as f:
         alg_config = RRConfig.model_validate_json(f.read())
     data_loader = DataLoader(
-        data_config=alg_config.data_config, feature_config=alg_config.feature_config
+        data_config=alg_config.data_config,
+        feature_config=alg_config.feature_config,
+        fetch_data=fetch_data,
     )
     trade_env = TradingEnv(
         data=data_loader.get_train_test()[1],

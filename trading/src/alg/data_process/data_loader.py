@@ -35,6 +35,7 @@ class DataSource:
 
     def get_data(
         self,
+        fetch_data: bool,
         request: DataRequests,
         df: pd.DataFrame,
         cache_path: str,
@@ -75,6 +76,7 @@ class AlpacaDataLoader(DataSource):
 
     def get_data(
         self,
+        fetch_data: bool,
         request: DataRequests,
         df: pd.DataFrame,
         cache_path: str,
@@ -93,7 +95,7 @@ class AlpacaDataLoader(DataSource):
             request.dataset_name + ".parquet",
         )
         user = user_cache.UserCache().load()
-        if os.path.exists(cache_file) and cache_enabled:
+        if os.path.exists(cache_file) and cache_enabled and not fetch_data:
             logging.info("Loading data from cache...")
             df = pd.concat([pd.read_parquet(cache_file), df])
         else:
@@ -121,7 +123,15 @@ class DataLoader:
     and applies the specified features to the data.
     """
 
-    def __init__(self, data_config: DataConfig, feature_config: FeatureConfig):
+    def __init__(
+        self,
+        data_config: DataConfig,
+        feature_config: FeatureConfig,
+        fetch_data: bool = False,
+    ):
+        """
+        Initializes the DataLoader with the given configurations.
+        """
         self.data_config = data_config
         self.feature_config = feature_config
 
@@ -131,6 +141,7 @@ class DataLoader:
 
         for request in self.data_config.requests:
             data = DataSource.factory(request.model_dump()).get_data(
+                fetch_data,
                 request,
                 self.df,
                 str(data_config.cache_path),
@@ -155,7 +166,7 @@ class DataLoader:
             f"[green]Data Successfully loaded...\n[white]Current features: {[f for f in self.features]}"
         )
         logging.info(
-            f"[white]Current tickers: {self.df.index.get_level_values('symbol').unique().tolist()}"
+            f"Current tickers: {self.df.index.get_level_values('symbol').unique().tolist()}"
         )
 
     @classmethod

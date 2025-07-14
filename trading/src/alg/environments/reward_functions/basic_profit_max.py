@@ -12,12 +12,10 @@ from trading.src.alg.portfolio.portfolio import Portfolio
 class BasicProfitMax(RewardFunction):
     def __init__(self, cfg: RewardConfig):
         self.previous_profit = 0.0
-        self.previous_net = None
         super().__init__(cfg)
 
     def reset(self):
         self.previous_profit = 0.0
-        self.previous_net = None
         return super().reset()
 
     def compute_reward(self, pf: Portfolio, current_date: str | None = None) -> float:
@@ -26,7 +24,6 @@ class BasicProfitMax(RewardFunction):
 
         profit = (pf.net_value(current_date) - pf.initial_cash) / pf.initial_cash
         normalized_profit = np.tanh(profit)
-        logging.debug(f"Normalized profit: {normalized_profit}")
         if (
             np.isnan(normalized_profit)
             or normalized_profit <= -1.0

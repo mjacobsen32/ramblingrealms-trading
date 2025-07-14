@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -61,8 +62,8 @@ class UserCache(BaseModel):
     def __getattribute__(self, name):
         attr = super().__getattribute__(name)
         if attr is None:
-            Console().logging.info(
-                f"[bold red]Attribute {name} not found. Please run the setup command."
+            logging.warning(
+                f"Attribute {name} not found. Please run the setup command."
             )
         return attr
 
