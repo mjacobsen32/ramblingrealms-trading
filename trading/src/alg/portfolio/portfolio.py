@@ -23,9 +23,6 @@ class Portfolio:
     Very much StateFULL
     """
 
-    vbt_pf: vbt.Portfolio | None = None
-    df = pd.DataFrame()
-
     def __init__(self, initial_cash: float = 100_000, stock_dimension: int = 1):
         """
         Initialize the Portfolio
@@ -54,22 +51,18 @@ class Portfolio:
         )
         return self.vbt_pf
 
-    def state(self, timestamp: pd.Timestamp) -> pd.Series:
+    def state(self, timestamp: pd.Timestamp) -> np.ndarray:
         """
         Get the current state of the portfolio.
         Returns:
             pd.Series: [internal_cash, positions].
         """
-        return pd.Series(
-            [
-                self.cash,
-                (
-                    self.df.loc[[timestamp]]["position"]
-                    if not self.df.empty
-                    else np.zeros(self.stock_dimension)
-                ),
-            ]
+        positions = (
+            self.df.loc[[timestamp]]["position"].values
+            if not self.df.empty
+            else np.zeros(self.stock_dimension)
         )
+        return np.concatenate([[self.cash], positions])
 
     def net_value(self) -> float:
         """
@@ -81,10 +74,29 @@ class Portfolio:
         """
         Update positions for a batch of tickers at a given timestamp.
         """
+        logging.debug(f"size_before_adjustment:\n{df['size']}")
+
+        df["size"] = df.apply(
+            lambda row: (
+                max(
+                    row["size"],
+                    -(
+                        self.df.groupby("symbol")["position"].last().get(row.name[1], 0)
+                        if not self.df.empty
+                        else 0
+                    ),
+                )
+                if row["size"] < 0
+                else row["size"]
+            ),
+            axis=1,
+        )
         self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
+        logging.debug(f"size_after_adjustment:\n{df['size']}")
         self.df["position"] = self.df.groupby("symbol")[
             "size"
         ].cumsum()  # shouldn't need to cumsum every time
+
         self.df["nav"] = self.df["position"] * self.df["close"]
         self.cash += -(df["size"] * df["close"]).sum()
         self.nav = self.df.groupby("symbol")["nav"].last().sum()

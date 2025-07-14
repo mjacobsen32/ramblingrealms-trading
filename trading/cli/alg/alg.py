@@ -95,7 +95,6 @@ def backtest(
         data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
-        backtest=True,
     )
     trade_env.reset()
 

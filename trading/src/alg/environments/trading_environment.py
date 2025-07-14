@@ -38,9 +38,6 @@ class TradingEnv(gym.Env):
             stock_dimension=self.stock_dimension,
         )
         self.observation_index = 0
-        self.observation_timestamp = self.data.index.get_level_values(
-            "timestamp"
-        ).unique()
 
         # Define action space: continuous [-1,1] per stock (sell, hold, buy)
         self.action_space = spaces.Box(
@@ -79,6 +76,9 @@ class TradingEnv(gym.Env):
         self.observation_index = 0
         self.terminal = False
         self.pf.reset()
+        self.observation_timestamp = self.data.index.get_level_values(
+            "timestamp"
+        ).unique()
         logging.debug(f"Environment reset: {self.render()}")
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
@@ -104,14 +104,17 @@ class TradingEnv(gym.Env):
         )
         prices = self.data.loc[[self.observation_timestamp[i]]]["close"].to_numpy()
         portfolio_state = np.asarray(self.pf.state(self.observation_timestamp[i]))
-
-        return np.concatenate(
+        c = np.concatenate(
             [
                 portfolio_state,
                 prices,
                 indicators,
             ]
-        ).astype(np.float32)
+        )
+
+        logging.debug(f"Observation: {c}")
+
+        return c
 
     def render(self):
         return (
@@ -131,11 +134,18 @@ class TradingEnv(gym.Env):
                 "close"
             ][action > 0]
         ).sum()
-        if attempted_buy > self.pf.cash:
+        if attempted_buy > self.pf.cash and np.any(action > 0):
             trade_limit = self.pf.cash / (action > 0).sum()
         else:
             trade_limit = self.cfg.trade_limit_percent * self.pf.total_value
-        scaled_actions = np.clip(action * trade_limit, -self.cfg.hmax, self.cfg.hmax)
+        scaled_actions = (
+            np.clip(action * trade_limit, -self.cfg.hmax, self.cfg.hmax)
+            // self.data.loc[self.observation_timestamp[self.observation_index]][
+                "close"
+            ]
+        )
+        scaled_actions.fillna(0, inplace=True)
+        logging.debug(f"Scaled Actions: {scaled_actions}")
         return scaled_actions
 
     def step(self, action):
@@ -152,26 +162,37 @@ class TradingEnv(gym.Env):
         """
 
         if self.terminal:
-            return self._get_observation(), 0, self.terminal, False, {}
+            return (
+                self._get_observation(self.observation_index - 1),
+                0,
+                self.terminal,
+                False,
+                {},
+            )
 
         scaled_actions = self.get_scaled_actions(action)
 
-        self.data.loc[self.observation_timestamp[self.observation_index]][
-            "size"
-        ] = scaled_actions
-
-        self.observation_index += 1
-        self.terminal = self.observation_index >= self.max_steps - 1
-
+        self.data.loc[self.observation_timestamp[self.observation_index], "size"] = (
+            scaled_actions.values
+        )
+        logging.debug(
+            f"{self.data.loc[self.observation_timestamp[self.observation_index], 'size']}"
+        )
         self.pf.update_position_batch(
             self.data.loc[[self.observation_timestamp[self.observation_index]]]
         )
+
         ret_info = {"net_value": self.pf.net_value()}
 
-        return (
+        logging.debug(f"Env State: {self.render()}")
+        logging.debug(f"Portfolio State: {self.pf}")
+        ret = (
             self._get_observation(),
             self.reward_function.compute_reward(self.pf),
             self.terminal,
             False,
             ret_info,
         )
+        self.observation_index += 1
+        self.terminal = self.observation_index >= self.max_steps - 1
+        return ret
