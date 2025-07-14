@@ -12,6 +12,9 @@ class RewardFunction:
     def __init__(self, cfg: RewardConfig):
         self.cfg = cfg
 
+    def __repr__(self) -> str:
+        return f"RewardFunction(cfg={self.cfg})"
+
     def reset(self):
         """
         Reset the reward function state.

@@ -27,52 +27,40 @@ class TradingEnv(gym.Env):
         data: pd.DataFrame,
         cfg: StockEnv,
         features: List[Feature],
-        backtest: bool = False,
     ):
-        self.unique_symbols = data.index.get_level_values("symbol").unique().unique()
-        self.stock_dimension = len(self.unique_symbols)
+        self.stock_dimension = len(data.index.get_level_values("symbol").unique())
         self.feature_cols = feature_utils.get_feature_cols(features=features)
         self.init_data(data)
-        self.backtest = backtest
         self.cfg = cfg
         self.reward_function = factory_method(cfg.reward_config)
         self.pf: Portfolio = Portfolio(
             initial_cash=cfg.initial_cash,
+            stock_dimension=self.stock_dimension,
         )
-
-        # Environment state space
-        self.state_space = (
-            1  # cash balance
-            + 2 * self.stock_dimension  # stock prices and shares held
-            + len(self.feature_cols)
-            * self.stock_dimension  # technical indicators for each stock
-        )
+        self.observation_index = 0
+        self.observation_timestamp = self.data.index.get_level_values(
+            "timestamp"
+        ).unique()
 
         # Define action space: continuous [-1,1] per stock (sell, hold, buy)
         self.action_space = spaces.Box(
             low=-1, high=1, shape=(self.stock_dimension,), dtype=np.float32
         )
 
+        # Environment state space
+        state_space = (
+            1  # cash balance
+            + 2 * self.stock_dimension  # stock prices and shares held
+            + (
+                len(self.feature_cols) * self.stock_dimension
+            )  # technical indicators for each stock
+        )
+
         # State space (cash + owned shares + prices + indicators)
         self.observation_space = spaces.Box(
-            low=-np.inf, high=np.inf, shape=(self.state_space,), dtype=np.float32
+            low=-np.inf, high=np.inf, shape=(state_space,), dtype=np.float32
         )
 
-        self.sell_cost = (
-            [float(x) for x in cfg.sell_cost_pct]
-            if isinstance(cfg.sell_cost_pct, list)
-            else [float(cfg.sell_cost_pct)] * self.stock_dimension
-        )
-        self.buy_cost = (
-            [float(x) for x in cfg.buy_cost_pct]
-            if isinstance(cfg.buy_cost_pct, list)
-            else [float(cfg.buy_cost_pct)] * self.stock_dimension
-        )
-
-        # Trading parameters
-        self.initial_cash = cfg.initial_cash
-        # historical data
-        self.asset_memory = [self.initial_cash]
         self._reset_internal_states()
 
     def init_data(self, data: pd.DataFrame):
@@ -83,18 +71,15 @@ class TradingEnv(gym.Env):
         """
         self.data = data.copy()
         self.data = self.data.reorder_levels(["timestamp", "symbol"])
-        self.data["size"] = 0
+        self.data["size"] = 0  # Initialize size column for trades
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
         self.max_steps = len(self.timestamps) - 1
 
     def _reset_internal_states(self):
-        self.day = 0
-        self.cash = self.initial_cash
-        self.stock_owned = np.zeros(self.stock_dimension, dtype=np.float32)
+        self.observation_index = 0
         self.terminal = False
-        self.total_assets = self.initial_cash
         self.pf.reset()
-        logging.debug(f"Environment reset: {self.initial_cash=}, {self.stock_owned=}")
+        logging.debug(f"Environment reset: {self.render()}")
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         """
@@ -104,26 +89,54 @@ class TradingEnv(gym.Env):
         self._reset_internal_states()
         return self._get_observation(), {}
 
-    def _get_current_date(self):
-        return self.timestamps[self.day]
+    def _get_observation(self, i: int = -1) -> np.ndarray:
+        """Get the current observation from the environment.
 
-    def _get_day_prices(self):
-        return self.data.xs(self._get_current_date(), level="timestamp")["close"].values
+        Returns:
+            np.ndarray: The current observation. [cash, positions, prices, indicators]
+        """
+        if i == -1:
+            i = self.observation_index
+        indicators = (
+            self.data.loc[[self.observation_timestamp[i]]][self.feature_cols]
+            .to_numpy()
+            .flatten()
+        )
+        prices = self.data.loc[[self.observation_timestamp[i]]]["close"].to_numpy()
+        portfolio_state = np.asarray(self.pf.state(self.observation_timestamp[i]))
 
-    def _get_observation(self):
-        current_date = self._get_current_date()
-        df_day = self.data.loc[[current_date]]
-        prices = df_day["close"].fillna(0).values
-        indicators = df_day[self.feature_cols].fillna(0).values.flatten()
-
-        obs = np.concatenate([[self.cash], self.stock_owned, prices, indicators])
-        return obs.astype(np.float32)
+        return np.concatenate(
+            [
+                portfolio_state,
+                prices,
+                indicators,
+            ]
+        ).astype(np.float32)
 
     def render(self):
-        logging.info(f"Day: {self.day}")
-        logging.info(f"Cash: {self.cash:.2f}")
-        logging.info(f"Stock Owned: {self.stock_owned}")
-        logging.info(f"Total Assets: {self.total_assets:.2f}")
+        return (
+            f"Day: {self.observation_timestamp[self.observation_index]}, "
+            f"Tickers: {self.data.index.get_level_values('symbol').unique().tolist()}, "
+            f"Observation Space: {self.observation_space.shape}, "
+            f"Action Space: {self.action_space.shape}, "
+            f"Features: {self.feature_cols}, "
+            f"Reward Function: {self.reward_function}, "
+            f"{self.pf}"
+        )
+
+    def get_scaled_actions(self, action: np.ndarray) -> np.ndarray:
+        attempted_buy = (
+            action[action > 0]
+            * self.data.loc[self.observation_timestamp[self.observation_index]][
+                "close"
+            ][action > 0]
+        ).sum()
+        if attempted_buy > self.pf.cash:
+            trade_limit = self.pf.cash / (action > 0).sum()
+        else:
+            trade_limit = self.cfg.trade_limit_percent * self.pf.total_value
+        scaled_actions = np.clip(action * trade_limit, -self.cfg.hmax, self.cfg.hmax)
+        return scaled_actions
 
     def step(self, action):
         """
@@ -141,44 +154,23 @@ class TradingEnv(gym.Env):
         if self.terminal:
             return self._get_observation(), 0, self.terminal, False, {}
 
-        current_date = self._get_current_date()
-        prices = self._get_day_prices()
-        trade_limit = self.cfg.trade_limit_percent * self.pf.total_value
-        scaled_actions = action * trade_limit
-        scaled_actions = np.clip(scaled_actions, -self.cfg.hmax, self.cfg.hmax)
-        for i, symbol in enumerate(self.unique_symbols):
-            price = prices[i]
-            act = scaled_actions[i]
-            dt_shares = 0
+        scaled_actions = self.get_scaled_actions(action)
 
-            if np.isnan(price):  # Ticker not available on this day
-                continue
+        self.data.loc[self.observation_timestamp[self.observation_index]][
+            "size"
+        ] = scaled_actions
 
-            if act < 0:  # Sell
-                dt_shares = min(abs(act) // price, self.stock_owned[i])
-                proceeds = dt_shares * price
-                cost = proceeds * self.sell_cost[i]
-                self.cash += proceeds - cost
-                self.stock_owned[i] -= dt_shares
-                dt_shares = -dt_shares  # Negative for selling
+        self.observation_index += 1
+        self.terminal = self.observation_index >= self.max_steps - 1
 
-            elif act > 0:  # Buy
-                dt_shares = act // price
-                cost = dt_shares * price
-                fee = cost * self.buy_cost[i]
-                if cost + fee <= self.cash:
-                    self.cash -= cost + fee
-                    self.stock_owned[i] += dt_shares
+        self.pf.update_position_batch(
+            self.data.loc[[self.observation_timestamp[self.observation_index]]]
+        )
+        ret_info = {"net_value": self.pf.net_value()}
 
-            self.data.loc[(current_date, symbol), "size"] = dt_shares
-        self.day += 1
-        self.terminal = self.day >= self.max_steps - 1
-
-        self.pf.update_position_batch(self.data.loc[[current_date]])
-        ret_info = {"net_value": self.pf.net_value(current_date)}
         return (
             self._get_observation(),
-            self.reward_function.compute_reward(self.pf, current_date),
+            self.reward_function.compute_reward(self.pf),
             self.terminal,
             False,
             ret_info,

@@ -1,15 +1,32 @@
 import logging
 
+import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from rich import print as rprint
 
+#         self.sell_cost = (
+#     [float(x) for x in cfg.sell_cost_pct]
+#     if isinstance(cfg.sell_cost_pct, list)
+#     else [float(cfg.sell_cost_pct)] * self.stock_dimension
+# )
+# self.buy_cost = (
+#     [float(x) for x in cfg.buy_cost_pct]
+#     if isinstance(cfg.buy_cost_pct, list)
+#     else [float(cfg.buy_cost_pct)] * self.stock_dimension
+# )
+
 
 class Portfolio:
+    """
+    Portfolio class for managing trading positions and cash flow.
+    Very much StateFULL
+    """
+
     vbt_pf: vbt.Portfolio | None = None
     df = pd.DataFrame()
 
-    def __init__(self, initial_cash: float = 100_000):
+    def __init__(self, initial_cash: float = 100_000, stock_dimension: int = 1):
         """
         Initialize the Portfolio
         """
@@ -19,6 +36,7 @@ class Portfolio:
         self.nav = 0
         self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
+        self.stock_dimension = stock_dimension
 
     def as_vbt_pf(self) -> vbt.Portfolio:
         """
@@ -36,7 +54,24 @@ class Portfolio:
         )
         return self.vbt_pf
 
-    def net_value(self, datetime) -> float:
+    def state(self, timestamp: pd.Timestamp) -> pd.Series:
+        """
+        Get the current state of the portfolio.
+        Returns:
+            pd.Series: [internal_cash, positions].
+        """
+        return pd.Series(
+            [
+                self.cash,
+                (
+                    self.df.loc[[timestamp]]["position"]
+                    if not self.df.empty
+                    else np.zeros(self.stock_dimension)
+                ),
+            ]
+        )
+
+    def net_value(self) -> float:
         """
         Calculate the net value of the portfolio.
         """
