@@ -1,15 +1,18 @@
 import logging
 
+import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from rich import print as rprint
 
 
 class Portfolio:
-    vbt_pf: vbt.Portfolio | None = None
-    df = pd.DataFrame()
+    """
+    Portfolio class for managing trading positions and cash flow.
+    Very much Stateful
+    """
 
-    def __init__(self, initial_cash: float = 100_000):
+    def __init__(self, initial_cash: float = 100_000, stock_dimension: int = 1):
         """
         Initialize the Portfolio
         """
@@ -19,6 +22,7 @@ class Portfolio:
         self.nav = 0
         self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
+        self.stock_dimension = stock_dimension
 
     def as_vbt_pf(self) -> vbt.Portfolio:
         """
@@ -36,7 +40,20 @@ class Portfolio:
         )
         return self.vbt_pf
 
-    def net_value(self, datetime) -> float:
+    def state(self, timestamp: pd.Timestamp) -> np.ndarray:
+        """
+        Get the current state of the portfolio.
+        Returns:
+            pd.Series: [internal_cash, positions].
+        """
+        positions = (
+            self.df.loc[[timestamp]]["position"].values
+            if not self.df.empty
+            else np.zeros(self.stock_dimension)
+        )
+        return np.concatenate([[self.cash], positions])
+
+    def net_value(self) -> float:
         """
         Calculate the net value of the portfolio.
         """
@@ -46,10 +63,29 @@ class Portfolio:
         """
         Update positions for a batch of tickers at a given timestamp.
         """
+        logging.debug(f"size_before_adjustment:\n{df['size']}")
+
+        df["size"] = df.apply(
+            lambda row: (
+                max(
+                    row["size"],
+                    -(
+                        self.df.groupby("symbol")["position"].last().get(row.name[1], 0)
+                        if not self.df.empty
+                        else 0
+                    ),
+                )
+                if row["size"] < 0
+                else row["size"]
+            ),
+            axis=1,
+        )
         self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
+        logging.debug(f"size_after_adjustment:\n{df['size']}")
         self.df["position"] = self.df.groupby("symbol")[
             "size"
         ].cumsum()  # shouldn't need to cumsum every time
+
         self.df["nav"] = self.df["position"] * self.df["close"]
         self.cash += -(df["size"] * df["close"]).sum()
         self.nav = self.df.groupby("symbol")["nav"].last().sum()
@@ -80,7 +116,7 @@ class Portfolio:
         self.nav = 0
         self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
-        logging.info(f"Portfolio has been reset.\n{self}")
+        logging.debug(f"Portfolio has been reset.\n{self}")
 
     def set_vbt(self, pf: vbt.Portfolio):
         """
@@ -110,7 +146,7 @@ class Portfolio:
         """
         Return the statistics of the backtest.
         """
-        return self.as_vbt_pf().stats()
+        return self.as_vbt_pf().stats(settings=dict(freq="d"))
 
     def orders(self):
         """

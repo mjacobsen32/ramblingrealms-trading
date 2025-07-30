@@ -92,7 +92,7 @@ def stock_env_config():
         buy_cost_pct=0.001,
         sell_cost_pct=0.001,
         turbulence_threshold=None,
-        reward_scaling=0,
+        trade_limit_percent=0.1,
     )
 
 
@@ -104,7 +104,6 @@ def trade_env(data_loader, stock_env_config, feature_config):
         data=data_loader.get_train_test()[0],
         cfg=stock_env_config,
         features=feature_config.features,
-        backtest=False,
     )
 
 

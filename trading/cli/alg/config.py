@@ -245,5 +245,5 @@ class RRConfig(BaseModel):
                 try:
                     return string_map[str(info.field_name)].model_validate(value)
                 except ValidationError as e_two:
-                    logging.info("Validation error two:", e_two)
+                    logging.error("Validation error two:", e_two)
         return value

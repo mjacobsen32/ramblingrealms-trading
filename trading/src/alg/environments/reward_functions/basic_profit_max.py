@@ -14,6 +14,9 @@ class BasicProfitMax(RewardFunction):
         self.previous_profit = 0.0
         super().__init__(cfg)
 
+    def __repr__(self) -> str:
+        return f"BasicProfitMax(profit_memory={self.previous_profit})"
+
     def reset(self):
         self.previous_profit = 0.0
         return super().reset()
@@ -22,7 +25,7 @@ class BasicProfitMax(RewardFunction):
         if current_date is None:
             current_date = pf.df.index.get_level_values("timestamp")[-1]
 
-        profit = (pf.net_value(current_date) - pf.initial_cash) / pf.initial_cash
+        profit = (pf.net_value() - pf.initial_cash) / pf.initial_cash
         normalized_profit = np.tanh(profit)
         if (
             np.isnan(normalized_profit)
