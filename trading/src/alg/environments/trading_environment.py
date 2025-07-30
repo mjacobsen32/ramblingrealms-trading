@@ -52,7 +52,10 @@ class TradingEnv(gym.Env):
                 len(self.feature_cols) * self.stock_dimension
             )  # technical indicators for each stock
         )
-
+        logging.info(
+            f"State space: {state_space}, Features ({len(self.feature_cols)}): {self.feature_cols}, "
+            f"Stock Dimension: {self.stock_dimension}, action space: {self.action_space.shape}"
+        )
         # State space (cash + owned shares + prices + indicators)
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(state_space,), dtype=np.float32
@@ -79,7 +82,7 @@ class TradingEnv(gym.Env):
         self.observation_timestamp = self.data.index.get_level_values(
             "timestamp"
         ).unique()
-        logging.debug(f"Environment reset: {self.render()}")
+        logging.debug(f"Environment reset:\n{self.render()}")
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         """
@@ -104,6 +107,9 @@ class TradingEnv(gym.Env):
         )
         prices = self.data.loc[[self.observation_timestamp[i]]]["close"].to_numpy()
         portfolio_state = np.asarray(self.pf.state(self.observation_timestamp[i]))
+        logging.debug(
+            f"Portfolio state: {portfolio_state.shape}\nPrices: {prices.shape}\nIndicators: {indicators.shape}"
+        )
         c = np.concatenate(
             [
                 portfolio_state,
@@ -118,7 +124,8 @@ class TradingEnv(gym.Env):
 
     def render(self):
         return (
-            f"Day: {self.observation_timestamp[self.observation_index]}, "
+            f"Day: {self.observation_timestamp[self.observation_index]}\n"
+            f"Slice: {self.data.loc[self.observation_timestamp[self.observation_index]]}\n"
             f"Tickers: {self.data.index.get_level_values('symbol').unique().tolist()}, "
             f"Observation Space: {self.observation_space.shape}, "
             f"Action Space: {self.action_space.shape}, "

@@ -32,11 +32,16 @@ class Portfolio:
             return self.vbt_pf
 
         self.df.reset_index(level="symbol", inplace=True)
+        price = self.df.pivot(columns="symbol", values="close")
+        close = self.df.pivot(columns="symbol", values="close")
+        size = self.df.pivot(columns="symbol", values="size")
         self.vbt_pf = vbt.Portfolio.from_orders(
-            close=self.df["close"],
-            size=self.df["size"],
+            close=close,
+            price=price,
+            size=size,
             init_cash=100_000,
             log=True,
+            cash_sharing=True,
         )
         return self.vbt_pf
 
@@ -128,25 +133,30 @@ class Portfolio:
         """
         Plot the results of the backtest.
         """
-        # for asset in self.as_vbt_pf().assets().columns.tolist():
-        #     print(self.as_vbt_pf().subplots) available subplots
-        self.as_vbt_pf().plot(
-            title="Portfolio",
-            subplots=[
-                "cash",
-                "asset_flow",
-                "trades",
-                "trade_pnl",
-                "cum_returns",
-                "orders",
-            ],
-        ).show()
+
+        pf = self.as_vbt_pf()
+        for asset in pf.assets().columns.tolist():
+            logging.info(f"Plotting asset: {asset}")
+            self.as_vbt_pf()[asset].plot(
+                title=asset.upper(),
+                subplots=[
+                    "cash",
+                    "asset_flow",
+                    "trades",
+                    "trade_pnl",
+                    "cum_returns",
+                    "orders",
+                ],
+            ).show()
 
     def stats(self):
         """
         Return the statistics of the backtest.
         """
-        return self.as_vbt_pf().stats(settings=dict(freq="d"))
+        ret = ""
+        for asset in self.as_vbt_pf().assets().columns.tolist():
+            ret += f"\nStats for {asset}:\n{self.as_vbt_pf()[asset].stats(settings=dict(freq='d'))}\n\n"
+        return ret
 
     def orders(self):
         """

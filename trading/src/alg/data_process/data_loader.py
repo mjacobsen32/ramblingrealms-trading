@@ -17,6 +17,7 @@ from trading.cli.alg.config import (
     DataSourceType,
     FeatureConfig,
 )
+from trading.src.features.utils import get_feature_cols
 from trading.src.user_cache import user_cache
 
 
@@ -136,8 +137,6 @@ class DataLoader:
         self.feature_config = feature_config
 
         self.df = pd.DataFrame()
-        self.features = pd.Series()
-        self.targets = pd.Series()
 
         for request in self.data_config.requests:
             data = DataSource.factory(request.model_dump()).get_data(
@@ -158,12 +157,13 @@ class DataLoader:
             ]:
                 self.df = feature.to_df(self.df, data)
 
-        self.features = self.df.columns
+        self.columns = self.df.columns
+        self.features = get_feature_cols(features=self.feature_config.features)
         self.df.sort_index(level=["timestamp", "symbol"], inplace=True)
         self.df.dropna()
 
         logging.info(
-            f"[green]Data Successfully loaded...\n[white]Current features: {[f for f in self.features]}"
+            f"Data Successfully loaded...\nCurrent columns: {[f for f in self.columns]}\nCurrent Features: {self.feature_config.features}"
         )
         logging.info(
             f"Current tickers: {self.df.index.get_level_values('symbol').unique().tolist()}"

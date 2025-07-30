@@ -196,7 +196,7 @@ class Candle(Feature):
     """
 
     def get_feature_names(self) -> List[str]:
-        return ["open", "high", "low", "close", "volume"]
+        return ["open", "high", "low", "close", "volume", "trade_count", "vwap"]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         return self.clean_columns(self.get_feature_names(), data)
@@ -210,6 +210,8 @@ class Candle(Feature):
     period: str = Field(
         TimeFrameUnit.Day, description="Time period of the candle (e.g., '1d', '1h')"
     )
+    trade_count: int = Field(0, description="Number of trades during the candle period")
+    vwap: float = Field(0.0, description="Volume Weighted Average Price for the candle")
 
 
 class MovingWindow(Feature):

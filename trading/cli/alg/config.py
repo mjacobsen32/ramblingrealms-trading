@@ -65,6 +65,9 @@ class FeatureConfig(BaseModel):
         description="Strategy for handling missing values (e.g., 'mean', 'median', 'drop')",
     )
 
+    def __repr__(self):
+        return f"FeatureConfig(features={self.features}, fill_strategy={self.fill_strategy})"
+
 
 class DataRequests(BaseModel):
     """

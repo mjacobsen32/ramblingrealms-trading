@@ -129,6 +129,6 @@ def analysis(
     with Path.open(Path(alg_config)) as f:
         config = RRConfig.model_validate_json(f.read())
     pf = Portfolio.load(config.backtest_config.results_path.as_path())
-    rprint(f"\n[green]Stats:[/green]\n{pf.stats()}")
+    rprint(f"\nStats:\n{pf.stats()}")
     if not no_plot:
         pf.plot()
