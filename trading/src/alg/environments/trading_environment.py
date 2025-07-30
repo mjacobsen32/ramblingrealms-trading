@@ -144,7 +144,7 @@ class TradingEnv(gym.Env):
                 "close"
             ]
         )
-        scaled_actions.fillna(0, inplace=True)
+        scaled_actions = np.nan_to_num(scaled_actions)
         logging.debug(f"Scaled Actions: {scaled_actions}")
         return scaled_actions
 
@@ -173,7 +173,9 @@ class TradingEnv(gym.Env):
         scaled_actions = self.get_scaled_actions(action)
 
         self.data.loc[self.observation_timestamp[self.observation_index], "size"] = (
-            scaled_actions.values
+            scaled_actions
+            if isinstance(scaled_actions, np.ndarray)
+            else scaled_actions.to_numpy()
         )
         logging.debug(
             f"{self.data.loc[self.observation_timestamp[self.observation_index], 'size']}"

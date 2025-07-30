@@ -5,22 +5,11 @@ import pandas as pd
 import vectorbt as vbt
 from rich import print as rprint
 
-#         self.sell_cost = (
-#     [float(x) for x in cfg.sell_cost_pct]
-#     if isinstance(cfg.sell_cost_pct, list)
-#     else [float(cfg.sell_cost_pct)] * self.stock_dimension
-# )
-# self.buy_cost = (
-#     [float(x) for x in cfg.buy_cost_pct]
-#     if isinstance(cfg.buy_cost_pct, list)
-#     else [float(cfg.buy_cost_pct)] * self.stock_dimension
-# )
-
 
 class Portfolio:
     """
     Portfolio class for managing trading positions and cash flow.
-    Very much StateFULL
+    Very much Stateful
     """
 
     def __init__(self, initial_cash: float = 100_000, stock_dimension: int = 1):
