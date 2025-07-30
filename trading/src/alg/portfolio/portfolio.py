@@ -127,7 +127,7 @@ class Portfolio:
         self.nav = 0
         self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
-        logging.info(f"Portfolio has been reset.\n{self}")
+        logging.debug(f"Portfolio has been reset.\n{self}")
 
     def set_vbt(self, pf: vbt.Portfolio):
         """
@@ -157,7 +157,7 @@ class Portfolio:
         """
         Return the statistics of the backtest.
         """
-        return self.as_vbt_pf().stats()
+        return self.as_vbt_pf().stats(settings=dict(freq="d"))
 
     def orders(self):
         """
