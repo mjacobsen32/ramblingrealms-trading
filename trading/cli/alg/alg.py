@@ -128,7 +128,9 @@ def analysis(
     logging.info(f"Starting analysis process...")
     with Path.open(Path(alg_config)) as f:
         config = RRConfig.model_validate_json(f.read())
-    pf = Portfolio.load(config.backtest_config.results_path.as_path())
+    pf = Portfolio.load(
+        config.stock_env.portfolio_config, config.backtest_config.results_path.as_path()
+    )
     rprint(f"\nStats:\n{pf.stats()}")
     if not no_plot:
         pf.plot()

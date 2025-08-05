@@ -1,7 +1,16 @@
 {
-    "initial_cash": 1000000,
-    "buy_cost_pct": 0.001,
-    "sell_cost_pct": 0.001,
-    "turbulence_threshold": null,
-    "reward_scaling": 1e5
+    "reward_config":{
+        "type": "basic_profit_max",
+        "reward_scaling": 1e4
+    },
+    "portfolio_config":{
+        "initial_cash": 1000000,
+        "buy_cost_pct": 0.001,
+        "sell_cost_pct": 0.001,
+        "turbulence_threshold": null,
+        "max_positions": 1,
+        "hmax": 10000,
+        "trade_mode": "cont",
+        "sell_mode": "cont"
+    }
 }

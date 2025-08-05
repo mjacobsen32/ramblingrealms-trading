@@ -130,27 +130,64 @@ class RewardConfig(BaseModel):
     )
 
 
-class StockEnv(BaseModel):
+class TradeMode(str, Enum):
+    """
+    Enum for trade modes.
+    """
+
+    DISCRETE = "discrete"
+    CONTINUOUS = "cont"
+
+
+class SellMode(str, Enum):
+    """
+    Enum for sell modes.
+    """
+
+    FIFO = "fifo"
+    CONTINUOUS = "cont"
+
+
+class PortfolioConfig(BaseModel):
     initial_cash: int = Field(100_000, description="Starting funds in state space")
-    hmax: int = Field(
-        10_000, description="Maximum cash to be traded in each trade per asset"
-    )
     buy_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
     sell_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
-    turbulence_threshold: Union[float, None] = Field(
+    max_positions: int | None = Field(
         None,
-        description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
+        description="Maximum number of open positions per asset at any time",
+    )
+    trade_mode: TradeMode = Field(
+        TradeMode.CONTINUOUS,
+        description="Mode for trading: DISCRETE (fixed actions) or CONTINUOUS (scaled based on actions)",
+    )
+    sell_mode: SellMode = Field(
+        SellMode.CONTINUOUS,
+        description="Mode for selling assets: FIFO (first in, first out) or CONTINUOUS (scaled based on actions)",
     )
     trade_limit_percent: float = Field(
         0.1,
         description="Maximum percentage of cash to be used in a single trade relative to the current asset value",
     )
+    hmax: int = Field(
+        10_000,
+        description="Maximum cash to be traded in each trade per asset, if using discrete actions each trade is the max.",
+    )
+
+
+class StockEnv(BaseModel):
+    turbulence_threshold: Union[float, None] = Field(
+        None,
+        description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
+    )
     reward_config: RewardConfig = Field(
         default_factory=RewardConfig, description="Reward function configuration"
+    )
+    portfolio_config: PortfolioConfig = Field(
+        default_factory=PortfolioConfig, description="Portfolio configuration"
     )
 
 

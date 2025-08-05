@@ -1,5 +1,7 @@
 import pytest
 
+from trading.cli.alg.config import TradeMode
+
 
 @pytest.fixture(autouse=True)
 def single_apple_ticker_request():
@@ -65,6 +67,20 @@ def data_loader(data_config, feature_config):
 
 
 @pytest.fixture
+def multi_data_loader(data_config, feature_config):
+    from trading.src.alg.data_process.data_loader import DataLoader
+
+    data_config.requests[0].kwargs["symbol_or_symbols"] = [
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+    ]
+    data_config.requests[0].dataset_name = "TEST_MULTI_TICKERS"
+    feature_config.features[0].source = "TEST_MULTI_TICKERS"
+    return DataLoader(data_config=data_config, feature_config=feature_config)
+
+
+@pytest.fixture
 def agent_config():
     """
     Fixture to create a simple agent configuration.
@@ -80,19 +96,45 @@ def agent_config():
 
 
 @pytest.fixture
-def stock_env_config():
+def portfolio_config():
+    """
+    Fixture to create a simple portfolio configuration.
+    """
+    from trading.cli.alg.config import PortfolioConfig, SellMode, TradeMode
+
+    return PortfolioConfig(
+        initial_cash=1_000_000,
+        hmax=10_000,
+        buy_cost_pct=0.001,
+        sell_cost_pct=0.001,
+        max_positions=1,
+        trade_mode=TradeMode.CONTINUOUS,
+        sell_mode=SellMode.CONTINUOUS,
+        trade_limit_percent=0.1,
+    )
+
+
+@pytest.fixture
+def reward_config():
+    """
+    Fixture to create a simple reward configuration.
+    """
+    from trading.cli.alg.config import RewardConfig
+
+    return RewardConfig(type="basic_profit_max", reward_scaling=1e5)
+
+
+@pytest.fixture
+def stock_env_config(portfolio_config, reward_config):
     """
     Fixture to create a simple environment configuration.
     """
     from trading.cli.alg.config import StockEnv
 
     return StockEnv(
-        initial_cash=100_000,
-        hmax=10_000,
-        buy_cost_pct=0.001,
-        sell_cost_pct=0.001,
-        turbulence_threshold=None,
-        trade_limit_percent=0.1,
+        portfolio_config=portfolio_config,
+        reward_config=reward_config,
+        turbulence_threshold=None,  # No turbulence threshold for testing
     )
 
 

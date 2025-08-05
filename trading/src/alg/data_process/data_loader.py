@@ -160,6 +160,7 @@ class DataLoader:
         self.columns = self.df.columns
         self.features = get_feature_cols(features=self.feature_config.features)
         self.df.sort_index(level=["timestamp", "symbol"], inplace=True)
+        self.df = self.df.reorder_levels(["timestamp", "symbol"])
         self.df.dropna()
 
         logging.info(
