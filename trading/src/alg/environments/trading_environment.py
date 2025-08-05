@@ -35,7 +35,7 @@ class TradingEnv(gym.Env):
         self.reward_function = factory_method(cfg.reward_config)
         self.pf: Portfolio = Portfolio(
             cfg.portfolio_config,
-            stock_dimension=self.stock_dimension,
+            data.index.get_level_values("symbol").unique(),
         )
         self.observation_index = 0
 
@@ -112,7 +112,7 @@ class TradingEnv(gym.Env):
             .flatten()
         )
         prices = self.data.loc[[self.observation_timestamp[i]]]["close"].to_numpy()
-        portfolio_state = np.asarray(self.pf.state(self.observation_timestamp[i]))
+        portfolio_state = np.asarray(self.pf.state())
         logging.debug(
             f"Portfolio state: {portfolio_state.shape}\nPrices: {prices.shape}\nIndicators: {indicators.shape}"
         )
@@ -169,8 +169,8 @@ class TradingEnv(gym.Env):
         date_slice = self.data.loc[[self.observation_timestamp[self.observation_index]]]
 
         date_slice["size"] = action
-
-        profit = self.pf.step(prices, date_slice)
+        logging.debug(f"action: {action}, date_slice: {date_slice}")
+        profit = self.pf.step(prices=prices, df=date_slice, normalized_actions=True)
 
         ret_info = {"net_value": self.pf.net_value(), "profit_change": profit}
 

@@ -11,6 +11,9 @@
         "max_positions": 1,
         "hmax": 10000,
         "trade_mode": "cont",
-        "sell_mode": "cont"
+        "sell_mode": "cont",
+        "action_threshold": 0.1,
+        "trade_limit_percent": 0.1,
+        "short_selling": false
     }
 }

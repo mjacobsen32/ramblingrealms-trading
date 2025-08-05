@@ -1,31 +1,35 @@
 import logging
+from collections import defaultdict, deque
 
 import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from rich import print as rprint
 
-from trading.cli.alg.config import PortfolioConfig
+from trading.cli.alg.config import PortfolioConfig, SellMode, TradeMode
+from trading.src.alg.portfolio.position import Position, PositionManager
 
 
 class Portfolio:
     """
     Portfolio class for managing trading positions and cash flow.
     Very much Stateful
+    todo: move action to "action" and "size" is the scaled_action
     """
 
-    def __init__(self, cfg: PortfolioConfig, stock_dimension: int = 1):
+    def __init__(self, cfg: PortfolioConfig, symbols: list[str]):
         """
         Initialize the Portfolio
         """
         self.cfg = cfg
         self.initial_cash = cfg.initial_cash
-        self.total_value = cfg.initial_cash
+        self.total_value: float = cfg.initial_cash
         self.cash = cfg.initial_cash
-        self.nav = 0
+        self.nav: float = 0.0
         self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
-        self.stock_dimension = stock_dimension
+        self.symbols = symbols
+        self._positions = PositionManager(symbols=symbols, maintain_history=True)
 
     def as_vbt_pf(self) -> vbt.Portfolio:
         """
@@ -49,19 +53,13 @@ class Portfolio:
         )
         return self.vbt_pf
 
-    def state(self, timestamp: pd.Timestamp = None) -> np.ndarray:
+    def state(self) -> np.ndarray:
         """
         Get the current state of the portfolio.
         Returns:
             pd.Series: [internal_cash, positions].
         """
-        timestamp = timestamp or self.df.index[-1] if not self.df.empty else None
-        positions = (
-            self.df.loc[[timestamp]]["position"].values
-            if not self.df.empty
-            else np.zeros(self.stock_dimension)
-        )
-        return np.concatenate([[self.cash], positions])
+        return np.concatenate([[self.cash], self._positions.as_numpy()])
 
     def net_value(self) -> float:
         """
@@ -69,36 +67,26 @@ class Portfolio:
         """
         return self.total_value
 
-    def scale_actions(self, df: pd.DataFrame, prices: np.ndarray) -> np.ndarray:
+    def enforce_trade_rules(self, df: pd.DataFrame, prices: np.ndarray) -> np.ndarray:
         """
-        Scale the actions to the portfolio size.
-        Enfore environment constraints.
+        Enforce trade rules on the actions.
         """
         logging.debug(f"Raw Action: {df['size']}")
+
+        buy_mask = df["size"] > 0
+        sell_mask = df["size"] < 0
 
         """
             No short selling / no negative positions allowed (yet)
         """
-        buy_mask = df["size"] > 0
-        sell_mask = df["size"] < 0
-        df["size"] = df.apply(
-            lambda row: (
-                max(
-                    row["size"],
-                    -(
-                        self.df.groupby("symbol")["position"].last().get(row.name[1], 0)
-                        if not self.df.empty
-                        else 0
-                    ),
-                )
-                if row["size"] < 0
-                else row["size"]
-            ),
-            axis=1,
+
+        positions = self._positions.as_numpy()
+        df.loc[sell_mask, "size"] = np.clip(
+            df.loc[sell_mask, "size"], -positions[sell_mask], 0
         )
 
         """
-            Scale the actions to the portfolio size
+            Scale the actions to the portfolio value
         """
 
         buy_limit = self.cfg.trade_limit_percent * self.total_value
@@ -128,31 +116,79 @@ class Portfolio:
 
         return df["size"].values
 
-    def update_position_batch(self, df: pd.DataFrame):
+    def scale_actions(self, df: pd.DataFrame, prices: np.ndarray) -> np.ndarray:
+        """
+        Scale the actions to the maximum position size.
+        """
+        # Find actions above threshold
+        above_thresh = df["size"].abs() > self.cfg.action_threshold
+
+        # Calculate max shares allowed by hmax and trade_limit
+        max_trade_value = min(
+            self.cfg.hmax, self.cfg.trade_limit_percent * self.net_value()
+        )
+        max_shares = max_trade_value // prices
+
+        # Only scale actions above threshold
+        # Map signal strength to whole number of shares between -max_shares and max_shares
+        # Only scale actions above threshold
+        signal = df.loc[above_thresh, "size"].clip(-1.0, 1.0)
+        df.loc[above_thresh, "size"] = np.round(signal * max_shares[above_thresh])
+        df.loc[~above_thresh, "size"] = 0.0
+        # Clip to ensure within bounds
+        df.loc[above_thresh, "size"] = np.clip(
+            df.loc[above_thresh, "size"],
+            -max_shares[above_thresh],
+            max_shares[above_thresh],
+        )
+
+        return df["size"].values
+
+    def enforce_trade_rules_fifo(
+        self, df: pd.DataFrame, prices: np.ndarray
+    ) -> np.ndarray:
+        return []
+
+    def update_position_batch(self, df: pd.DataFrame) -> float:
         """
         Update positions for a batch of tickers at a given timestamp.
         """
-        self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
-        self.df["position"] = self.df.groupby("symbol")[
-            "size"
-        ].cumsum()  # shouldn't need to cumsum every time
+        step_profit = 0.0
+        trade_mask = df["size"] != 0
 
-        self.df["nav"] = self.df["position"] * self.df["close"]
-        self.cash += -(df["size"] * df["close"]).sum()
-        self.nav = self.df.groupby("symbol")["nav"].last().sum()
+        for multi_index, row in df[trade_mask].iterrows():
+            _, profit = self._positions.step(
+                multi_index[1], multi_index[0], row["size"], row["close"]
+            )
+            step_profit += profit
+
+        self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
+        self.cash = self.cash + -(df["size"] * df["close"]).sum()
+        self.nav = self._positions.nav(df["close"])
         self.total_value = self.cash + self.nav
 
-    def step(self, prices, df) -> dict:
-        """
-        Take a step in the portfolio environment.
-        """
-        current_total_value = self.net_value()
+        return step_profit
 
-        df["size"] = self.scale_actions(df, prices)
-        self.update_position_batch(df=df)
+    def step(
+        self, prices: np.ndarray, df: pd.DataFrame, normalized_actions: bool = False
+    ) -> dict:
+        """
+        Scale the actions and take a step in the portfolio environment.
+        1. scale actions to trade size
+        2. enforce trade limits
+        3. update positions
+        """
+        if normalized_actions:
+            df["size"] = self.scale_actions(df, prices)
+
+        if self.cfg.sell_mode == SellMode.FIFO:
+            df["size"] = self.enforce_trade_rules_fifo(df, prices)
+        elif self.cfg.sell_mode == SellMode.CONTINUOUS:
+            df["size"] = self.enforce_trade_rules(df, prices)
+        step_profit = self.update_position_batch(df=df)
         return {
             "scaled_actions": df["size"].values,
-            "profit": self.net_value() - current_total_value,
+            "profit": step_profit,
         }
 
     @classmethod
@@ -162,7 +198,7 @@ class Portfolio:
         """
         pf = vbt.Portfolio.load(file_path)
         logging.info(f"Loaded backtest results from {file_path}")
-        ret = cls(cfg=cfg)
+        ret = cls(cfg=cfg, symbols=pf.symbols.tolist())
         ret.vbt_pf = pf
         return ret
 
@@ -177,9 +213,10 @@ class Portfolio:
         self.initial_cash = self.initial_cash
         self.total_value = self.initial_cash
         self.cash = self.initial_cash
-        self.nav = 0
+        self.nav = 0.0
         self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
+        self._positions.reset()
         logging.debug(f"Portfolio has been reset.\n{self}")
 
     def set_vbt(self, pf: vbt.Portfolio):
@@ -221,3 +258,9 @@ class Portfolio:
         String representation of the Portfolio.
         """
         return f"Portfolio(initial_cash={self.initial_cash}, total_value={self.total_value}, cash={self.cash}, nav={self.nav}, df_shape={self.df.shape})"
+
+    def get_positions(self) -> defaultdict:
+        """
+        Return the current positions in the portfolio.
+        """
+        return self._positions

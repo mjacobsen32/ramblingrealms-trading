@@ -34,7 +34,7 @@ def mild_profitable_portfolio(portfolio_config):
         }
     ).set_index(["timestamp", "symbol"])
     portfolio_config.initial_cash = 5_000
-    pf = Portfolio(cfg=portfolio_config)
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 
@@ -52,7 +52,7 @@ def mild_negative_portfolio(portfolio_config):
         }
     ).set_index(["timestamp", "symbol"])
     portfolio_config.initial_cash = 5_000
-    pf = Portfolio(cfg=portfolio_config)
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 
@@ -70,7 +70,7 @@ def strong_profitable_portfolio(portfolio_config):
         }
     ).set_index(["timestamp", "symbol"])
     portfolio_config.initial_cash = 5_000
-    pf = Portfolio(cfg=portfolio_config)
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 
@@ -89,7 +89,7 @@ def strong_negative_portfolio(portfolio_config):
         }
     ).set_index(["timestamp", "symbol"])
     portfolio_config.initial_cash = 5_000
-    pf = Portfolio(cfg=portfolio_config)
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 

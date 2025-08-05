@@ -176,6 +176,10 @@ class PortfolioConfig(BaseModel):
         10_000,
         description="Maximum cash to be traded in each trade per asset, if using discrete actions each trade is the max.",
     )
+    action_threshold: float = Field(
+        0.1,
+        description="Minimum action value to trigger a trade, used to avoid noise in continuous actions",
+    )
 
 
 class StockEnv(BaseModel):

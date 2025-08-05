@@ -9,9 +9,14 @@ from trading.test.alg.test_fixtures import *
 
 
 @pytest.fixture
-def single_tic_data():
+def dates():
+    return pd.date_range(start="2023-01-01", periods=5, freq="D")
+
+
+@pytest.fixture
+def single_tic_data(dates):
     data = {
-        "timestamp": pd.date_range(start="2023-01-01", periods=5, freq="D"),
+        "timestamp": dates,
         "symbol": ["AAPL"] * 5,
         "close": [10, 10, 20, 10, 155],
         "size": [10, 0, -10, 0, 0],
@@ -20,8 +25,15 @@ def single_tic_data():
 
 
 @pytest.fixture
-def dates():
-    return pd.date_range(start="2023-01-01", periods=5, freq="D")
+def discrete_expected_states():
+    expected_states = [
+        [700, 10, 10, 0],
+        [540, 5, 20, 0],
+        [270, 0, 20, 10],
+        [400, 0, 15, 10],
+        [590, 0, 15, 5],
+    ]
+    return expected_states
 
 
 @pytest.fixture
@@ -34,6 +46,16 @@ def expected_states():
         [590, 0, 15, 5],
     ]
     return expected_states
+
+
+@pytest.fixture
+def expected_positions():
+    positions = [
+        [10, 5, 0, 0, 0],
+        [10, 20, 20, 15, 15],
+        [0.0, 0.0, 10, 10, 5],
+    ]
+    return np.array(positions)
 
 
 @pytest.fixture
@@ -66,7 +88,7 @@ def multi_tic_data(dates):
 
 def test_portfolio_data_set(data_loader, portfolio_config):
     portfolio_config.initial_cash = 1000
-    pf = Portfolio(cfg=portfolio_config, stock_dimension=1)
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     np.random.seed(42)  # For reproducible results
     data = data_loader.get_train_test()[0].copy()
     data["size"] = np.random.choice([-1, 0, 1], size=len(data))
@@ -77,7 +99,7 @@ def test_portfolio_data_set(data_loader, portfolio_config):
 
 def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
     portfolio_config.initial_cash = 1000
-    pf = Portfolio(cfg=portfolio_config, stock_dimension=1)
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "GOOGL"])
     np.random.seed(42)  # For reproducible results
     data = multi_data_loader.get_train_test()[0].copy()
     data["size"] = np.random.choice([-1, 0, 1], size=len(data))
@@ -93,13 +115,12 @@ def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
 
 def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_config):
     portfolio_config.initial_cash = 1000
-    pf = Portfolio(cfg=portfolio_config, stock_dimension=3)
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
     assert pf.initial_cash == 1000, "Initial cash should be set to 1000"
     assert pf.cash == 1000, "Initial cash should be set to 1000"
     assert pf.total_value == 1000, "Total value should be equal to initial cash"
     assert pf.nav == 0, "NAV should be initialized to 0"
     assert pf.vbt_pf == None, "VectorBT portfolio should be None initially"
-    assert pf.stock_dimension == 3, "Stock dimension should be set to 1"
 
     np.testing.assert_array_equal(
         pf.state(), np.array([1000, 0, 0, 0])
@@ -108,7 +129,7 @@ def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_confi
     for i, date in enumerate(dates):
         pf.update_position_batch(multi_tic_data.loc[[date]])
         expected = np.array(expected_states[i])
-        actual = pf.state(date)
+        actual = pf.state()
         np.testing.assert_array_equal(
             actual, expected, f"State at date {date} should match expected values"
         )
@@ -154,7 +175,7 @@ def test_cash_limit(constraints_portfolio_config):
     cfg.initial_cash = 1000
     cfg.hmax = 1000
     cfg.trade_limit_percent = 1.0
-    pf = Portfolio(cfg=cfg, stock_dimension=2)
+    pf = Portfolio(cfg=cfg, symbols=["AAPL", "NVDA"])
     df = pd.DataFrame(
         {
             "timestamp": [
@@ -188,3 +209,84 @@ def test_cash_limit(constraints_portfolio_config):
         [50.0, 50.0],
         "Action should be scaled to max shares with remaining cash",
     )
+
+
+@pytest.fixture()
+def normalized_actions():
+    data = {
+        "timestamp": pd.date_range(start="2023-01-01", periods=5, freq="D"),
+        "symbol": ["AAPL"] * 5,
+        "close": [10, 10, 10, 10, 10],
+        "size": [1.0, 0.1, -1.0, 0.5, 0],
+    }
+    return pd.DataFrame(data)
+
+
+def test_scale_actions(constraints_portfolio_config, normalized_actions):
+    cfg = constraints_portfolio_config
+    cfg.action_threshold = 0.1
+    pf = Portfolio(cfg=cfg, symbols=["AAPL"])
+    scaled = pf.scale_actions(
+        normalized_actions.iloc[0:1], normalized_actions.iloc[0:1]["close"]
+    )
+    assert scaled[0] == 10.0
+    scaled = pf.scale_actions(
+        normalized_actions.iloc[1:2], normalized_actions.iloc[1:2]["close"]
+    )
+    assert scaled[0] == 0.0
+    scaled = pf.scale_actions(
+        normalized_actions.iloc[2:3], normalized_actions.iloc[2:3]["close"]
+    )
+    assert scaled[0] == -10.0
+    scaled = pf.scale_actions(
+        normalized_actions.iloc[3:4], normalized_actions.iloc[3:4]["close"]
+    )
+    assert scaled[0] == 5.0
+
+
+def test_positions(multi_tic_data, dates, portfolio_config, expected_positions):
+    portfolio_config.initial_cash = 1000
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
+    for i, date in enumerate(dates):
+        pf.update_position_batch(multi_tic_data.loc[[date]])
+        np.testing.assert_array_equal(
+            expected_positions[:, i], pf.get_positions().as_numpy()
+        )
+
+
+def test_discrete_mode(
+    multi_tic_data, dates, discrete_expected_states, portfolio_config
+):
+    portfolio_config.initial_cash = 1000
+    portfolio_config.trade_mode = "discrete"
+    portfolio_config.sell_mode = "fifo"
+    portfolio_config.max_positions = 1
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
+
+    np.testing.assert_array_equal(
+        pf.state(), np.array([1000, 0, 0, 0])
+    ), "Initial state should be [cash, positions]"
+
+    for i, date in enumerate(dates):
+        pf.update_position_batch(multi_tic_data.loc[[date]])
+        expected = np.array(discrete_expected_states[i])
+        actual = pf.state()
+        np.testing.assert_array_equal(
+            actual, expected, f"State at date {date} should match expected values"
+        )
+
+    assert pf.total_value > 1000, "Total value should increase with positive trades"
+    assert pf.nav > 0, "NAV should be greater than 0 after trades"
+
+    vbt = pf.as_vbt_pf()
+    assert vbt is not None, "VectorBT portfolio should be created"
+    assert pf.vbt_pf == vbt, "VectorBT portfolio should be stored in the portfolio"
+
+    assert (
+        len(pf.orders()) == 8
+    ), "There should be 8 orders in the portfolio (non-zero sizes)"
+
+    assert len(vbt.total_profit(group_by=False)) == 3
+    assert (
+        vbt.total_profit() == vbt.total_profit(group_by=False).sum()
+    ), "Total profit should match sum of individual profits"
