@@ -101,6 +101,12 @@ class PositionManager(defaultdict):
             dtype=np.float32,
         )
 
+    def positions_held_as_numpy(self) -> np.ndarray:
+        return np.array(
+            [len(self[symbol]) for symbol in self.symbols],
+            dtype=np.int32,
+        )
+
     def __repr__(self):
         return f"PositionManager(positions={dict(self)}, history={self.history is not None})"
 
@@ -149,22 +155,6 @@ class PositionManager(defaultdict):
             self.position_view[symbol].rolling_return += profit
             return True, profit
         return False, profit
-
-    def append(self, symbol: str, position: Position):
-        """
-        Append a new position to the manager.
-        """
-        if symbol not in self:
-            self[symbol] = deque()
-        self[symbol].append(position)
-
-    def popleft(self, symbol: str) -> Position | None:
-        """
-        Pop the oldest position from the manager.
-        """
-        if symbol in self and self[symbol]:
-            return self[symbol].popleft()
-        return None
 
     def nav(self, prices: pd.Series) -> float:
         """

@@ -168,7 +168,7 @@ class TradingEnv(gym.Env):
 
         date_slice = self.data.loc[[self.observation_timestamp[self.observation_index]]]
 
-        date_slice["size"] = action
+        date_slice["action"] = action
         logging.debug(f"action: {action}, date_slice: {date_slice}")
         profit = self.pf.step(prices=prices, df=date_slice, normalized_actions=True)
 
@@ -176,6 +176,7 @@ class TradingEnv(gym.Env):
 
         logging.debug(f"Env State: {self.render()}")
         logging.debug(f"Portfolio State: {self.pf}")
+
         ret = (
             self._get_observation(),
             self.reward_function.compute_reward(self.pf),

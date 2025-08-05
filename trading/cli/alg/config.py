@@ -144,7 +144,7 @@ class SellMode(str, Enum):
     Enum for sell modes.
     """
 
-    FIFO = "fifo"
+    DISCRETE = "discrete"
     CONTINUOUS = "cont"
 
 
@@ -166,7 +166,7 @@ class PortfolioConfig(BaseModel):
     )
     sell_mode: SellMode = Field(
         SellMode.CONTINUOUS,
-        description="Mode for selling assets: FIFO (first in, first out) or CONTINUOUS (scaled based on actions)",
+        description="Mode for selling assets: DISCRETE (fixed actions) or CONTINUOUS (scaled based on actions)",
     )
     trade_limit_percent: float = Field(
         0.1,

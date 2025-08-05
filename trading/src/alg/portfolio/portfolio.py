@@ -67,23 +67,39 @@ class Portfolio:
         """
         return self.total_value
 
-    def enforce_trade_rules(self, df: pd.DataFrame, prices: np.ndarray) -> np.ndarray:
+    def enforce_trade_rules(
+        self,
+        df: pd.DataFrame,
+        prices: np.ndarray,
+        sell_mode: SellMode = SellMode.CONTINUOUS,
+    ) -> np.ndarray:
         """
         Enforce trade rules on the actions.
+        From trade sizes to actual trade sizes based on configuration and current portfolio state.
         """
         logging.debug(f"Raw Action: {df['size']}")
 
-        buy_mask = df["size"] > 0
-        sell_mask = df["size"] < 0
+        max_positions_mask = (
+            self._positions.positions_held_as_numpy() < self.cfg.max_positions
+            if self.cfg.max_positions is not None
+            else True
+        )
 
+        buy_mask = max_positions_mask & (df["size"] > 0)
+        sell_mask = df["size"] < 0
         """
             No short selling / no negative positions allowed (yet)
         """
 
         positions = self._positions.as_numpy()
-        df.loc[sell_mask, "size"] = np.clip(
-            df.loc[sell_mask, "size"], -positions[sell_mask], 0
-        )
+        if sell_mode == SellMode.CONTINUOUS:
+            # Sell proportionally based on signal strength
+            df.loc[sell_mask, "size"] = np.clip(
+                df.loc[sell_mask, "size"], -positions[sell_mask], 0
+            )
+        elif sell_mode == SellMode.DISCRETE:
+            # Sell entire position if sell action is triggered
+            df.loc[sell_mask, "size"] = -positions[sell_mask]
 
         """
             Scale the actions to the portfolio value
@@ -92,7 +108,7 @@ class Portfolio:
         buy_limit = self.cfg.trade_limit_percent * self.total_value
 
         # Compute per-trade cost
-        buy_values = df["size"][buy_mask] * prices[buy_mask]
+        buy_values = df.loc[buy_mask, "size"] * prices[buy_mask]
 
         # Cap each trade at buy_limit
         capped_values = np.minimum(buy_values, buy_limit)
@@ -100,7 +116,7 @@ class Portfolio:
         attempted_buy = capped_values.sum()
 
         if attempted_buy > self.cash:
-            buy_limit = min(buy_limit, self.cash / buy_mask.sum())
+            buy_limit = min(buy_limit, self.cash // len(buy_mask))
 
         logging.debug(f"Buy Limit dollar amount: {buy_limit}")
 
@@ -111,17 +127,24 @@ class Portfolio:
 
         # Clip the size to not exceed the minimum of both limits
         df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
+        df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
         df["size"] = np.nan_to_num(df["size"])
         logging.debug(f"Scaled Actions: {df['size']}")
 
         return df["size"].values
 
-    def scale_actions(self, df: pd.DataFrame, prices: np.ndarray) -> np.ndarray:
+    def scale_actions(
+        self,
+        df: pd.DataFrame,
+        prices: np.ndarray,
+        trade_mode: TradeMode = TradeMode.CONTINUOUS,
+    ) -> np.ndarray:
         """
         Scale the actions to the maximum position size.
+        From signal strength to a desired trade size
         """
         # Find actions above threshold
-        above_thresh = df["size"].abs() > self.cfg.action_threshold
+        above_thresh = df["action"].abs() > self.cfg.action_threshold
 
         # Calculate max shares allowed by hmax and trade_limit
         max_trade_value = min(
@@ -129,25 +152,18 @@ class Portfolio:
         )
         max_shares = max_trade_value // prices
 
-        # Only scale actions above threshold
-        # Map signal strength to whole number of shares between -max_shares and max_shares
-        # Only scale actions above threshold
-        signal = df.loc[above_thresh, "size"].clip(-1.0, 1.0)
-        df.loc[above_thresh, "size"] = np.round(signal * max_shares[above_thresh])
+        if trade_mode == TradeMode.DISCRETE:
+            df.loc[above_thresh, "size"] = (
+                df.loc[above_thresh, "action"] * max_shares[above_thresh]
+            )
+        elif trade_mode == TradeMode.CONTINUOUS:
+            df.loc[above_thresh, "size"] = np.round(
+                df.loc[above_thresh, "action"] * max_shares[above_thresh]
+            )
+
         df.loc[~above_thresh, "size"] = 0.0
-        # Clip to ensure within bounds
-        df.loc[above_thresh, "size"] = np.clip(
-            df.loc[above_thresh, "size"],
-            -max_shares[above_thresh],
-            max_shares[above_thresh],
-        )
 
         return df["size"].values
-
-    def enforce_trade_rules_fifo(
-        self, df: pd.DataFrame, prices: np.ndarray
-    ) -> np.ndarray:
-        return []
 
     def update_position_batch(self, df: pd.DataFrame) -> float:
         """
@@ -179,12 +195,9 @@ class Portfolio:
         3. update positions
         """
         if normalized_actions:
-            df["size"] = self.scale_actions(df, prices)
+            df["size"] = self.scale_actions(df, prices, self.cfg.trade_mode)
 
-        if self.cfg.sell_mode == SellMode.FIFO:
-            df["size"] = self.enforce_trade_rules_fifo(df, prices)
-        elif self.cfg.sell_mode == SellMode.CONTINUOUS:
-            df["size"] = self.enforce_trade_rules(df, prices)
+        df["size"] = self.enforce_trade_rules(df, prices, self.cfg.sell_mode)
         step_profit = self.update_position_batch(df=df)
         return {
             "scaled_actions": df["size"].values,

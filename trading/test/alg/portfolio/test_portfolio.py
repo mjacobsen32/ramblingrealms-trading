@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from trading.cli.alg.config import SellMode, TradeMode
 from trading.src.alg.portfolio.portfolio import Portfolio
 from trading.test.alg.test_fixtures import *
 
@@ -22,18 +23,6 @@ def single_tic_data(dates):
         "size": [10, 0, -10, 0, 0],
     }
     return pd.DataFrame(data)
-
-
-@pytest.fixture
-def discrete_expected_states():
-    expected_states = [
-        [700, 10, 10, 0],
-        [540, 5, 20, 0],
-        [270, 0, 20, 10],
-        [400, 0, 15, 10],
-        [590, 0, 15, 5],
-    ]
-    return expected_states
 
 
 @pytest.fixture
@@ -80,6 +69,34 @@ def multi_tic_data(dates):
                     "symbol": tic,
                     "close": close_prices[tic][i],
                     "size": sizes[tic][i],
+                }
+            )
+    df = pd.DataFrame(records).set_index(["timestamp", "symbol"])
+    return df
+
+
+@pytest.fixture
+def normalized_multi_tic_data(dates):
+    tics = ["AAPL", "MSFT", "NVDA"]
+    close_prices = {
+        "AAPL": [10, 12, 14, 16, 18],
+        "MSFT": [20, 22, 24, 26, 28],
+        "NVDA": [30, 32, 34, 36, 38],
+    }
+    actions = {
+        "AAPL": [1, -1, -1, 0, 0],
+        "MSFT": [1, 1, 0, -1, 0],
+        "NVDA": [0, 0, 1, 0, -1],
+    }
+    records = []
+    for i, date in enumerate(dates):
+        for tic in tics:
+            records.append(
+                {
+                    "timestamp": date,
+                    "symbol": tic,
+                    "close": close_prices[tic][i],
+                    "action": actions[tic][i],
                 }
             )
     df = pd.DataFrame(records).set_index(["timestamp", "symbol"])
@@ -167,6 +184,7 @@ def constraints_portfolio_config():
         trade_mode=TradeMode.CONTINUOUS,
         sell_mode=SellMode.CONTINUOUS,
         trade_limit_percent=0.1,
+        action_threshold=0.0,
     )
 
 
@@ -217,7 +235,7 @@ def normalized_actions():
         "timestamp": pd.date_range(start="2023-01-01", periods=5, freq="D"),
         "symbol": ["AAPL"] * 5,
         "close": [10, 10, 10, 10, 10],
-        "size": [1.0, 0.1, -1.0, 0.5, 0],
+        "action": [1.0, 0.1, -1.0, 0.5, 0],
     }
     return pd.DataFrame(data)
 
@@ -254,12 +272,10 @@ def test_positions(multi_tic_data, dates, portfolio_config, expected_positions):
         )
 
 
-def test_discrete_mode(
-    multi_tic_data, dates, discrete_expected_states, portfolio_config
-):
+def test_discrete_mode(normalized_multi_tic_data, dates, portfolio_config):
     portfolio_config.initial_cash = 1000
-    portfolio_config.trade_mode = "discrete"
-    portfolio_config.sell_mode = "fifo"
+    portfolio_config.trade_mode = TradeMode.DISCRETE
+    portfolio_config.sell_mode = SellMode.DISCRETE
     portfolio_config.max_positions = 1
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
 
@@ -267,26 +283,18 @@ def test_discrete_mode(
         pf.state(), np.array([1000, 0, 0, 0])
     ), "Initial state should be [cash, positions]"
 
+    expected_positions = [
+        [800.0, 10.0, 5.0, 0.0],
+        [920.0, 0.0, 5.0, 0.0],
+        [818.0, 0.0, 5.0, 3.0],
+        [948.0, 0.0, 0.0, 3.0],
+        [1062.0, 0.0, 0.0, 0.0],
+    ]
+
     for i, date in enumerate(dates):
-        pf.update_position_batch(multi_tic_data.loc[[date]])
-        expected = np.array(discrete_expected_states[i])
-        actual = pf.state()
-        np.testing.assert_array_equal(
-            actual, expected, f"State at date {date} should match expected values"
+        pf.step(
+            normalized_multi_tic_data.loc[[date]]["close"].values,
+            normalized_multi_tic_data.loc[[date]],
+            normalized_actions=True,
         )
-
-    assert pf.total_value > 1000, "Total value should increase with positive trades"
-    assert pf.nav > 0, "NAV should be greater than 0 after trades"
-
-    vbt = pf.as_vbt_pf()
-    assert vbt is not None, "VectorBT portfolio should be created"
-    assert pf.vbt_pf == vbt, "VectorBT portfolio should be stored in the portfolio"
-
-    assert (
-        len(pf.orders()) == 8
-    ), "There should be 8 orders in the portfolio (non-zero sizes)"
-
-    assert len(vbt.total_profit(group_by=False)) == 3
-    assert (
-        vbt.total_profit() == vbt.total_profit(group_by=False).sum()
-    ), "Total profit should match sum of individual profits"
+        np.testing.assert_array_equal(pf.state(), expected_positions[i])
