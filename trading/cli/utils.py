@@ -5,6 +5,17 @@ from rich.logging import RichHandler
 
 FORMAT = "%(message)s"
 
+logging.getLogger("kaleidoscope").setLevel(logging.WARNING)
+logging.getLogger("plotly").setLevel(logging.WARNING)
+logging.getLogger("rich").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("requests").setLevel(logging.WARNING)
+logging.getLogger("websockets").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+logging.getLogger("numpy").setLevel(logging.WARNING)
+logging.getLogger("pandas").setLevel(logging.WARNING)
+logging.getLogger("vectorbt").setLevel(logging.WARNING)
+
 
 def init_file_logger(log_level: str, log_dir: str):
     # File handler for DEBUG and above

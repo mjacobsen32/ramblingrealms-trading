@@ -261,6 +261,10 @@ class Portfolio:
         """
         vbt_pf = self.as_vbt_pf()
         plots: list[tp.BaseFigure] = []
+        pio.renderers.default = "browser"
+        logging.info(
+            f"Generating portfolio plots...\nRendering with: {pio.renderers.default}"
+        )
         p = vbt_pf.plot(
             title="Portfolio Backtest Results",
             subplots=["orders", "trades", "value", "cash", "drawdowns"],
@@ -274,10 +278,8 @@ class Portfolio:
             p = vbt_pf.plot(
                 subplots=[
                     "asset_flow",
-                    "trades",
                     "trade_pnl",
                     "cum_returns",
-                    "orders",
                 ],
                 title=f"{tic} Backtest Results",
                 column=tic,
