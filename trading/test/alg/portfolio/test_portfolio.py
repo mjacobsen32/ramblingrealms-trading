@@ -298,3 +298,4 @@ def test_discrete_mode(normalized_multi_tic_data, dates, portfolio_config):
             normalized_actions=True,
         )
         np.testing.assert_array_equal(pf.state(), expected_positions[i])
+    print(pf.orders())

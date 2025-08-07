@@ -177,10 +177,11 @@ class Portfolio:
         trade_mask = df["size"] != 0
 
         for multi_index, row in df[trade_mask].iterrows():
-            _, profit = self._positions.step(
+            _, actual_size, profit = self._positions.step(
                 multi_index[1], multi_index[0], row["size"], row["close"]
             )
             step_profit += profit
+            df.loc[multi_index, "size"] = actual_size
 
         self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
         self.cash = self.cash + -(df["size"] * df["close"]).sum()
@@ -267,7 +268,7 @@ class Portfolio:
         )
         p = vbt_pf.plot(
             title="Portfolio Backtest Results",
-            subplots=["orders", "trades", "value", "cash", "drawdowns"],
+            subplots=["value", "cash", "drawdowns"],
         )
         if p is not None:
             plots.append(p)
@@ -276,11 +277,7 @@ class Portfolio:
 
         for tic in symbols:
             p = vbt_pf.plot(
-                subplots=[
-                    "asset_flow",
-                    "trade_pnl",
-                    "cum_returns",
-                ],
+                subplots=["asset_flow", "trade_pnl", "cum_returns", "trades"],
                 title=f"{tic} Backtest Results",
                 column=tic,
                 group_by=False,
@@ -309,6 +306,12 @@ class Portfolio:
         """
         return self.as_vbt_pf().orders.records_readable
 
+    def trades(self):
+        """
+        Return the trades of the backtest.
+        """
+        return self.as_vbt_pf().trades.records_readable
+
     def __repr__(self) -> str:
         """
         String representation of the Portfolio.
@@ -331,3 +334,4 @@ class Portfolio:
         if analysis_config.to_csv:
             self.get_positions().to_csv(ProjectPath.BACKTEST_DIR / "positions.csv")
             self.orders().to_csv(ProjectPath.BACKTEST_DIR / "orders.csv")
+            self.trades().to_csv(ProjectPath.BACKTEST_DIR / "trades.csv")

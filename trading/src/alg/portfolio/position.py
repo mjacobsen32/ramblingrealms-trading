@@ -148,12 +148,13 @@ class PositionManager(defaultdict):
 
     def step(
         self, symbol: str, date: pd.Timestamp, size: float, price: float
-    ) -> tuple[bool, float]:
+    ) -> tuple[bool, float, float]:
         """
         Step through the position manager.
         Return a set indicating if a position was exited and the profit from that position.
         """
         profit = 0.0
+        actual_size = 0.0
         self.position_view[symbol].size += size
         if symbol not in self:
             self[symbol] = deque()
@@ -168,21 +169,22 @@ class PositionManager(defaultdict):
                     # Close the entire position
                     position = self[symbol].popleft()
                     remaining_shares -= position.size
+                    actual_size += position.size
                     profit += position.exit(date, price)
-                    # logging.warning(self.history.keys())
                     if self.history is not None:
                         self.history[symbol].append(position)
                 else:
                     # Close a partial position
                     position = self[symbol][0]
                     position.size -= remaining_shares
+                    actual_size += position.size
                     profit += position.exit(date, price, partial_exit=remaining_shares)
                     remaining_shares = 0.0
                     if self.history is not None:
                         self.history[symbol].append(position)
             self.position_view[symbol].rolling_return += profit
-            return True, profit
-        return False, profit
+            return True, actual_size, profit
+        return False, actual_size, profit
 
     def nav(self, prices: pd.Series) -> float:
         """
