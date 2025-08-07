@@ -34,6 +34,9 @@ class Portfolio:
         self.symbols = symbols
         self._positions = PositionManager(symbols=symbols, maintain_history=True)
 
+    def __del__(self):
+        self.df.to_csv(ProjectPath.BACKTEST_DIR / "portfolio.csv")
+
     def as_vbt_pf(self) -> vbt.Portfolio:
         """
         Update the portfolio with new data.
@@ -50,7 +53,8 @@ class Portfolio:
             close=close,
             price=price,
             size=size,
-            init_cash=100_000,
+            size_type=0,  # amount
+            init_cash=1000000,
             log=True,
             cash_sharing=True,
         )
@@ -182,11 +186,17 @@ class Portfolio:
             )
             step_profit += profit
             df.loc[multi_index, "size"] = actual_size
+            logging.debug(
+                f"Updating position for {multi_index[1]} on {multi_index[0]}: "
+                f"size={row['size']}, actual_size={actual_size}, profit={profit}"
+            )
 
         self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
         self.cash = self.cash + -(df["size"] * df["close"]).sum()
         self.nav = self._positions.nav(df["close"])
         self.total_value = self.cash + self.nav
+
+        logging.debug(f"df: {df}\nstep_profit: {step_profit}\n")
 
         return step_profit
 

@@ -97,7 +97,9 @@ class PositionManager(defaultdict):
         if self.history is None:
             logging.warning("No history to save.")
             return
-        # self.history.update(self)
+
+        for symbol, positions in self.items():
+            self.history[symbol].extend(positions)
         for symbol, positions in self.history.items():
             for position in positions:
                 data.append(
@@ -106,7 +108,7 @@ class PositionManager(defaultdict):
                         "size": position.size,
                         "enter_price": position.enter_price,
                         "enter_date": position.enter_date,
-                        "exit_date": position.exit_date,
+                        "exit_date": getattr(position, "exit_date", None),
                         "exit_price": getattr(position, "exit_price", None),
                     }
                 )
@@ -161,6 +163,7 @@ class PositionManager(defaultdict):
         if size > 0.0:
             # BUY Push new position
             self[symbol].append(Position(symbol, size, price, date))
+            actual_size = size
         elif size < 0.0:
             # SELL Close as many positions as needed
             remaining_shares = -size
@@ -169,7 +172,6 @@ class PositionManager(defaultdict):
                     # Close the entire position
                     position = self[symbol].popleft()
                     remaining_shares -= position.size
-                    actual_size += position.size
                     profit += position.exit(date, price)
                     if self.history is not None:
                         self.history[symbol].append(position)
@@ -177,11 +179,11 @@ class PositionManager(defaultdict):
                     # Close a partial position
                     position = self[symbol][0]
                     position.size -= remaining_shares
-                    actual_size += position.size
                     profit += position.exit(date, price, partial_exit=remaining_shares)
                     remaining_shares = 0.0
                     if self.history is not None:
                         self.history[symbol].append(position)
+            actual_size = size - remaining_shares
             self.position_view[symbol].rolling_return += profit
             return True, actual_size, profit
         return False, actual_size, profit
