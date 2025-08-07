@@ -44,6 +44,8 @@ dependencies = [
     "stable-baselines3 (>=2.6.0,<3.0.0)",
     "tqdm (>=4.67.1,<5.0.0)",
     "nbformat (>=5.10.4,<6.0.0)",
+    "kaleido (>=1.0.0,<2.0.0)",
+    "anywidget (>=0.9.18,<0.10.0)",
 
 ]
 [project.urls]

@@ -2,7 +2,7 @@
     "name": "ppo",
     "description": "A generic ppo trading algorithm configuration.",
     "version": "1.0",
-    "log_dir": "{PROJECT_ROOT}/logs/",
+    "out_dir": "{PROJECT_ROOT}/logs/",
     "agent_config": "{PROJECT_ROOT}/trading/test/configs/agent_config.json",
     "feature_config": "{PROJECT_ROOT}/trading/test/configs/feature_config.json",
     "data_config": "{PROJECT_ROOT}/trading/test/configs/data_config.json",

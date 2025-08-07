@@ -38,6 +38,6 @@ class BackTesting:
             obs, reward, terminated, truncated, info = self.env.step(action)
 
         if self.backtest_config.save_results:
-            self.env.pf.save(str(self.backtest_config.results_path))
+            self.env.pf.save(str(self.backtest_config.results_path.as_path()))
 
         return self.env.pf

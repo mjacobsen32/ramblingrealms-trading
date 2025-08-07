@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -5,7 +6,8 @@ import typer
 from rich import print as rprint
 from typing_extensions import Annotated
 
-from trading.cli.alg.config import RRConfig
+from trading.cli.alg.config import ProjectPath, RRConfig
+from trading.cli.utils import init_file_logger
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.backtest.backtesting import BackTesting, Portfolio
 from trading.src.alg.data_process.data_loader import DataLoader
@@ -18,6 +20,7 @@ app = typer.Typer(
 
 @app.command(help="")
 def train(
+    ctx: typer.Context,
     config: Annotated[
         str, typer.Option("--config", "-c", help="Path to the configuration file.")
     ],
@@ -41,6 +44,7 @@ def train(
     # Load configuration
     with Path.open(Path(config)) as f:
         alg_config = RRConfig.model_validate_json(f.read())
+        init_file_logger(ctx.obj.file_log_level, str(ProjectPath.OUT_DIR))
     data_loader = DataLoader(
         data_config=alg_config.data_config,
         feature_config=alg_config.feature_config,
@@ -69,12 +73,13 @@ def train(
             data=data_loader.get_train_test()[1],
         )
         pf = bt.run()
-        logging.info(pf.stats())
-        pf.plot()
+        pf.analysis(alg_config.backtest_config.analysis_config)
+    ProjectPath.cache()
 
 
 @app.command(help="Run backtesting on the trained model.")
 def backtest(
+    ctx: typer.Context,
     config: Annotated[
         str, typer.Option("--config", "-c", help="Path to the configuration file.")
     ],
@@ -88,6 +93,7 @@ def backtest(
     # Load configuration
     with Path.open(Path(config)) as f:
         alg_config = RRConfig.model_validate_json(f.read())
+        init_file_logger(ctx.obj.file_log_level, str(ProjectPath.OUT_DIR))
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
@@ -112,25 +118,27 @@ def backtest(
         ),
     )
     pf = bt.run()
-    logging.info(pf.stats())
-    pf.plot()
+    pf.analysis(alg_config.backtest_config.analysis_config)
+    ProjectPath.cache()
 
 
 @app.command(help="Run analysis on the backtest results.")
 def analysis(
+    ctx: typer.Context,
     alg_config: Annotated[
         str, typer.Option("--config", "-c", help="Path to the configuration file.")
     ],
-    no_plot: bool = typer.Option(
-        False, "--no-plot", "-n", help="Do not plot the backtesting results."
-    ),
+    out_dir: Annotated[
+        str, typer.Option("--out_dir", "-o", help="Path to the root output directory.")
+    ],
 ):
     logging.info(f"Starting analysis process...")
     with Path.open(Path(alg_config)) as f:
+        ProjectPath.OUT_DIR = Path(out_dir).resolve()
         config = RRConfig.model_validate_json(f.read())
+        init_file_logger(ctx.obj.file_log_level, str(ProjectPath.OUT_DIR))
+
     pf = Portfolio.load(
         config.stock_env.portfolio_config, config.backtest_config.results_path.as_path()
     )
-    rprint(f"\nStats:\n{pf.stats()}")
-    if not no_plot:
-        pf.plot()
+    pf.analysis(config.backtest_config.analysis_config)

@@ -4,12 +4,12 @@ from pathlib import Path
 import typer
 from pydantic import SecretStr
 from rich import print
-from rich.logging import RichHandler
 from rich.prompt import Prompt
 
 from trading.cli.alg import alg
 from trading.cli.data import data
 from trading.cli.etrade import etrade
+from trading.cli.utils import init_logger
 from trading.src.user_cache.user_cache import UserCache as User
 from trading.src.utility.utils import read_key
 
@@ -17,6 +17,15 @@ app = typer.Typer(name="rr_trading", help="rr_trading CLI commands")
 app.add_typer(etrade.app, name="etrade", help="E-Trade API commands")
 app.add_typer(data.app, name="data", help="Data CLI commands")
 app.add_typer(alg.app, name="alg", help="Algorithmic commands")
+
+
+class AppState:
+    def __init__(self):
+        self.file_log_level = "INFO"
+        self.console_log_level = "INFO"
+
+
+FORMAT = "%(message)s"
 
 
 @app.callback()
@@ -28,7 +37,7 @@ def main(
         help="Logging level for console (e.g., DEBUG, INFO, WARNING)",
     ),
     log_level_file: str = typer.Option(
-        "NOTSET",
+        "INFO",
         "--log-level-file",
         help="Logging level for file log (e.g., DEBUG, INFO, WARNING)",
     ),
@@ -36,31 +45,10 @@ def main(
     """Initialize logging before any command runs."""
     # Allow options to be parsed from anywhere in the command line
     ctx.resilient_parsing = True
-
-    FORMAT = "%(message)s"
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)  # Capture all logs, handlers will filter
-
-    if log_level_file.upper() != "NOTSET":
-        # File handler for DEBUG and above
-        file_handler = logging.FileHandler("./logs/rr_trading.log")
-        file_handler.setLevel(log_level_file.upper())
-        file_handler.setFormatter(logging.Formatter(FORMAT))
-        logger.addHandler(file_handler)
-
-    # Console handler for INFO and above
-    console_handler = RichHandler(markup=True)
-    console_handler.setLevel(log_level_console.upper())
-    console_handler.setFormatter(logging.Formatter(FORMAT))
-    logger.addHandler(console_handler)
-
-    # Remove default handlers if any (optional, but avoids duplicate logs)
-    logger.propagate = False
-
-    logger.debug(
-        f"Initialized logger with console={log_level_console}, file={log_level_file}"
-    )
+    ctx.ensure_object(AppState)
+    ctx.obj.file_log_level = log_level_file.upper()
+    ctx.obj.console_log_level = log_level_console.upper()
+    init_logger(ctx.obj.console_log_level)
 
 
 @app.command(help="Print the current user configuration")

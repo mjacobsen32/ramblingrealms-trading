@@ -2,13 +2,13 @@
     "name": "ppo",
     "description": "A generic ppo trading algorithm configuration.",
     "version": "1.0",
-    "log_dir": "{PROJECT_ROOT}/logs/",
+    "out_dir": "{PROJECT_ROOT}/logs/",
     "agent_config": "{PROJECT_ROOT}/trading/configs/agent_config.json",
     "feature_config": "{PROJECT_ROOT}/trading/configs/feature_config.json",
     "data_config": "{PROJECT_ROOT}/trading/configs/data_config.json",
     "stock_env": "{PROJECT_ROOT}/trading/configs/stock_env.json",
     "backtest_config": {
         "save_results": true,
-        "results_path": "{PROJECT_ROOT}/results/ppo_results.pkl"
+        "results_path": "{PROJECT_ROOT}/backtest_results/ppo_results.pkl"
     }
 }

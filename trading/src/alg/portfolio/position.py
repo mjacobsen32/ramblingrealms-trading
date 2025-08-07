@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict, deque
 from enum import Enum
 
@@ -76,24 +77,50 @@ class PositionManager(defaultdict):
         super().__init__(deque)
         self.position_view = defaultdict(PositionView)
         self.symbols = symbols
-        self.history: dict[str, deque[Position]] | None
+        self.history: defaultdict[str, deque[Position]] | None
 
         if maintain_history:
-            self.history = {symbol: deque() for symbol in symbols}
+            self.history = defaultdict(deque)
         else:
             self.history = None
         for symbol in symbols:
             self[symbol] = deque()
             self.position_view[symbol] = PositionView()
+        logging.info(f"Initializing PositionManager for symbols: {symbols}")
+        logging.info(f"{self.history}")
+
+    def to_csv(self, path: str):
+        """
+        Save the positions to a CSV file.
+        """
+        data = []
+        if self.history is None:
+            logging.warning("No history to save.")
+            return
+        # self.history.update(self)
+        for symbol, positions in self.history.items():
+            for position in positions:
+                data.append(
+                    {
+                        "symbol": symbol,
+                        "size": position.size,
+                        "enter_price": position.enter_price,
+                        "enter_date": position.enter_date,
+                        "exit_date": position.exit_date,
+                        "exit_price": getattr(position, "exit_price", None),
+                    }
+                )
+        df = pd.DataFrame(data)
+        df.to_csv(path, index=False)
 
     def reset(self):
         """
         Reset the position manager.
         """
-        self.clear()
-        self.position_view.clear()
-        if self.history is not None:
-            self.history.clear()
+        # self.clear()
+        # self.position_view.clear()
+        # if self.history is not None:
+        #     self.history.clear()
 
     def as_numpy(self) -> np.ndarray:
         return np.array(
@@ -142,7 +169,8 @@ class PositionManager(defaultdict):
                     position = self[symbol].popleft()
                     remaining_shares -= position.size
                     profit += position.exit(date, price)
-                    if self.history:
+                    # logging.warning(self.history.keys())
+                    if self.history is not None:
                         self.history[symbol].append(position)
                 else:
                     # Close a partial position
@@ -150,7 +178,7 @@ class PositionManager(defaultdict):
                     position.size -= remaining_shares
                     profit += position.exit(date, price, partial_exit=remaining_shares)
                     remaining_shares = 0.0
-                    if self.history:
+                    if self.history is not None:
                         self.history[symbol].append(position)
             self.position_view[symbol].rolling_return += profit
             return True, profit

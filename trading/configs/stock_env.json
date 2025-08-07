@@ -9,11 +9,11 @@
         "sell_cost_pct": 0.001,
         "turbulence_threshold": null,
         "max_positions": 1,
-        "hmax": 10000,
-        "trade_mode": "cont",
-        "sell_mode": "cont",
+        "hmax": 250000,
+        "trade_mode": "discrete",
+        "sell_mode": "discrete",
         "action_threshold": 0.1,
-        "trade_limit_percent": 0.1,
+        "trade_limit_percent": 1.0,
         "short_selling": false
     }
 }

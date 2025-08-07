@@ -1,12 +1,15 @@
 import logging
-from collections import defaultdict, deque
+from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import vectorbt as vbt
+from plotly import io as pio
 from rich import print as rprint
+from vectorbt import _typing as tp
 
-from trading.cli.alg.config import PortfolioConfig, SellMode, TradeMode
+from trading.cli.alg.config import PortfolioConfig, ProjectPath, SellMode, TradeMode
 from trading.src.alg.portfolio.position import Position, PositionManager
 
 
@@ -153,12 +156,13 @@ class Portfolio:
         max_shares = max_trade_value // prices
 
         if trade_mode == TradeMode.DISCRETE:
-            df.loc[above_thresh, "size"] = (
-                df.loc[above_thresh, "action"] * max_shares[above_thresh]
-            )
+            df.loc[above_thresh, "size"] = df.loc[above_thresh, "action"].astype(
+                np.int64
+            ) * max_shares[above_thresh].astype(np.int64)
         elif trade_mode == TradeMode.CONTINUOUS:
             df.loc[above_thresh, "size"] = np.round(
-                df.loc[above_thresh, "action"] * max_shares[above_thresh]
+                df.loc[above_thresh, "action"].astype(np.int64)
+                * max_shares[above_thresh].astype(np.int64)
             )
 
         df.loc[~above_thresh, "size"] = 0.0
@@ -205,19 +209,32 @@ class Portfolio:
         }
 
     @classmethod
-    def load(cls, cfg: PortfolioConfig, file_path: str) -> "Portfolio":
+    def load(cls, cfg: PortfolioConfig, file_path: Path) -> "Portfolio":
         """
         Load backtesting results from a JSON file.
         """
-        pf = vbt.Portfolio.load(file_path)
+        pf = vbt.Portfolio.load(str(file_path))
         logging.info(f"Loaded backtest results from {file_path}")
-        ret = cls(cfg=cfg, symbols=pf.symbols.tolist())
+        ret = cls(cfg=cfg, symbols=[])
         ret.vbt_pf = pf
         return ret
 
     def save(self, file_path: str):
         logging.info(f"Saving backtest results to {file_path}")
         self.as_vbt_pf().save(file_path)
+
+    def save_plots(self, backtest_dir: Path):
+        plots = []
+        paths = []
+        for p in self._get_plots():
+            title = p.layout.title.text.replace(" ", "_").lower()
+            path = backtest_dir / "plots" / f"{title}.svg"
+            if not path.parent.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+            p.update_layout(width=1200, height=2400)
+            plots.append(p)
+            paths.append(path)
+        pio.write_images(plots, paths, format="svg", scale=2, width=1200, height=2400)
 
     def reset(self):
         """
@@ -228,7 +245,7 @@ class Portfolio:
         self.cash = self.initial_cash
         self.nav = 0.0
         self.df = pd.DataFrame()
-        self.vbt_pf: vbt.Portfolio | None = None
+        self.vbt_pf = None
         self._positions.reset()
         logging.debug(f"Portfolio has been reset.\n{self}")
 
@@ -238,21 +255,45 @@ class Portfolio:
         """
         self.vbt_pf = pf
 
+    def _get_plots(self) -> list[tp.BaseFigure]:
+        """
+        Get the plots for the portfolio.
+        """
+        vbt_pf = self.as_vbt_pf()
+        plots: list[tp.BaseFigure] = []
+        p = vbt_pf.plot(
+            title="Portfolio Backtest Results",
+            subplots=["orders", "trades", "value", "cash", "drawdowns"],
+        )
+        if p is not None:
+            plots.append(p)
+
+        symbols = vbt_pf.orders.records_readable["Column"].unique().tolist()
+
+        for tic in symbols:
+            p = vbt_pf.plot(
+                subplots=[
+                    "asset_flow",
+                    "trades",
+                    "trade_pnl",
+                    "cum_returns",
+                    "orders",
+                ],
+                title=f"{tic} Backtest Results",
+                column=tic,
+                group_by=False,
+            )
+            if p is not None:
+                plots.append(p)
+
+        return plots
+
     def plot(self):
         """
         Plot the results of the backtest.
         """
-        self.as_vbt_pf().plot(
-            title="Portfolio Backtest Results",
-            subplots=[
-                "cash",
-                "asset_flow",
-                "trades",
-                "trade_pnl",
-                "cum_returns",
-                "orders",
-            ],
-        ).show()
+        for p in self._get_plots():
+            p.show()
 
     def stats(self):
         """
@@ -264,7 +305,7 @@ class Portfolio:
         """
         Return the orders of the backtest.
         """
-        return self.as_vbt_pf().orders
+        return self.as_vbt_pf().orders.records_readable
 
     def __repr__(self) -> str:
         """
@@ -277,3 +318,14 @@ class Portfolio:
         Return the current positions in the portfolio.
         """
         return self._positions
+
+    def analysis(self, analysis_config):
+        rprint(f"\nStats:\n{self.stats()}")
+
+        if analysis_config.plot:
+            self.plot()
+        if analysis_config.save_plots:
+            self.save_plots(ProjectPath.BACKTEST_DIR)
+        if analysis_config.to_csv:
+            self.get_positions().to_csv(ProjectPath.BACKTEST_DIR / "positions.csv")
+            self.orders().to_csv(ProjectPath.BACKTEST_DIR / "orders.csv")

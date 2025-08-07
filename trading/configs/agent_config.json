@@ -1,7 +1,6 @@
 {
     "algo": "ppo",
-    "log_dir": "{PROJECT_ROOT}/logs/",
-    "total_timesteps": 10000,
+    "total_timesteps": 100,
     "save_path": "{PROJECT_ROOT}/models/ppo_multi_ticker",
         "kwargs": {
             "policy": "MlpPolicy",
@@ -19,7 +18,7 @@
             "max_grad_norm": 0.5,
             "use_sde": false,
             "sde_sample_freq": -1,        
-            "device": "cpu",
+            "device": "cuda",
             "rollout_buffer_class": null,
             "rollout_buffer_kwargs": {},
             "target_kl": 0.01,
