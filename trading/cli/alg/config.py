@@ -248,7 +248,7 @@ class AnalysisConfig(BaseModel):
     Configuration for the analysis of backtest results.
     """
 
-    plot: bool = Field(
+    render_plots: bool = Field(
         True, description="Plot the backtesting results in browser using .show()"
     )
     save_plots: bool = Field(True, description="Whether to save the analysis plots")

@@ -5,6 +5,7 @@ import gymnasium as gym
 import numpy as np
 import pandas as pd
 import vectorbt as vbt
+from alpaca.data.timeframe import TimeFrameUnit
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import VecNormalize
 
@@ -27,6 +28,7 @@ class TradingEnv(gym.Env):
         data: pd.DataFrame,
         cfg: StockEnv,
         features: List[Feature],
+        time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
     ):
         self.stock_dimension = len(data.index.get_level_values("symbol").unique())
         self.feature_cols = feature_utils.get_feature_cols(features=features)
@@ -34,8 +36,9 @@ class TradingEnv(gym.Env):
         self.cfg = cfg
         self.reward_function = factory_method(cfg.reward_config)
         self.pf: Portfolio = Portfolio(
-            cfg.portfolio_config,
-            data.index.get_level_values("symbol").unique(),
+            cfg=cfg.portfolio_config,
+            symbols=data.index.get_level_values("symbol").unique(),
+            time_step=time_step,
         )
         self.observation_index = 0
 

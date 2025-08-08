@@ -12,7 +12,7 @@
         "backtest_dir": "{OUT_DIR}/backtest_results/",
         "results_path": "{BACKTEST_DIR}/ppo_multi_ticker_results.pkl",
         "analysis_config": {
-            "plot": true,
+            "render_plots": false,
             "save_plots": true,
             "to_csv": true
         }

@@ -54,6 +54,12 @@ def train(
         data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
+        time_step=tuple(
+            [
+                alg_config.data_config.time_step_unit,
+                alg_config.data_config.time_step_period,
+            ]
+        ),
     )
     trade_env.reset()
 
@@ -101,6 +107,12 @@ def backtest(
         data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
+        time_step=tuple(
+            [
+                alg_config.data_config.time_step_unit,
+                alg_config.data_config.time_step_period,
+            ]
+        ),
     )
     trade_env.reset()
 

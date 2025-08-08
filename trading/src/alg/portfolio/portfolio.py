@@ -5,12 +5,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import vectorbt as vbt
+from alpaca.data.timeframe import TimeFrameUnit
 from plotly import io as pio
 from rich import print as rprint
 from vectorbt import _typing as tp
 
 from trading.cli.alg.config import PortfolioConfig, ProjectPath, SellMode, TradeMode
 from trading.src.alg.portfolio.position import Position, PositionManager
+from trading.src.utility.utils import time_frame_unit_to_pd_timedelta
 
 
 class Portfolio:
@@ -20,7 +22,12 @@ class Portfolio:
     todo: move action to "action" and "size" is the scaled_action
     """
 
-    def __init__(self, cfg: PortfolioConfig, symbols: list[str]):
+    def __init__(
+        self,
+        cfg: PortfolioConfig,
+        symbols: list[str],
+        time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
+    ):
         """
         Initialize the Portfolio
         """
@@ -33,6 +40,7 @@ class Portfolio:
         self.vbt_pf: vbt.Portfolio | None = None
         self.symbols = symbols
         self._positions = PositionManager(symbols=symbols, maintain_history=True)
+        self.time_step = time_frame_unit_to_pd_timedelta(time_step)
 
     def __del__(self):
         self.df.to_csv(ProjectPath.BACKTEST_DIR / "portfolio.csv")
@@ -54,9 +62,10 @@ class Portfolio:
             price=price,
             size=size,
             size_type=0,  # amount
-            init_cash=1000000,
+            init_cash=self.initial_cash,
             log=True,
             cash_sharing=True,
+            freq="d",
         )
         return self.vbt_pf
 
@@ -271,14 +280,38 @@ class Portfolio:
         Get the plots for the portfolio.
         """
         vbt_pf = self.as_vbt_pf()
+        """
+         plots: [
+             "value", 
+             "cash", 
+             "drawdowns", 
+             "orders", 
+             "trades", 
+             "trade_pnl", 
+             "asset_flow", 
+             "cash_flow", 
+             "assets", 
+             "asset_value", 
+             "cum_returns", 
+             "underwater", 
+             "gross_exposure", 
+             "net_exposure"
+            ]
+        """
         plots: list[tp.BaseFigure] = []
-        pio.renderers.default = "browser"
-        logging.info(
-            f"Generating portfolio plots...\nRendering with: {pio.renderers.default}"
-        )
         p = vbt_pf.plot(
             title="Portfolio Backtest Results",
-            subplots=["value", "cash", "drawdowns"],
+            subplots=[
+                "value",
+                "cash",
+                "drawdowns",
+                "cash_flow",
+                "asset_value",
+                "cum_returns",
+                "underwater",
+                "gross_exposure",
+                "net_exposure",
+            ],
         )
         if p is not None:
             plots.append(p)
@@ -287,7 +320,22 @@ class Portfolio:
 
         for tic in symbols:
             p = vbt_pf.plot(
-                subplots=["asset_flow", "trade_pnl", "cum_returns", "trades"],
+                subplots=[
+                    "value",
+                    "cash",
+                    "drawdowns",
+                    "orders",
+                    "trades",
+                    "trade_pnl",
+                    "asset_flow",
+                    "cash_flow",
+                    "assets",
+                    "asset_value",
+                    "cum_returns",
+                    "underwater",
+                    "gross_exposure",
+                    "net_exposure",
+                ],
                 title=f"{tic} Backtest Results",
                 column=tic,
                 group_by=False,
@@ -301,6 +349,10 @@ class Portfolio:
         """
         Plot the results of the backtest.
         """
+        pio.renderers.default = "browser"
+        logging.info(
+            f"Generating portfolio plots...\nRendering with: {pio.renderers.default}"
+        )
         for p in self._get_plots():
             p.show()
 
@@ -337,7 +389,7 @@ class Portfolio:
     def analysis(self, analysis_config):
         rprint(f"\nStats:\n{self.stats()}")
 
-        if analysis_config.plot:
+        if analysis_config.render_plots:
             self.plot()
         if analysis_config.save_plots:
             self.save_plots(ProjectPath.BACKTEST_DIR)
