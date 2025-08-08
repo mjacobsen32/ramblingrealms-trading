@@ -174,9 +174,8 @@ class Portfolio:
             ) * max_shares[above_thresh].astype(np.int64)
         elif trade_mode == TradeMode.CONTINUOUS:
             df.loc[above_thresh, "size"] = np.round(
-                df.loc[above_thresh, "action"].astype(np.int64)
-                * max_shares[above_thresh].astype(np.int64)
-            )
+                df.loc[above_thresh, "action"] * max_shares[above_thresh]
+            ).astype(np.int64)
 
         df.loc[~above_thresh, "size"] = 0.0
 

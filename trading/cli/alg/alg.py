@@ -81,6 +81,7 @@ def train(
         pf = bt.run()
         pf.analysis(alg_config.backtest_config.analysis_config)
     ProjectPath.cache()
+    logging.info("Training completed successfully.")
 
 
 @app.command(help="Run backtesting on the trained model.")
@@ -132,6 +133,7 @@ def backtest(
     pf = bt.run()
     pf.analysis(alg_config.backtest_config.analysis_config)
     ProjectPath.cache()
+    logging.info("Backtesting completed successfully.")
 
 
 @app.command(help="Run analysis on the backtest results.")
@@ -154,3 +156,5 @@ def analysis(
         config.stock_env.portfolio_config, config.backtest_config.results_path.as_path()
     )
     pf.analysis(config.backtest_config.analysis_config)
+
+    logging.info("Analysis completed successfully.")

@@ -2,9 +2,19 @@
     "name": "ppo",
     "description": "A generic ppo trading algorithm configuration.",
     "version": "1.0",
-    "out_dir": "{PROJECT_ROOT}/logs/",
+    "out_dir": "{PROJECT_ROOT}/trading/test/temp/out/",
     "agent_config": "{PROJECT_ROOT}/trading/test/configs/agent_config.json",
     "feature_config": "{PROJECT_ROOT}/trading/test/configs/feature_config.json",
     "data_config": "{PROJECT_ROOT}/trading/test/configs/data_config.json",
-    "stock_env": "{PROJECT_ROOT}/trading/test/configs/stock_env.json"
+    "stock_env": "{PROJECT_ROOT}/trading/test/configs/stock_env.json",
+    "backtest_config": {
+        "save_results": true,
+        "backtest_dir": "{OUT_DIR}/backtest_results/",
+        "results_path": "{BACKTEST_DIR}/ppo_multi_ticker_results.pkl",
+        "analysis_config": {
+            "render_plots": false,
+            "save_plots": true,
+            "to_csv": true
+        }
+    }
 }
