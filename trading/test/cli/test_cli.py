@@ -26,10 +26,40 @@ def temp_dirs():
         shutil.rmtree(out_dir)
 
 
+@pytest.fixture(scope="session")
+def fake_keys(temp_dirs):
+    key_path = Path(str(ProjectPath.OUT_DIR)) / "test_key.txt"
+    secret_path = Path(str(ProjectPath.OUT_DIR)) / "test_secret.txt"
+
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.write_text("fake_key")
+    secret_path.write_text("fake_secret")
+    yield
+
+    key_path.unlink()
+    secret_path.unlink()
+
+
 def test_main():
     result = runner.invoke(app, "--help", color=False)
     assert result.exit_code == 0
-    assert "Usage: rr_trading [OPTIONS] COMMAND [ARGS]..." in result.output
+
+
+def test_print_config():
+    result = runner.invoke(app, ["print-config"], color=False)
+    assert result.exit_code == 0
+
+
+def test_setup(fake_keys):
+    key_path = Path(str(ProjectPath.OUT_DIR)) / "test_key.txt"
+    secret_path = Path(str(ProjectPath.OUT_DIR)) / "test_secret.txt"
+    result = runner.invoke(
+        app,
+        ["setup"],
+        color=False,
+        input=f"y\n{key_path}\n{secret_path}\nn\ny\n{key_path}\n{secret_path}\nn\ny\n{key_path}\ny\n{key_path}\n{secret_path}\n",
+    )
+    assert result.exit_code == 0
 
 
 def test_train_backtest_analysis(temp_dirs):

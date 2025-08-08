@@ -57,7 +57,7 @@ def print_config():
     Print the current user configuration.
     """
     config = User.load()
-    rprint(config)
+    print(config)
 
 
 @app.command(help="Run the setup wizard")
