@@ -27,20 +27,24 @@ def temp_dirs():
 
 
 def test_main():
-    result = runner.invoke(app, "--help")
+    result = runner.invoke(app, "--help", color=False)
     assert result.exit_code == 0
     assert "Usage: rr_trading [OPTIONS] COMMAND [ARGS]..." in result.output
 
 
 def test_train_backtest_analysis(temp_dirs):
     train_res = runner.invoke(
-        app, ["alg", "train", "--config", str(CONFIG_DIR / "generic_alg.json")]
+        app,
+        ["alg", "train", "--config", str(CONFIG_DIR / "generic_alg.json")],
+        color=False,
     )
     assert train_res.exit_code == 0
     assert "Training completed successfully." in train_res.output
 
     backtest_res = runner.invoke(
-        app, ["alg", "backtest", "--config", str(CONFIG_DIR / "generic_alg.json")]
+        app,
+        ["alg", "backtest", "--config", str(CONFIG_DIR / "generic_alg.json")],
+        color=False,
     )
     assert backtest_res.exit_code == 0
     assert "Backtest results will be saved to: " in backtest_res.output
@@ -56,6 +60,7 @@ def test_train_backtest_analysis(temp_dirs):
             "-o",
             str(ProjectPath.OUT_DIR),
         ],
+        color=False,
     )
     assert analysis_res.exit_code == 0
     assert "Analysis completed successfully." in analysis_res.output
