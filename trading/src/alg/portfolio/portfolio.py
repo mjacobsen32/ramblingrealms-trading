@@ -42,9 +42,6 @@ class Portfolio:
         self._positions = PositionManager(symbols=symbols, maintain_history=True)
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
 
-    def __del__(self):
-        self.df.to_csv(ProjectPath.BACKTEST_DIR / "portfolio.csv")
-
     def as_vbt_pf(self) -> vbt.Portfolio:
         """
         Update the portfolio with new data.

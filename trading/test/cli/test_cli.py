@@ -21,7 +21,6 @@ runner = CliRunner()
 @pytest.fixture(scope="session", autouse=True)
 def temp_dirs():
     yield
-    # Remove the output directory recursively if it exists after running tests
     out_dir = Path(str(ProjectPath.OUT_DIR))
     if out_dir.exists():
         shutil.rmtree(out_dir)
