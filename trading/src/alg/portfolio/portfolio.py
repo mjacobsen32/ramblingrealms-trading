@@ -19,7 +19,6 @@ class Portfolio:
     """
     Portfolio class for managing trading positions and cash flow.
     Very much Stateful
-    todo: move action to "action" and "size" is the scaled_action
     """
 
     def __init__(
@@ -141,7 +140,6 @@ class Portfolio:
         # Clip the size to not exceed the minimum of both limits
         df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
-        df["size"] = np.nan_to_num(df["size"])
         logging.debug(f"Scaled Actions: {df['size']}")
 
         return df["size"].values
@@ -170,9 +168,11 @@ class Portfolio:
                 np.int64
             ) * max_shares[above_thresh].astype(np.int64)
         elif trade_mode == TradeMode.CONTINUOUS:
-            df.loc[above_thresh, "size"] = np.round(
-                df.loc[above_thresh, "action"] * max_shares[above_thresh]
-            ).astype(np.int64)
+            df.loc[above_thresh, "size"] = (
+                (df.loc[above_thresh, "action"].values * max_shares[above_thresh])
+                .round()
+                .astype(np.int64)
+            )
 
         df.loc[~above_thresh, "size"] = 0.0
 
@@ -190,7 +190,7 @@ class Portfolio:
                 multi_index[1], multi_index[0], row["size"], row["close"]
             )
             step_profit += profit
-            df.loc[multi_index, "size"] = actual_size
+            df.at[multi_index, "size"] = actual_size
             logging.debug(
                 f"Updating position for {multi_index[1]} on {multi_index[0]}: "
                 f"size={row['size']}, actual_size={actual_size}, profit={profit}"
@@ -217,7 +217,7 @@ class Portfolio:
         if normalized_actions:
             df["size"] = self.scale_actions(df, prices, self.cfg.trade_mode)
 
-        df["size"] = self.enforce_trade_rules(df, prices, self.cfg.sell_mode)
+        df.loc[:, "size"] = self.enforce_trade_rules(df, prices, self.cfg.sell_mode)
         step_profit = self.update_position_batch(df=df)
         return {
             "scaled_actions": df["size"].values,
@@ -250,7 +250,8 @@ class Portfolio:
             p.update_layout(width=1200, height=2400)
             plots.append(p)
             paths.append(path)
-        pio.write_images(plots, paths, format="svg", scale=2, width=1200, height=2400)
+            # use pio.write_images when kaleido is upgraded to 1.x.x
+            pio.write_image(p, path, format="svg", scale=2, width=1200, height=3600)
 
     def reset(self):
         """

@@ -329,11 +329,6 @@ class RRConfig(BaseModel):
         logging.info(f"Saving/loading all output to/from: {ProjectPath.OUT_DIR}")
         return ProjectPath.model_validate(p)
 
-    # @field_validator("backtest_config", mode="after")
-    # @classmethod
-    # def validate_backtest_config(cls, value: BackTestConfig) -> BackTestConfig:
-    #     return BackTestConfig.model_validate(value.model_dump())
-
     @field_validator(
         "agent_config",
         "data_config",

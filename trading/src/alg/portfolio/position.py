@@ -48,7 +48,7 @@ class Position:
         )
 
     def __repr__(self):
-        return f"Position(symbol={self.symbol}, size={self.size}, enter_price={self.enter_price}, enter_date={self.enter_date}, exit_date={self.exit_date})"
+        return f"Position(symbol={self.symbol}, size={self.size}, enter_price={self.enter_price}, enter_date={self.enter_date}, exit_date={self.exit_date}, exit_price={self.exit_price})"
 
 
 class PositionView:
@@ -119,10 +119,10 @@ class PositionManager(defaultdict):
         """
         Reset the position manager.
         """
-        # self.clear()
-        # self.position_view.clear()
-        # if self.history is not None:
-        #     self.history.clear()
+        self.clear()
+        self.position_view.clear()
+        if self.history is not None:
+            self.history.clear()
 
     def as_numpy(self) -> np.ndarray:
         return np.array(

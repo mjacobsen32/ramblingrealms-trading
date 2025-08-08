@@ -38,16 +38,16 @@ dependencies = [
     "torch (>=2.7.0,<3.0.0)",
     "scikit-learn (>=1.6.1,<2.0.0)",
     "matplotlib (>=3.10.3,<4.0.0)",
-    "vectorbt (>=0.27.3,<0.28.0)",
+    "vectorbt (>=0.28.0)",
     "pandas-market-calendars (>=5.1.0,<6.0.0)",
     "gymnasium (>=1.2.0,<2.0.0)",
     "stable-baselines3 (>=2.6.0,<3.0.0)",
     "tqdm (>=4.67.1,<5.0.0)",
     "nbformat (>=5.10.4,<6.0.0)",
-    "kaleido (>=1.0.0,<2.0.0)",
+    "kaleido (<=0.2.1)",
     "anywidget (>=0.9.18,<0.10.0)",
-
 ]
+
 [project.urls]
 repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
 

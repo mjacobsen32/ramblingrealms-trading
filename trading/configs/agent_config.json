@@ -1,6 +1,6 @@
 {
     "algo": "ppo",
-    "total_timesteps": 1000,
+    "total_timesteps": 10000,
     "save_path": "{PROJECT_ROOT}/models/ppo_multi_ticker",
         "kwargs": {
             "policy": "MlpPolicy",
@@ -17,8 +17,8 @@
             "vf_coef": 0.5,
             "max_grad_norm": 0.5,
             "use_sde": false,
-            "sde_sample_freq": -1,        
-            "device": "cuda",
+            "sde_sample_freq": -1,
+            "device": "cpu",
             "rollout_buffer_class": null,
             "rollout_buffer_kwargs": {},
             "target_kl": 0.01,
