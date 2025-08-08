@@ -8,6 +8,7 @@ from trading.cli.alg.alg import backtest
 from trading.cli.alg.config import RRConfig
 from trading.src.alg.data_process.data_loader import DataLoader
 from trading.src.alg.environments.trading_environment import TradingEnv
+from trading.test.alg.test_fixtures import *
 
 CONFIG_DIR = Path(__file__).parent.parent.parent / "configs"
 

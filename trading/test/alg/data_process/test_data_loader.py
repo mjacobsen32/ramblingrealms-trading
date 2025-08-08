@@ -71,17 +71,8 @@ def test_data_loader_split(data_loader):
     ), "Testing DataFrame should contain only one ticker"
 
 
-def test_multi_ticker(data_config, feature_config):
-    from trading.src.alg.data_process.data_loader import DataLoader
-
-    data_config.requests[0].kwargs["symbol_or_symbols"] = [
-        "AAPL",
-        "MSFT",
-        "GOOGL",
-    ]
-    data_config.requests[0].dataset_name = "TEST_MULTI_TICKERS"
-    feature_config.features[0].source = "TEST_MULTI_TICKERS"
-    data_loader = DataLoader(data_config=data_config, feature_config=feature_config)
+def test_multi_ticker(multi_data_loader):
+    data_loader = multi_data_loader
 
     assert data_loader.df.shape[0] > 0, "DataFrame should not be empty"
     symbols = data_loader.df.index.get_level_values("symbol")

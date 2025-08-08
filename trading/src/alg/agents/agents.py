@@ -3,7 +3,7 @@ from typing import Optional
 
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC
 
-from trading.cli.alg.config import AgentConfig
+from trading.cli.alg.config import AgentConfig, ProjectPath
 from trading.src.alg.environments.trading_environment import TradingEnv
 
 AGENT_REGISTRY = {"ppo": PPO, "a2c": A2C, "dqn": DQN, "ddpg": DDPG, "sac": SAC}
@@ -42,7 +42,9 @@ class Agent:
 
         return AgentClass(
             env=env,
-            tensorboard_log=config.log_dir.as_path() if config.log_dir else None,
+            tensorboard_log=(
+                ProjectPath.OUT_DIR / "tensorboard" if ProjectPath.OUT_DIR else None
+            ),
             **config.kwargs,
         )
 

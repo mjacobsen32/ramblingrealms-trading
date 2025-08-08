@@ -40,6 +40,14 @@ class UserCache(BaseModel):
         default=SecretStr(""),
         description="Alpaca API Secret",
     )
+    out_dir: Path = Field(
+        default=Path(""),
+        description="Output directory for saving results",
+    )
+    backtest_dir: Path = Field(
+        default=Path(""),
+        description="Directory for storing backtest results",
+    )
 
     user_cache_path: Path = Path(
         os.environ.get(

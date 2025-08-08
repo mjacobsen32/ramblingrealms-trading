@@ -3,11 +3,12 @@ import logging
 import pandas as pd
 import pytest
 
-from trading.cli.alg.config import RewardConfig
+from trading.cli.alg.config import PortfolioConfig, RewardConfig
 from trading.src.alg.environments.reward_functions.basic_profit_max import (
     BasicProfitMax,
 )
 from trading.src.alg.portfolio.portfolio import Portfolio
+from trading.test.alg.test_fixtures import *
 
 
 @pytest.fixture
@@ -19,7 +20,7 @@ def basic_reward_function():
 
 
 @pytest.fixture
-def mild_profitable_portfolio():
+def mild_profitable_portfolio(portfolio_config):
     df = pd.DataFrame(
         {
             "timestamp": pd.date_range(
@@ -32,13 +33,14 @@ def mild_profitable_portfolio():
             "size": [30, 20, 10, -40, -20],
         }
     ).set_index(["timestamp", "symbol"])
-    pf = Portfolio(initial_cash=5_000)
+    portfolio_config.initial_cash = 5_000
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 
 
 @pytest.fixture
-def mild_negative_portfolio():
+def mild_negative_portfolio(portfolio_config):
     df = pd.DataFrame(
         {
             "timestamp": pd.date_range(
@@ -49,13 +51,14 @@ def mild_negative_portfolio():
             "size": [30, 20, 10, -40, -20],
         }
     ).set_index(["timestamp", "symbol"])
-    pf = Portfolio(initial_cash=5_000)
+    portfolio_config.initial_cash = 5_000
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 
 
 @pytest.fixture
-def strong_profitable_portfolio():
+def strong_profitable_portfolio(portfolio_config):
     df = pd.DataFrame(
         {
             "timestamp": pd.date_range(
@@ -66,13 +69,14 @@ def strong_profitable_portfolio():
             "size": [30, 20, 10, -40, -20],
         }
     ).set_index(["timestamp", "symbol"])
-    pf = Portfolio(initial_cash=5_000)
+    portfolio_config.initial_cash = 5_000
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 
 
 @pytest.fixture
-def strong_negative_portfolio():
+def strong_negative_portfolio(portfolio_config):
     df = pd.DataFrame(
         {
             "timestamp": pd.date_range(
@@ -84,7 +88,8 @@ def strong_negative_portfolio():
             "size": [30, 20, 10, -40, -20],
         }
     ).set_index(["timestamp", "symbol"])
-    pf = Portfolio(initial_cash=5_000)
+    portfolio_config.initial_cash = 5_000
+    pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     pf.update_position_batch(df)
     return pf
 

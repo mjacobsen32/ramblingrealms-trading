@@ -1,11 +1,11 @@
 {
     "algo": "ppo",
     "save_path": "{PROJECT_ROOT}/trading/test/models/ppo",
-    "total_timesteps": 10000,
+    "total_timesteps": 1000,
     "kwargs": {
         "policy": "MlpPolicy",
         "learning_rate": 0.0003,
-        "n_steps": 10000,
+        "n_steps": 256,
         "batch_size": 64,
         "n_epochs": 10,
         "gamma": 0.99,

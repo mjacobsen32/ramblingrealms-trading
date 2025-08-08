@@ -1,8 +1,7 @@
 {
     "algo": "ppo",
-    "log_dir": "{PROJECT_ROOT}/logs/",
     "total_timesteps": 10000,
-    "save_path": "{PROJECT_ROOT}/models/ppo",
+    "save_path": "{PROJECT_ROOT}/models/ppo_multi_ticker",
         "kwargs": {
             "policy": "MlpPolicy",
             "learning_rate": 0.0003,
@@ -18,7 +17,7 @@
             "vf_coef": 0.5,
             "max_grad_norm": 0.5,
             "use_sde": false,
-            "sde_sample_freq": -1,        
+            "sde_sample_freq": -1,
             "device": "cpu",
             "rollout_buffer_class": null,
             "rollout_buffer_kwargs": {},

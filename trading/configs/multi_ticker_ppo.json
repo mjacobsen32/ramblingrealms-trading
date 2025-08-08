@@ -1,12 +1,12 @@
 {
-    "name": "ppo",
+    "name": "ppo_multi_ticker",
     "description": "A generic ppo trading algorithm configuration.",
     "version": "1.0",
-    "out_dir": "{PROJECT_ROOT}/trading/test/temp/out/",
-    "agent_config": "{PROJECT_ROOT}/trading/test/configs/agent_config.json",
-    "feature_config": "{PROJECT_ROOT}/trading/test/configs/feature_config.json",
-    "data_config": "{PROJECT_ROOT}/trading/test/configs/data_config.json",
-    "stock_env": "{PROJECT_ROOT}/trading/test/configs/stock_env.json",
+    "out_dir": "{PROJECT_ROOT}/out/",
+    "agent_config": "{PROJECT_ROOT}/trading/configs/agent_config.json",
+    "feature_config": "{PROJECT_ROOT}/trading/configs/feature_config.json",
+    "data_config": "{PROJECT_ROOT}/trading/configs/multi_ticker_data_config.json",
+    "stock_env": "{PROJECT_ROOT}/trading/configs/stock_env.json",
     "backtest_config": {
         "save_results": true,
         "backtest_dir": "{OUT_DIR}/backtest_results/",

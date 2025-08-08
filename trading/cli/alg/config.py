@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Self, Union
@@ -9,15 +10,32 @@ from pydantic import BaseModel, Field, ValidationError, field_validator, model_v
 from pydantic_core.core_schema import ValidationInfo
 
 from trading.src.features.generic_features import Feature
+from trading.src.user_cache.user_cache import UserCache as user_cache
 
 
 class ProjectPath(BaseModel):
     PROJECT_ROOT: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
+    OUT_DIR: ClassVar[Path | None] = None
+    BACKTEST_DIR: ClassVar[Path | None] = None
     path: str = Field(str(), description="Path to the project root")
+
+    @classmethod
+    def use_cache(cls):
+        cache = user_cache.load()
+        ProjectPath.OUT_DIR = cache.out_dir
+        ProjectPath.BACKTEST_DIR = cache.backtest_dir
+
+    @classmethod
+    def cache(cls):
+        # persist output directories to user cache
+        cache = user_cache.load()
+        cache.out_dir = cls.OUT_DIR if cls.OUT_DIR else Path()
+        cache.backtest_dir = cls.BACKTEST_DIR if cls.BACKTEST_DIR else Path()
+        cache.save()
 
     @model_validator(mode="before")
     @classmethod
-    def validate_path(cls, data):
+    def validate_path(cls, data) -> dict[str, str]:
         # Accept both dict and str
         if isinstance(data, dict):
             value = data.get("path", "")
@@ -25,13 +43,20 @@ class ProjectPath(BaseModel):
             value = str(data)
         if "{PROJECT_ROOT}" in value:
             value = value.replace("{PROJECT_ROOT}", str(cls.PROJECT_ROOT))
+        elif "{OUT_DIR}" in value:
+            value = value.replace("{OUT_DIR}", str(cls.OUT_DIR))
+        elif "{BACKTEST_DIR}" in value:
+            value = value.replace("{BACKTEST_DIR}", str(cls.BACKTEST_DIR))
         return {"path": value}
 
     def __str__(self) -> str:
         return self.path
 
     def as_path(self) -> Path:
-        return Path(self.path)
+        p = Path(self.path)
+        if not p.parent.exists():
+            p.parent.mkdir(parents=True, exist_ok=True)
+        return p
 
 
 class DataSourceType(str, Enum):
@@ -64,6 +89,9 @@ class FeatureConfig(BaseModel):
         "mean",
         description="Strategy for handling missing values (e.g., 'mean', 'median', 'drop')",
     )
+
+    def __repr__(self):
+        return f"FeatureConfig(features={self.features}, fill_strategy={self.fill_strategy})"
 
 
 class DataRequests(BaseModel):
@@ -127,27 +155,68 @@ class RewardConfig(BaseModel):
     )
 
 
-class StockEnv(BaseModel):
+class TradeMode(str, Enum):
+    """
+    Enum for trade modes.
+    """
+
+    DISCRETE = "discrete"
+    CONTINUOUS = "cont"
+
+
+class SellMode(str, Enum):
+    """
+    Enum for sell modes.
+    """
+
+    DISCRETE = "discrete"
+    CONTINUOUS = "cont"
+
+
+class PortfolioConfig(BaseModel):
     initial_cash: int = Field(100_000, description="Starting funds in state space")
-    hmax: int = Field(
-        10_000, description="Maximum cash to be traded in each trade per asset"
-    )
     buy_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
     sell_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
-    turbulence_threshold: Union[float, None] = Field(
+    max_positions: int | None = Field(
         None,
-        description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
+        description="Maximum number of open positions per asset at any time",
+    )
+    trade_mode: TradeMode = Field(
+        TradeMode.CONTINUOUS,
+        description="Mode for trading: DISCRETE (fixed actions) or CONTINUOUS (scaled based on actions)",
+    )
+    sell_mode: SellMode = Field(
+        SellMode.CONTINUOUS,
+        description="Mode for selling assets: DISCRETE (fixed actions) or CONTINUOUS (scaled based on actions)",
     )
     trade_limit_percent: float = Field(
         0.1,
         description="Maximum percentage of cash to be used in a single trade relative to the current asset value",
     )
+    hmax: int = Field(
+        10_000,
+        description="Maximum cash to be traded in each trade per asset, if using discrete actions each trade is the max.",
+    )
+    action_threshold: float = Field(
+        0.1,
+        description="Minimum action value to trigger a trade, used to avoid noise in continuous actions",
+    )
+
+
+class StockEnv(BaseModel):
+    turbulence_threshold: Union[float, None] = Field(
+        None,
+        description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
+    )
     reward_config: RewardConfig = Field(
         default_factory=RewardConfig, description="Reward function configuration"
+    )
+    portfolio_config: PortfolioConfig = Field(
+        default_factory=PortfolioConfig, description="Portfolio configuration"
     )
 
 
@@ -172,10 +241,18 @@ class AgentConfig(BaseModel):
     kwargs: Dict[str, Any] = Field(
         default_factory=dict, description="Hyperparameters for the agent"
     )
-    log_dir: ProjectPath | None = Field(
-        None,
-        description="Directory to save logs and model checkpoints",
+
+
+class AnalysisConfig(BaseModel):
+    """
+    Configuration for the analysis of backtest results.
+    """
+
+    render_plots: bool = Field(
+        True, description="Plot the backtesting results in browser using .show()"
     )
+    save_plots: bool = Field(True, description="Whether to save the analysis plots")
+    to_csv: bool = Field(True, description="Save the analysis results to CSV files")
 
 
 class BackTestConfig(BaseModel):
@@ -186,6 +263,27 @@ class BackTestConfig(BaseModel):
     save_results: bool = Field(
         False, description="Whether to save the backtesting results"
     )
+    backtest_dir: ProjectPath = Field(
+        default_factory=ProjectPath,
+        description="Directory for storing backtest results",
+    )
+    analysis_config: AnalysisConfig = Field(
+        default_factory=AnalysisConfig,
+    )
+
+    @field_validator(
+        "backtest_dir",
+        mode="after",
+    )
+    @classmethod
+    def validate_backtest_dir(cls, value: ProjectPath) -> BaseModel:
+        logging.info(f"Validating backtest directory: {value}")
+        p = ProjectPath.model_validate(value)
+        ProjectPath.BACKTEST_DIR = p.as_path()
+        ProjectPath.BACKTEST_DIR.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Backtest results will be saved to: {ProjectPath.BACKTEST_DIR}")
+        return ProjectPath.model_validate(p)
+
     results_path: ProjectPath = Field(
         default_factory=ProjectPath,
         description="Path to save the backtesting results",
@@ -200,6 +298,7 @@ class RRConfig(BaseModel):
     name: str = Field(..., description="Name of the algorithm")
     description: str = Field("", description="Description of the algorithm")
     version: str = Field("1.0.0", description="Version of the algorithm")
+    out_dir: ProjectPath = Field(default_factory=ProjectPath)
     agent_config: AgentConfig | ProjectPath = Field(
         default_factory=AgentConfig, description="Agent configuration"
     )
@@ -212,10 +311,23 @@ class RRConfig(BaseModel):
     stock_env: StockEnv | ProjectPath = Field(
         default_factory=StockEnv, description="Stock Trading Environment Config"
     )
-    log_dir: ProjectPath = Field(default_factory=ProjectPath)
     backtest_config: BackTestConfig | ProjectPath = Field(
         default_factory=BackTestConfig, description="Backtesting configuration"
     )
+
+    @field_validator(
+        "out_dir",
+        mode="before",
+    )
+    @classmethod
+    def validate_out_dir(cls, value: ProjectPath) -> BaseModel:
+        p = ProjectPath.model_validate(value)
+        if ProjectPath.OUT_DIR is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ProjectPath.OUT_DIR = p.as_path() / Path(timestamp)
+            ProjectPath.OUT_DIR.mkdir(parents=True, exist_ok=True)
+        logging.info(f"Saving/loading all output to/from: {ProjectPath.OUT_DIR}")
+        return ProjectPath.model_validate(p)
 
     @field_validator(
         "agent_config",
