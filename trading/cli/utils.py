@@ -21,8 +21,8 @@ logging.getLogger("choreographer").setLevel(logging.WARNING)
 
 def init_file_logger(log_level: str, log_dir: str):
     # File handler for DEBUG and above
+    logger = logging.getLogger()
     if log_level != "NOTSET":
-        logger = logging.getLogger()
         file_handler = logging.FileHandler(Path(log_dir) / "rr_trading.log")
         file_handler.setLevel(log_level)
         file_handler.setFormatter(logging.Formatter(FORMAT))
@@ -30,10 +30,13 @@ def init_file_logger(log_level: str, log_dir: str):
         logging.info("File logger initialized with level: %s", log_level)
 
 
-def init_logger(log_level: str):
+def init_logger(log_level: str, log_file_level: str):
     logger = logging.getLogger()
     logger.handlers.clear()
-    logger.setLevel(logging.DEBUG)
+
+    console_level = getattr(logging, log_level, logging.NOTSET)
+    file_level = getattr(logging, log_file_level, logging.NOTSET)
+    logger.setLevel(max(console_level, file_level))
 
     console_handler = RichHandler(markup=True)
     console_handler.setLevel(log_level)

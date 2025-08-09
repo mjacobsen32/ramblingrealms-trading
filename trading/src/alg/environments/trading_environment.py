@@ -173,7 +173,9 @@ class TradingEnv(gym.Env):
 
         date_slice["action"] = action
         logging.debug(f"action: {action}, date_slice: {date_slice}")
-        profit = self.pf.step(prices=prices, df=date_slice, normalized_actions=True)
+        profit = self.pf.step(
+            prices=prices, df=date_slice, normalized_actions=True
+        )  # heaviest
 
         ret_info = {"net_value": self.pf.net_value(), "profit_change": profit}
 

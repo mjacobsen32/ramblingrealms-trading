@@ -31,7 +31,7 @@ def train(
         help="Run the training in dry run mode without saving results.",
     ),
     no_test: bool = typer.Option(
-        False, "--no_test", "-t", help="Run the backtesting suite via the new model"
+        False, "--no-test", "-t", help="Run the backtesting suite via the new model"
     ),
     fetch_data: bool = typer.Option(
         False,

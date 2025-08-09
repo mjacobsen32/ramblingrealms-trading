@@ -202,6 +202,10 @@ class Portfolio:
         self.total_value = self.cash + self.nav
 
         logging.debug(f"df: {df}\nstep_profit: {step_profit}\n")
+        print(logging.getLevelName(logging.getLogger().level))
+        print(logging.getLevelName(logging.getLogger().getEffectiveLevel()))
+        print(logging.getLevelName(logging.getLogger().handlers[0].level))
+        exit(0)
 
         return step_profit
 
