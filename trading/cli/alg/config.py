@@ -197,8 +197,8 @@ class PortfolioConfig(BaseModel):
         0.1,
         description="Maximum percentage of cash to be used in a single trade relative to the current asset value",
     )
-    hmax: int = Field(
-        10_000,
+    hmax: float = Field(
+        10_000.0,
         description="Maximum cash to be traded in each trade per asset, if using discrete actions each trade is the max.",
     )
     action_threshold: float = Field(

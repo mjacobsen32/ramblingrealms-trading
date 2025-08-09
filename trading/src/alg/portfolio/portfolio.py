@@ -120,7 +120,11 @@ class Portfolio:
         buy_limit = self.cfg.trade_limit_percent * self.total_value
 
         # Compute per-trade cost
-        buy_values = df.loc[buy_mask, "size"] * prices[buy_mask]
+        # Use numpy for faster computation
+        buy_indices = np.where(buy_mask)[0]
+        buy_sizes = df["size"].values[buy_indices]
+        buy_prices = prices[buy_indices]
+        buy_values = buy_sizes * buy_prices
 
         # Cap each trade at buy_limit
         capped_values = np.minimum(buy_values, buy_limit)
@@ -135,10 +139,17 @@ class Portfolio:
         # Calculate the maximum shares allowed by hmax and buy_limit for each buy
         max_shares_hmax = self.cfg.hmax // prices[buy_mask]
         max_shares_buy_limit = buy_limit // prices[buy_mask]
-        max_shares = np.minimum(max_shares_hmax, max_shares_buy_limit)
+        # Use np.minimum with out parameter to avoid extra allocation
+        np.minimum(max_shares_hmax, max_shares_buy_limit, out=max_shares_hmax)
+        max_shares = max_shares_hmax
 
         # Clip the size to not exceed the minimum of both limits
-        df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
+        # df["size"] = df["size"].where(~buy_mask, df["size"].clip(lower=0, upper=max_shares))
+        size_values = df["size"].values
+        buy_indices = np.where(buy_mask)[0]
+        size_values[buy_indices] = np.clip(size_values[buy_indices], 0, max_shares)
+        df["size"] = size_values
+
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
         logging.debug("Scaled Actions: %s", df["size"])
 
@@ -163,20 +174,22 @@ class Portfolio:
         )
         max_shares = max_trade_value // prices
 
+        # Vectorized, faster assignment using numpy
+        size = np.zeros_like(df["action"].values, dtype=np.float64)
+        actions = df["action"].values
+        above_idx = np.where(above_thresh)[0]
+
         if trade_mode == TradeMode.DISCRETE:
-            df.loc[above_thresh, "size"] = df.loc[above_thresh, "action"].astype(
-                np.int64
-            ) * max_shares[above_thresh].astype(np.int64)
+            size[above_idx] = actions[above_idx].astype(np.float64) * max_shares[
+                above_idx
+            ].astype(np.float64)
         elif trade_mode == TradeMode.CONTINUOUS:
-            df.loc[above_thresh, "size"] = (
-                (df.loc[above_thresh, "action"].values * max_shares[above_thresh])
-                .round()
-                .astype(np.int64)
-            )
+            size[above_idx] = np.round(
+                actions[above_idx] * max_shares[above_thresh]
+            ).astype(np.float64)
 
-        df.loc[~above_thresh, "size"] = 0.0
-
-        return df["size"].values
+        df["size"] = size
+        return size
 
     def update_position_batch(self, df: pd.DataFrame) -> float:
         """
