@@ -32,7 +32,7 @@ class BasicProfitMax(RewardFunction):
             or normalized_profit <= -1.0
             or normalized_profit >= 1.0
         ):
-            logging.warning(f"Normalized profit is {normalized_profit}")
+            logging.warning("Normalized profit is %s", normalized_profit)
         ret = normalized_profit - self.previous_profit
         self.previous_profit = normalized_profit
         return ret

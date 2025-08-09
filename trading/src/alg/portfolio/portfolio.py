@@ -89,7 +89,7 @@ class Portfolio:
         Enforce trade rules on the actions.
         From trade sizes to actual trade sizes based on configuration and current portfolio state.
         """
-        logging.debug(f"Raw Action: {df['size']}")
+        logging.debug("Raw Action: %s", df["size"])
 
         max_positions_mask = (
             self._positions.positions_held_as_numpy() < self.cfg.max_positions
@@ -130,7 +130,7 @@ class Portfolio:
         if attempted_buy > self.cash:
             buy_limit = min(buy_limit, self.cash // len(buy_mask))
 
-        logging.debug(f"Buy Limit dollar amount: {buy_limit}")
+        logging.debug("Buy Limit dollar amount: %s", buy_limit)
 
         # Calculate the maximum shares allowed by hmax and buy_limit for each buy
         max_shares_hmax = self.cfg.hmax // prices[buy_mask]
@@ -140,7 +140,7 @@ class Portfolio:
         # Clip the size to not exceed the minimum of both limits
         df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
-        logging.debug(f"Scaled Actions: {df['size']}")
+        logging.debug("Scaled Actions: %s", df["size"])
 
         return df["size"].values
 
@@ -192,8 +192,12 @@ class Portfolio:
             step_profit += profit
             df.at[multi_index, "size"] = actual_size
             logging.debug(
-                f"Updating position for {multi_index[1]} on {multi_index[0]}: "
-                f"size={row['size']}, actual_size={actual_size}, profit={profit}"
+                "Updating position for %s on %s: size=%s, actual_size=%s, profit=%s",
+                multi_index[1],
+                multi_index[0],
+                row["size"],
+                actual_size,
+                profit,
             )
 
         self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
@@ -201,11 +205,7 @@ class Portfolio:
         self.nav = self._positions.nav(df["close"])
         self.total_value = self.cash + self.nav
 
-        logging.debug(f"df: {df}\nstep_profit: {step_profit}\n")
-        print(logging.getLevelName(logging.getLogger().level))
-        print(logging.getLevelName(logging.getLogger().getEffectiveLevel()))
-        print(logging.getLevelName(logging.getLogger().handlers[0].level))
-        exit(0)
+        logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
 
         return step_profit
 
@@ -234,13 +234,13 @@ class Portfolio:
         Load backtesting results from a JSON file.
         """
         pf = vbt.Portfolio.load(str(file_path))
-        logging.info(f"Loaded backtest results from {file_path}")
+        logging.info("Loaded backtest results from %s", file_path)
         ret = cls(cfg=cfg, symbols=[])
         ret.vbt_pf = pf
         return ret
 
     def save(self, file_path: str):
-        logging.info(f"Saving backtest results to {file_path}")
+        logging.info("Saving backtest results to %s", file_path)
         self.as_vbt_pf().save(file_path)
 
     def save_plots(self, backtest_dir: Path):
@@ -268,7 +268,7 @@ class Portfolio:
         self.df = pd.DataFrame()
         self.vbt_pf = None
         self._positions.reset()
-        logging.debug(f"Portfolio has been reset.\n{self}")
+        logging.debug("Portfolio has been reset.\n%s", self)
 
     def set_vbt(self, pf: vbt.Portfolio):
         """
@@ -352,7 +352,7 @@ class Portfolio:
         """
         pio.renderers.default = "browser"
         logging.info(
-            f"Generating portfolio plots...\nRendering with: {pio.renderers.default}"
+            "Generating portfolio plots...\nRendering with: %s", pio.renderers.default
         )
         for p in self._get_plots():
             p.show()

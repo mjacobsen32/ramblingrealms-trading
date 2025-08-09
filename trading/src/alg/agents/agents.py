@@ -62,14 +62,14 @@ class Agent:
         return AgentClass.load(str(config.save_path), env=env)
 
     def learn(self, timesteps: Optional[int] = None):
-        logging.debug(f"Starting training for {self.config.algo} agent.")
+        logging.debug("Starting training for %s agent.", self.config.algo)
         ret = self.model.learn(
             total_timesteps=(
                 self.config.total_timesteps if timesteps is None else timesteps
             ),
             progress_bar=True,
         )
-        logging.debug(f"Training completed for {self.config.algo} agent.")
+        logging.debug("Training completed for %s agent.", self.config.algo)
         return ret
 
     def predict(self, obs):

@@ -86,8 +86,8 @@ class PositionManager(defaultdict):
         for symbol in symbols:
             self[symbol] = deque()
             self.position_view[symbol] = PositionView()
-        logging.info(f"Initializing PositionManager for symbols: {symbols}")
-        logging.info(f"{self.history}")
+        logging.info("Initializing PositionManager for symbols: %s", symbols)
+        logging.info("%s", self.history)
 
     def to_csv(self, path: str):
         """

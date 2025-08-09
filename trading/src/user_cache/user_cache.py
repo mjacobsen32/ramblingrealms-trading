@@ -71,7 +71,7 @@ class UserCache(BaseModel):
         attr = super().__getattribute__(name)
         if attr is None:
             logging.warning(
-                f"Attribute {name} not found. Please run the setup command."
+                "Attribute %s not found. Please run the setup command.", name
             )
         return attr
 

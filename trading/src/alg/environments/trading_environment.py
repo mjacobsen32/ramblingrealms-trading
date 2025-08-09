@@ -63,8 +63,12 @@ class TradingEnv(gym.Env):
             )  # technical indicators for each stock
         )
         logging.info(
-            f"State space: {state_space}, Features ({len(self.feature_cols)}): {self.feature_cols}, "
-            f"Stock Dimension: {self.stock_dimension}, action space: {self.action_space.shape}"
+            "State space: %s, Features (%s): %s, Stock Dimension: %s, action space: %s",
+            state_space,
+            len(self.feature_cols),
+            self.feature_cols,
+            self.stock_dimension,
+            self.action_space.shape,
         )
         # State space (cash + owned shares + prices + indicators)
         self.observation_space = spaces.Box(
@@ -91,7 +95,7 @@ class TradingEnv(gym.Env):
         self.observation_timestamp = self.data.index.get_level_values(
             "timestamp"
         ).unique()
-        logging.debug(f"Environment reset:\n{self.render()}")
+        logging.debug("Environment reset:\n%s", self.render())
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         """
@@ -117,7 +121,10 @@ class TradingEnv(gym.Env):
         prices = self.data.loc[[self.observation_timestamp[i]]]["close"].to_numpy()
         portfolio_state = np.asarray(self.pf.state())
         logging.debug(
-            f"Portfolio state: {portfolio_state.shape}\nPrices: {prices.shape}\nIndicators: {indicators.shape}"
+            "Portfolio state: %s\nPrices: %s\nIndicators: %s",
+            portfolio_state.shape,
+            prices.shape,
+            indicators.shape,
         )
         c = np.concatenate(
             [
@@ -127,7 +134,7 @@ class TradingEnv(gym.Env):
             ]
         )
 
-        logging.debug(f"Observation: {c}")
+        logging.debug("Observation: %s", c)
 
         return c
 
@@ -172,15 +179,19 @@ class TradingEnv(gym.Env):
         date_slice = self.data.loc[[self.observation_timestamp[self.observation_index]]]
 
         date_slice["action"] = action
-        logging.debug(f"action: {action}, date_slice: {date_slice}")
+        logging.debug("action: %s, date_slice: %s", action, date_slice)
         profit = self.pf.step(
             prices=prices, df=date_slice, normalized_actions=True
         )  # heaviest
 
         ret_info = {"net_value": self.pf.net_value(), "profit_change": profit}
 
-        logging.debug(f"Env State: {self.render()}")
-        logging.debug(f"Portfolio State: {self.pf}")
+        (
+            logging.debug("Env State: %s", self.render())
+            if logging.getLogger().isEnabledFor(logging.DEBUG)
+            else None
+        )
+        logging.debug("Portfolio State: %s", self.pf)
 
         ret = (
             self._get_observation(),

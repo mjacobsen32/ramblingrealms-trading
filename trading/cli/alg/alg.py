@@ -146,7 +146,7 @@ def analysis(
         str, typer.Option("--out_dir", "-o", help="Path to the root output directory.")
     ],
 ):
-    logging.info(f"Starting analysis process...")
+    logging.info("Starting analysis process...")
     with Path.open(Path(alg_config)) as f:
         ProjectPath.OUT_DIR = Path(out_dir).resolve()
         config = RRConfig.model_validate_json(f.read())
