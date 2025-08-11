@@ -94,7 +94,6 @@ class Portfolio:
         From trade sizes to actual trade sizes based on configuration and current portfolio state.
         @TODO clean up and make more efficient
         """
-        logging.debug("Raw Action: %s", df["size"])
 
         buy_mask = df["size"] > 0
         sell_mask = df["size"] < 0
@@ -138,7 +137,7 @@ class Portfolio:
         # Clip the size to not exceed the minimum of both limits
         df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
-        logging.debug("Scaled Actions: %s", df["size"])
+        logging.debug("Scaled Sizes: %s", df["size"])
 
         return df["size"].values
 
@@ -153,6 +152,7 @@ class Portfolio:
         From signal strength to a desired trade size
         @TODO clean up and make more efficient
         """
+        logging.debug("Raw Action: %s", df["action"])
         # Find actions above threshold
         above_thresh = df["action"].abs() > self.cfg.action_threshold
 

@@ -1,3 +1,4 @@
+import pandas as pd
 import vectorbt as vbt
 
 from trading.cli.alg.config import RewardConfig
@@ -10,11 +11,12 @@ class RewardFunction:
     @TODO pass in the profit calculated from the position step
     """
 
-    def __init__(self, cfg: RewardConfig):
+    def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
         self.cfg = cfg
+        self.initial_state = initial_state
 
     def __repr__(self) -> str:
-        return f"RewardFunction(cfg={self.cfg})"
+        return f"RewardFunction(cfg={self.cfg}, initial_state={self.initial_state})"
 
     def reset(self):
         """
@@ -22,7 +24,9 @@ class RewardFunction:
         """
         pass
 
-    def compute_reward(self, pf: Portfolio) -> float:
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
         """
         Compute the reward for a given action and state transition.
         """

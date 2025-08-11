@@ -1,5 +1,6 @@
 import logging
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -14,7 +15,8 @@ from trading.test.alg.test_fixtures import *
 @pytest.fixture
 def basic_reward_function():
     basic_reward_function = BasicProfitMax(
-        cfg=RewardConfig(type="basic_profit_max", reward_scaling=1000.0)
+        cfg=RewardConfig(type="basic_profit_max", reward_scaling=1000.0),
+        initial_state=np.array([5000, 0.0]),
     )
     return basic_reward_function
 
@@ -118,13 +120,13 @@ def test_basic_profit_max(
     mild_negative_portfolio,
 ):
     rf = basic_reward_function
-    strong_profit = rf.compute_reward(strong_profitable_portfolio)
+    strong_profit = rf.compute_reward(strong_profitable_portfolio, [], 0.0)
     rf.reset()
-    mild_profit = rf.compute_reward(mild_profitable_portfolio)
+    mild_profit = rf.compute_reward(mild_profitable_portfolio, [], 0.0)
     rf.reset()
-    strong_negative = rf.compute_reward(strong_negative_portfolio)
+    strong_negative = rf.compute_reward(strong_negative_portfolio, [], 0.0)
     rf.reset()
-    mild_negative = rf.compute_reward(mild_negative_portfolio)
+    mild_negative = rf.compute_reward(mild_negative_portfolio, [], 0.0)
     assert strong_profit > 0.5
     assert mild_profit > 0.00
     assert strong_negative < -0.5

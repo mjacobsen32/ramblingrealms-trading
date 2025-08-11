@@ -34,12 +34,12 @@ class TradingEnv(gym.Env):
         self.feature_cols = feature_utils.get_feature_cols(features=features)
         self.init_data(data)
         self.cfg = cfg
-        self.reward_function = factory_method(cfg.reward_config)
         self.pf: Portfolio = Portfolio(
             cfg=cfg.portfolio_config,
             symbols=data.index.get_level_values("symbol").unique(),
             time_step=time_step,
         )
+        self.reward_function = factory_method(cfg.reward_config, self.pf.state())
         self.observation_index = 0
 
         # Define action space: continuous [-1,1] per stock (sell, hold, buy)
@@ -143,15 +143,15 @@ class TradingEnv(gym.Env):
         return c
 
     def render(self):
-        return (
-            f"Day: {self.observation_timestamp[self.observation_index]}\n"
-            f"Slice: {self.data.loc[self.observation_timestamp[self.observation_index]]}\n"
-            f"Tickers: {self.data.index.get_level_values('symbol').unique().tolist()}, "
-            f"Observation Space: {self.observation_space.shape}, "
-            f"Action Space: {self.action_space.shape}, "
-            f"Features: {self.feature_cols}, "
-            f"Reward Function: {self.reward_function}, "
-            f"{self.pf}"
+        return "Day: {}\nSlice: {}\nTickers: {}, Observation Space: {}, Action Space: {}, Features: {}, Reward Function: {}, {}".format(
+            self.observation_timestamp[self.observation_index],
+            self.data.loc[self.observation_timestamp[self.observation_index]],
+            self.data.index.get_level_values("symbol").unique().tolist(),
+            self.observation_space.shape,
+            self.action_space.shape,
+            self.feature_cols,
+            self.reward_function,
+            self.pf,
         )
 
     def step(self, action):
@@ -180,20 +180,21 @@ class TradingEnv(gym.Env):
 
         date_slice.loc[:, "action"] = action
         logging.debug("action: %s, date_slice: %s", action, date_slice)
-        profit = self.pf.step(df=date_slice, normalized_actions=True)  # heaviest
+        realized_step_profit = self.pf.step(df=date_slice, normalized_actions=True)
 
-        ret_info = {"net_value": self.pf.net_value(), "profit_change": profit}
+        ret_info = {
+            "net_value": self.pf.net_value(),
+            "profit_change": realized_step_profit,
+        }
 
-        (
-            logging.debug("Env State: %s", self.render())
-            if logging.getLogger().isEnabledFor(logging.DEBUG)
-            else None
-        )
+        logging.debug("Env State: %s", self)
         logging.debug("Portfolio State: %s", self.pf)
 
         ret = (
             self._get_observation(),
-            self.reward_function.compute_reward(self.pf),
+            self.reward_function.compute_reward(
+                pf=self.pf, df=date_slice, realized_profit=realized_step_profit
+            ),
             self.terminal,
             False,
             ret_info,

@@ -1,7 +1,7 @@
 {
     "reward_config":{
         "type": "basic_profit_max",
-        "reward_scaling": 1e4
+        "reward_scaling": 1e6
     },
     "portfolio_config":{
         "initial_cash": 1000000,
