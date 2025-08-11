@@ -35,6 +35,7 @@ def mild_profitable_portfolio(portfolio_config):
     ).set_index(["timestamp", "symbol"])
     df["close"] = df["price"]
     df["timestamp"] = df.index.get_level_values("timestamp").unique()
+    df["profit"] = 0.0
     portfolio_config.initial_cash = 5_000
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     for date in df.index.get_level_values("timestamp").unique():
@@ -56,6 +57,7 @@ def mild_negative_portfolio(portfolio_config):
     ).set_index(["timestamp", "symbol"])
     df["close"] = df["price"]
     df["timestamp"] = df.index.get_level_values("timestamp").unique()
+    df["profit"] = 0.0
     portfolio_config.initial_cash = 5_000
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     for date in df.index.get_level_values("timestamp").unique():
@@ -77,6 +79,7 @@ def strong_profitable_portfolio(portfolio_config):
     ).set_index(["timestamp", "symbol"])
     df["close"] = df["price"]
     df["timestamp"] = df.index.get_level_values("timestamp").unique()
+    df["profit"] = 0.0
     portfolio_config.initial_cash = 5_000
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     for date in df.index.get_level_values("timestamp").unique():
@@ -99,6 +102,7 @@ def strong_negative_portfolio(portfolio_config):
     ).set_index(["timestamp", "symbol"])
     df["close"] = df["price"]
     df["timestamp"] = df.index.get_level_values("timestamp").unique()
+    df["profit"] = 0.0
     portfolio_config.initial_cash = 5_000
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     for date in df.index.get_level_values("timestamp").unique():

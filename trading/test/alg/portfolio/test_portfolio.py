@@ -19,8 +19,8 @@ def single_tic_data(dates):
     data = {
         "timestamp": dates,
         "symbol": ["AAPL"] * 5,
-        "close": [10, 10, 20, 10, 155],
-        "size": [10, 0, -10, 0, 0],
+        "close": [10.0, 10.0, 20.0, 10.0, 155.0],
+        "size": [10.0, 0.0, -10.0, 0.0, 0.0],
     }
     return pd.DataFrame(data)
 
@@ -28,11 +28,11 @@ def single_tic_data(dates):
 @pytest.fixture
 def expected_states():
     expected_states = [
-        [700, 10, 10, 0],
-        [540, 5, 20, 0],
-        [270, 0, 20, 10],
-        [400, 0, 15, 10],
-        [590, 0, 15, 5],
+        [700.0, 10.0, 10.0, 0.0],
+        [540.0, 5.0, 20.0, 0.0],
+        [270.0, 0.0, 20.0, 10.0],
+        [400.0, 0.0, 15.0, 10.0],
+        [590.0, 0.0, 15.0, 5.0],
     ]
     return expected_states
 
@@ -40,9 +40,9 @@ def expected_states():
 @pytest.fixture
 def expected_positions():
     positions = [
-        [10, 5, 0, 0, 0],
-        [10, 20, 20, 15, 15],
-        [0.0, 0.0, 10, 10, 5],
+        [10.0, 5.0, 0.0, 0.0, 0.0],
+        [10.0, 20.0, 20.0, 15.0, 15.0],
+        [0.0, 0.0, 10.0, 10.0, 5.0],
     ]
     return np.array(positions)
 
@@ -51,14 +51,14 @@ def expected_positions():
 def multi_tic_data(dates):
     tics = ["AAPL", "MSFT", "NVDA"]
     close_prices = {
-        "AAPL": [10, 12, 14, 16, 18],
-        "MSFT": [20, 22, 24, 26, 28],
-        "NVDA": [30, 32, 34, 36, 38],
+        "AAPL": [10.0, 12.0, 14.0, 16.0, 18.0],
+        "MSFT": [20.0, 22.0, 24.0, 26.0, 28.0],
+        "NVDA": [30.0, 32.0, 34.0, 36.0, 38.0],
     }
     sizes = {
-        "AAPL": [10, -5, -5, 0, 0],
-        "MSFT": [10, 10, 0, -5, 0],
-        "NVDA": [0, 0, 10, 0, -5],
+        "AAPL": [10.0, -5.0, -5.0, 0.0, 0.0],
+        "MSFT": [10.0, 10.0, 0.0, -5.0, 0.0],
+        "NVDA": [0.0, 0.0, 10.0, 0.0, -5.0],
     }
     records = []
     for i, date in enumerate(dates):
@@ -74,6 +74,8 @@ def multi_tic_data(dates):
     df = pd.DataFrame(records).set_index(["timestamp", "symbol"])
     df["timestamp"] = df.index.get_level_values("timestamp")
     df["price"] = df["close"]
+    df["profit"] = 0.0
+    df["action"] = 0.0
     return df
 
 
@@ -105,6 +107,8 @@ def normalized_multi_tic_data(dates):
     df = pd.DataFrame(records).set_index(["timestamp", "symbol"])
     df["timestamp"] = df.index.get_level_values("timestamp")
     df["price"] = df["close"]
+    df["profit"] = 0.0
+    df["size"] = 0.0
     return df
 
 
@@ -113,9 +117,6 @@ def test_portfolio_data_set(data_loader, portfolio_config):
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     np.random.seed(42)  # For reproducible results
     data = data_loader.get_train_test()[0].copy()
-    data["size"] = np.random.choice([-1, 0, 1], size=len(data))
-    data["timestamp"] = data.index.get_level_values("timestamp")
-    data["price"] = data["close"]
     for date in data.index.get_level_values("timestamp").unique():
         pf.update_position_batch(data.loc[date])
     vbt = pf.as_vbt_pf()
@@ -126,9 +127,6 @@ def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "GOOGL"])
     np.random.seed(42)  # For reproducible results
     data = multi_data_loader.get_train_test()[0].copy()
-    data["size"] = np.random.choice([-1, 0, 1], size=len(data))
-    data["timestamp"] = data.index.get_level_values("timestamp")
-    data["price"] = data["close"]
     for date in data.index.get_level_values("timestamp").unique():
         pf.update_position_batch(data.loc[date])
     vbt = pf.as_vbt_pf()
@@ -217,6 +215,8 @@ def test_cash_limit(constraints_portfolio_config):
         }
     ).set_index(["symbol"])
     df["price"] = df["close"]
+    df["profit"] = 0.0
+    df["action"] = 0.0
 
     ret = pf.step(df.iloc[0:2])
     np.testing.assert_array_equal(
@@ -247,6 +247,9 @@ def normalized_actions():
         "symbol": ["AAPL"] * 5,
         "close": [10, 10, 10, 10, 10],
         "action": [1.0, 0.1, -1.0, 0.5, 0],
+        "price": [10, 10, 10, 10, 10],
+        "size": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "profit": [0.0, 0.0, 0.0, 0.0, 0.0],
     }
     return pd.DataFrame(data)
 

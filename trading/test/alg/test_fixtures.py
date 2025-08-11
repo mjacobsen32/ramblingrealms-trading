@@ -63,7 +63,13 @@ def feature_config():
 def data_loader(data_config, feature_config):
     from trading.src.alg.data_process.data_loader import DataLoader
 
-    return DataLoader(data_config=data_config, feature_config=feature_config)
+    data = DataLoader(data_config=data_config, feature_config=feature_config)
+    data.df["price"] = data.df["close"]
+    data.df["timestamp"] = data.df.index.get_level_values("timestamp")
+    data.df["size"] = 0.0
+    data.df["profit"] = 0.0
+    data.df["action"] = 0.0
+    return data
 
 
 @pytest.fixture
@@ -77,7 +83,13 @@ def multi_data_loader(data_config, feature_config):
     ]
     data_config.requests[0].dataset_name = "TEST_MULTI_TICKERS"
     feature_config.features[0].source = "TEST_MULTI_TICKERS"
-    return DataLoader(data_config=data_config, feature_config=feature_config)
+    data = DataLoader(data_config=data_config, feature_config=feature_config)
+    data.df["price"] = data.df["close"]
+    data.df["timestamp"] = data.df.index.get_level_values("timestamp")
+    data.df["size"] = 0.0
+    data.df["profit"] = 0.0
+    data.df["action"] = 0.0
+    return data
 
 
 @pytest.fixture

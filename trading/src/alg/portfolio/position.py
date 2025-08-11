@@ -191,7 +191,6 @@ class PositionManager:
         Exit positions based on the provided DataFrame.
         """
         step_profit = 0.0
-        df["profit"] = 0.0
         for sym, row in df.iterrows():
             remaining_lot = -row["size"]  # total to sell
             queue = self.positions[sym]
@@ -237,11 +236,8 @@ class PositionManager:
         self.df.loc[sell_mask, "position_counts"] += np.sign(exit_view["size"])
         self.df.loc[sell_mask, "rolling_profit"] += exit_view["profit"]
 
-        print(buy_mask.to_list(), sell_mask.to_list())
         df.loc[sell_mask, "size"] = exit_view["size"]
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
-
-        print(df["size"].to_list())
 
         return df, exit_view["profit"].sum()
 

@@ -7,7 +7,6 @@ import pandas as pd
 import vectorbt as vbt
 from alpaca.data.timeframe import TimeFrameUnit
 from plotly import io as pio
-from rich import print as rprint
 from vectorbt import _typing as tp
 
 from trading.cli.alg.config import PortfolioConfig, ProjectPath, SellMode, TradeMode
@@ -143,7 +142,7 @@ class Portfolio:
         size_values = df["size"].values
         buy_indices = np.where(buy_mask)[0]
         size_values[buy_indices] = np.clip(size_values[buy_indices], 0, max_shares)
-        df["size"] = size_values
+        df.loc[:, "size"] = size_values
 
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
         logging.debug("Scaled Actions: %s", df["size"])
@@ -183,7 +182,7 @@ class Portfolio:
                 actions[above_idx] * max_shares[above_thresh]
             ).astype(np.float64)
 
-        df["size"] = size
+        df.loc[:, "size"] = size
         return size
 
     def update_position_batch(self, df: pd.DataFrame) -> float:
@@ -212,7 +211,9 @@ class Portfolio:
         3. update positions
         """
         if normalized_actions:
-            df["size"] = self.scale_actions(df, df["price"].values, self.cfg.trade_mode)
+            df.loc[:, "size"] = self.scale_actions(
+                df, df["price"].values, self.cfg.trade_mode
+            )
 
         df.loc[:, "size"] = self.enforce_trade_rules(
             df, df["price"].values, self.cfg.sell_mode
@@ -383,7 +384,7 @@ class Portfolio:
         return self._positions
 
     def analysis(self, analysis_config):
-        rprint(f"\nStats:\n{self.stats()}")
+        logging.info(f"\nStats:\n{self.stats()}")
 
         if analysis_config.render_plots:
             self.plot()
