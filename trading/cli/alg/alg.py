@@ -79,7 +79,7 @@ def train(
             data=data_loader.get_train_test()[1],
         )
         pf = bt.run()
-        pf.analysis(alg_config.backtest_config.analysis_config)
+        pf.analysis(alg_config.backtest_config.analysis_config, trade_env.data)
     ProjectPath.cache()
     logging.info("Training completed successfully.")
 
@@ -131,7 +131,7 @@ def backtest(
         ),
     )
     pf = bt.run()
-    pf.analysis(alg_config.backtest_config.analysis_config)
+    pf.analysis(alg_config.backtest_config.analysis_config, trade_env.data)
     ProjectPath.cache()
     logging.info("Backtesting completed successfully.")
 

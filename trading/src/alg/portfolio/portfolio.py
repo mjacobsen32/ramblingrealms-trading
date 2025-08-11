@@ -34,18 +34,22 @@ class Portfolio:
         self.total_value: float = cfg.initial_cash
         self.cash = cfg.initial_cash
         self.nav: float = 0.0
-        self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
         self.symbols = symbols
         self._positions = PositionManager(symbols=symbols, max_lots=cfg.max_positions)
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
+        self.df: pd.DataFrame | None = None
 
-    def as_vbt_pf(self) -> vbt.Portfolio:
+    def as_vbt_pf(self, df: pd.DataFrame | None = None) -> vbt.Portfolio:
         """
         Update the portfolio with new data.
         """
         if self.vbt_pf is not None:
             return self.vbt_pf
+        elif df is not None:
+            self.df = df
+        elif self.df is None:
+            raise ValueError("No DataFrame provided")
 
         self.df.reset_index(level="symbol", inplace=True)
         self.df.set_index(["timestamp"], inplace=True)
@@ -192,9 +196,6 @@ class Portfolio:
         # Reduce df to a single datetime index (symbols only)
         df, step_profit = self._positions.step(df)
 
-        self.df = pd.concat(
-            [self.df, df.loc[:, ["close", "size", "timestamp"]]], axis=0
-        )
         self.cash = self.cash - (df["size"] * df["close"]).sum()
         self.nav = self._positions.nav(df["close"])
         self.total_value = self.cash + self.nav
@@ -235,9 +236,9 @@ class Portfolio:
         ret.vbt_pf = pf
         return ret
 
-    def save(self, file_path: str):
+    def save(self, file_path: str, df: pd.DataFrame | None = None):
         logging.info("Saving backtest results to %s", file_path)
-        self.as_vbt_pf().save(file_path)
+        self.as_vbt_pf(df=df).save(file_path)
 
     def save_plots(self, backtest_dir: Path):
         plots = []
@@ -261,7 +262,6 @@ class Portfolio:
         self.total_value = self.initial_cash
         self.cash = self.initial_cash
         self.nav = 0.0
-        self.df = pd.DataFrame()
         self.vbt_pf = None
         self._positions.reset()
         logging.debug("Portfolio has been reset.\n%s", self)
@@ -375,7 +375,7 @@ class Portfolio:
         """
         String representation of the Portfolio.
         """
-        return f"Portfolio(initial_cash={self.initial_cash}, total_value={self.total_value}, cash={self.cash}, nav={self.nav}, df_shape={self.df.shape})"
+        return f"Portfolio(initial_cash={self.initial_cash}, total_value={self.total_value}, cash={self.cash}, nav={self.nav})"
 
     def get_positions(self) -> PositionManager:
         """
@@ -383,14 +383,21 @@ class Portfolio:
         """
         return self._positions
 
-    def analysis(self, analysis_config):
+    def analysis(self, analysis_config, df: pd.DataFrame | None = None):
         logging.info(f"\nStats:\n{self.stats()}")
+        self.as_vbt_pf(df=df)
+
+        bt_dir = (
+            ProjectPath.BACKTEST_DIR
+            if ProjectPath.BACKTEST_DIR is not None
+            else Path.cwd()
+        )
 
         if analysis_config.render_plots:
             self.plot()
         if analysis_config.save_plots:
-            self.save_plots(ProjectPath.BACKTEST_DIR)
+            self.save_plots(bt_dir)
         if analysis_config.to_csv:
-            self.get_positions().to_csv(ProjectPath.BACKTEST_DIR / "positions.csv")
-            self.orders().to_csv(ProjectPath.BACKTEST_DIR / "orders.csv")
-            self.trades().to_csv(ProjectPath.BACKTEST_DIR / "trades.csv")
+            self.get_positions().to_csv(str(bt_dir / "positions.csv"))
+            self.orders().to_csv(bt_dir / "orders.csv")
+            self.trades().to_csv(bt_dir / "trades.csv")

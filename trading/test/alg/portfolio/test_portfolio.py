@@ -119,7 +119,7 @@ def test_portfolio_data_set(data_loader, portfolio_config):
     data = data_loader.get_train_test()[0].copy()
     for date in data.index.get_level_values("timestamp").unique():
         pf.update_position_batch(data.loc[date])
-    vbt = pf.as_vbt_pf()
+    vbt = pf.as_vbt_pf(data)
 
 
 def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
@@ -129,7 +129,7 @@ def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
     data = multi_data_loader.get_train_test()[0].copy()
     for date in data.index.get_level_values("timestamp").unique():
         pf.update_position_batch(data.loc[date])
-    vbt = pf.as_vbt_pf()
+    vbt = pf.as_vbt_pf(data)
     prof = vbt.total_profit()
     assert len(vbt.total_profit(group_by=False)) == 3
     assert (
@@ -162,7 +162,7 @@ def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_confi
     assert pf.total_value > 1000, "Total value should increase with positive trades"
     assert pf.nav > 0, "NAV should be greater than 0 after trades"
 
-    vbt = pf.as_vbt_pf()
+    vbt = pf.as_vbt_pf(multi_tic_data)
     assert vbt is not None, "VectorBT portfolio should be created"
     assert pf.vbt_pf == vbt, "VectorBT portfolio should be stored in the portfolio"
 
