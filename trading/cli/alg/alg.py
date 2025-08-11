@@ -31,7 +31,7 @@ def train(
         help="Run the training in dry run mode without saving results.",
     ),
     no_test: bool = typer.Option(
-        False, "--no_test", "-t", help="Run the backtesting suite via the new model"
+        False, "--no-test", "-t", help="Run the backtesting suite via the new model"
     ),
     fetch_data: bool = typer.Option(
         False,
@@ -79,7 +79,7 @@ def train(
             data=data_loader.get_train_test()[1],
         )
         pf = bt.run()
-        pf.analysis(alg_config.backtest_config.analysis_config)
+        pf.analysis(alg_config.backtest_config.analysis_config, trade_env.data)
     ProjectPath.cache()
     logging.info("Training completed successfully.")
 
@@ -131,7 +131,7 @@ def backtest(
         ),
     )
     pf = bt.run()
-    pf.analysis(alg_config.backtest_config.analysis_config)
+    pf.analysis(alg_config.backtest_config.analysis_config, trade_env.data)
     ProjectPath.cache()
     logging.info("Backtesting completed successfully.")
 
@@ -146,7 +146,7 @@ def analysis(
         str, typer.Option("--out_dir", "-o", help="Path to the root output directory.")
     ],
 ):
-    logging.info(f"Starting analysis process...")
+    logging.info("Starting analysis process...")
     with Path.open(Path(alg_config)) as f:
         ProjectPath.OUT_DIR = Path(out_dir).resolve()
         config = RRConfig.model_validate_json(f.read())

@@ -21,10 +21,8 @@ class BasicProfitMax(RewardFunction):
         self.previous_profit = 0.0
         return super().reset()
 
-    def compute_reward(self, pf: Portfolio, current_date: str | None = None) -> float:
-        if current_date is None:
-            current_date = pf.df.index.get_level_values("timestamp")[-1]
-
+    def compute_reward(self, pf: Portfolio) -> float:
+        # todo just pass in profit
         profit = (pf.net_value() - pf.initial_cash) / pf.initial_cash
         normalized_profit = np.tanh(profit)
         if (
@@ -32,7 +30,7 @@ class BasicProfitMax(RewardFunction):
             or normalized_profit <= -1.0
             or normalized_profit >= 1.0
         ):
-            logging.warning(f"Normalized profit is {normalized_profit}")
+            logging.warning("Normalized profit is %s", normalized_profit)
         ret = normalized_profit - self.previous_profit
         self.previous_profit = normalized_profit
         return ret

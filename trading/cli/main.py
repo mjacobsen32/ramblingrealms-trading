@@ -34,12 +34,12 @@ def main(
     log_level_console: str = typer.Option(
         "INFO",
         "--log-level-console",
-        help="Logging level for console (e.g., DEBUG, INFO, WARNING)",
+        help="Logging level for console (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL, NOTSET)",
     ),
     log_level_file: str = typer.Option(
-        "INFO",
+        "NOTSET",
         "--log-level-file",
-        help="Logging level for file log (e.g., DEBUG, INFO, WARNING)",
+        help="Logging level for file log (e.g., DEBUG, INFO, WARNING, ERROR, CRITICAL, NOTSET)",
     ),
 ):
     """Initialize logging before any command runs."""
@@ -48,7 +48,7 @@ def main(
     ctx.ensure_object(AppState)
     ctx.obj.file_log_level = log_level_file.upper()
     ctx.obj.console_log_level = log_level_console.upper()
-    init_logger(ctx.obj.console_log_level)
+    init_logger(ctx.obj.console_log_level, ctx.obj.file_log_level)
 
 
 @app.command(help="Print the current user configuration")
@@ -57,7 +57,7 @@ def print_config():
     Print the current user configuration.
     """
     config = User.load()
-    print(config)
+    logging.info(config)
 
 
 @app.command(help="Run the setup wizard")

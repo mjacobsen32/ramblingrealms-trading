@@ -7,9 +7,6 @@ import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
-from rich import print as rprint
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
 
 from trading.cli.alg.config import (
     DataConfig,
@@ -164,10 +161,13 @@ class DataLoader:
         self.df.dropna()
 
         logging.info(
-            f"Data Successfully loaded...\nCurrent columns: {[f for f in self.columns]}\nCurrent Features: {self.feature_config.features}"
+            "Data Successfully loaded...\nCurrent columns: %s\nCurrent Features: %s",
+            [f for f in self.columns],
+            self.feature_config.features,
         )
         logging.info(
-            f"Current tickers: {self.df.index.get_level_values('symbol').unique().tolist()}"
+            "Current tickers: %s",
+            self.df.index.get_level_values("symbol").unique().tolist(),
         )
 
     @classmethod
@@ -186,7 +186,7 @@ class DataLoader:
         train = self.df.iloc[:split_idx]
         test = self.df.iloc[split_idx:]
         logging.info(
-            f"Train data: {self.data_info(train)}\nTest data: {self.data_info(test)}"
+            "Train data: %s\nTest data: %s", self.data_info(train), self.data_info(test)
         )
 
         return train, test

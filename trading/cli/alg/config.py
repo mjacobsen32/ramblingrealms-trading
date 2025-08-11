@@ -181,8 +181,8 @@ class PortfolioConfig(BaseModel):
     sell_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
-    max_positions: int | None = Field(
-        None,
+    max_positions: int = Field(
+        1,
         description="Maximum number of open positions per asset at any time",
     )
     trade_mode: TradeMode = Field(
@@ -197,8 +197,8 @@ class PortfolioConfig(BaseModel):
         0.1,
         description="Maximum percentage of cash to be used in a single trade relative to the current asset value",
     )
-    hmax: int = Field(
-        10_000,
+    hmax: float = Field(
+        10_000.0,
         description="Maximum cash to be traded in each trade per asset, if using discrete actions each trade is the max.",
     )
     action_threshold: float = Field(
@@ -277,11 +277,11 @@ class BackTestConfig(BaseModel):
     )
     @classmethod
     def validate_backtest_dir(cls, value: ProjectPath) -> BaseModel:
-        logging.info(f"Validating backtest directory: {value}")
+        logging.info("Validating backtest directory: %s", value)
         p = ProjectPath.model_validate(value)
         ProjectPath.BACKTEST_DIR = p.as_path()
         ProjectPath.BACKTEST_DIR.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Backtest results will be saved to: {ProjectPath.BACKTEST_DIR}")
+        logging.info("Backtest results will be saved to: %s", ProjectPath.BACKTEST_DIR)
         return ProjectPath.model_validate(p)
 
     results_path: ProjectPath = Field(
@@ -326,7 +326,7 @@ class RRConfig(BaseModel):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             ProjectPath.OUT_DIR = p.as_path() / Path(timestamp)
             ProjectPath.OUT_DIR.mkdir(parents=True, exist_ok=True)
-        logging.info(f"Saving/loading all output to/from: {ProjectPath.OUT_DIR}")
+        logging.info("Saving/loading all output to/from: %s", ProjectPath.OUT_DIR)
         return ProjectPath.model_validate(p)
 
     @field_validator(
@@ -357,5 +357,5 @@ class RRConfig(BaseModel):
                 try:
                     return string_map[str(info.field_name)].model_validate(value)
                 except ValidationError as e_two:
-                    logging.error("Validation error two:", e_two)
+                    logging.error("Validation error two: %s", e_two)
         return value

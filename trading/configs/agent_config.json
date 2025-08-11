@@ -1,6 +1,6 @@
 {
     "algo": "ppo",
-    "total_timesteps": 10000,
+    "total_timesteps": 100,
     "save_path": "{PROJECT_ROOT}/models/ppo_multi_ticker",
         "kwargs": {
             "policy": "MlpPolicy",

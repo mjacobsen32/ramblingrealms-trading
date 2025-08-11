@@ -7,6 +7,7 @@ from trading.src.alg.portfolio.portfolio import Portfolio
 class RewardFunction:
     """
     Base class for reward functions in trading environments.
+    @TODO pass in the profit calculated from the position step
     """
 
     def __init__(self, cfg: RewardConfig):
@@ -21,7 +22,7 @@ class RewardFunction:
         """
         pass
 
-    def compute_reward(self, pf: Portfolio, current_date: str | None = None) -> float:
+    def compute_reward(self, pf: Portfolio) -> float:
         """
         Compute the reward for a given action and state transition.
         """

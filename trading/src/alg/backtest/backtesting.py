@@ -1,8 +1,4 @@
-import pickle
-
 import pandas as pd
-import vectorbt as vbt
-from rich import print as rprint
 
 from trading.cli.alg.config import BackTestConfig
 from trading.src.alg.portfolio.portfolio import Portfolio
@@ -38,6 +34,8 @@ class BackTesting:
             obs, reward, terminated, truncated, info = self.env.step(action)
 
         if self.backtest_config.save_results:
-            self.env.pf.save(str(self.backtest_config.results_path.as_path()))
+            self.env.pf.save(
+                str(self.backtest_config.results_path.as_path()), df=self.env.data
+            )
 
         return self.env.pf

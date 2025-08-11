@@ -19,8 +19,8 @@ def single_tic_data(dates):
     data = {
         "timestamp": dates,
         "symbol": ["AAPL"] * 5,
-        "close": [10, 10, 20, 10, 155],
-        "size": [10, 0, -10, 0, 0],
+        "close": [10.0, 10.0, 20.0, 10.0, 155.0],
+        "size": [10.0, 0.0, -10.0, 0.0, 0.0],
     }
     return pd.DataFrame(data)
 
@@ -28,11 +28,11 @@ def single_tic_data(dates):
 @pytest.fixture
 def expected_states():
     expected_states = [
-        [700, 10, 10, 0],
-        [540, 5, 20, 0],
-        [270, 0, 20, 10],
-        [400, 0, 15, 10],
-        [590, 0, 15, 5],
+        [700.0, 10.0, 10.0, 0.0],
+        [540.0, 5.0, 20.0, 0.0],
+        [270.0, 0.0, 20.0, 10.0],
+        [400.0, 0.0, 15.0, 10.0],
+        [590.0, 0.0, 15.0, 5.0],
     ]
     return expected_states
 
@@ -40,9 +40,9 @@ def expected_states():
 @pytest.fixture
 def expected_positions():
     positions = [
-        [10, 5, 0, 0, 0],
-        [10, 20, 20, 15, 15],
-        [0.0, 0.0, 10, 10, 5],
+        [10.0, 5.0, 0.0, 0.0, 0.0],
+        [10.0, 20.0, 20.0, 15.0, 15.0],
+        [0.0, 0.0, 10.0, 10.0, 5.0],
     ]
     return np.array(positions)
 
@@ -51,14 +51,14 @@ def expected_positions():
 def multi_tic_data(dates):
     tics = ["AAPL", "MSFT", "NVDA"]
     close_prices = {
-        "AAPL": [10, 12, 14, 16, 18],
-        "MSFT": [20, 22, 24, 26, 28],
-        "NVDA": [30, 32, 34, 36, 38],
+        "AAPL": [10.0, 12.0, 14.0, 16.0, 18.0],
+        "MSFT": [20.0, 22.0, 24.0, 26.0, 28.0],
+        "NVDA": [30.0, 32.0, 34.0, 36.0, 38.0],
     }
     sizes = {
-        "AAPL": [10, -5, -5, 0, 0],
-        "MSFT": [10, 10, 0, -5, 0],
-        "NVDA": [0, 0, 10, 0, -5],
+        "AAPL": [10.0, -5.0, -5.0, 0.0, 0.0],
+        "MSFT": [10.0, 10.0, 0.0, -5.0, 0.0],
+        "NVDA": [0.0, 0.0, 10.0, 0.0, -5.0],
     }
     records = []
     for i, date in enumerate(dates):
@@ -72,6 +72,10 @@ def multi_tic_data(dates):
                 }
             )
     df = pd.DataFrame(records).set_index(["timestamp", "symbol"])
+    df["timestamp"] = df.index.get_level_values("timestamp")
+    df["price"] = df["close"]
+    df["profit"] = 0.0
+    df["action"] = 0.0
     return df
 
 
@@ -99,7 +103,12 @@ def normalized_multi_tic_data(dates):
                     "action": actions[tic][i],
                 }
             )
+
     df = pd.DataFrame(records).set_index(["timestamp", "symbol"])
+    df["timestamp"] = df.index.get_level_values("timestamp")
+    df["price"] = df["close"]
+    df["profit"] = 0.0
+    df["size"] = 0.0
     return df
 
 
@@ -108,10 +117,9 @@ def test_portfolio_data_set(data_loader, portfolio_config):
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL"])
     np.random.seed(42)  # For reproducible results
     data = data_loader.get_train_test()[0].copy()
-    data["size"] = np.random.choice([-1, 0, 1], size=len(data))
-    for date in data.index:
-        pf.update_position_batch(data.loc[[date]])
-    vbt = pf.as_vbt_pf()
+    for date in data.index.get_level_values("timestamp").unique():
+        pf.update_position_batch(data.loc[date])
+    vbt = pf.as_vbt_pf(data)
 
 
 def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
@@ -119,10 +127,9 @@ def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "GOOGL"])
     np.random.seed(42)  # For reproducible results
     data = multi_data_loader.get_train_test()[0].copy()
-    data["size"] = np.random.choice([-1, 0, 1], size=len(data))
     for date in data.index.get_level_values("timestamp").unique():
-        pf.update_position_batch(data.loc[[date]])
-    vbt = pf.as_vbt_pf()
+        pf.update_position_batch(data.loc[date])
+    vbt = pf.as_vbt_pf(data)
     prof = vbt.total_profit()
     assert len(vbt.total_profit(group_by=False)) == 3
     assert (
@@ -132,6 +139,7 @@ def test_portfolio_multi_data_set(multi_data_loader, portfolio_config):
 
 def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_config):
     portfolio_config.initial_cash = 1000
+    portfolio_config.max_positions = 5
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
     assert pf.initial_cash == 1000, "Initial cash should be set to 1000"
     assert pf.cash == 1000, "Initial cash should be set to 1000"
@@ -144,7 +152,7 @@ def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_confi
     ), "Initial state should be [cash, positions]"
 
     for i, date in enumerate(dates):
-        pf.update_position_batch(multi_tic_data.loc[[date]])
+        pf.update_position_batch(multi_tic_data.loc[date])
         expected = np.array(expected_states[i])
         actual = pf.state()
         np.testing.assert_array_equal(
@@ -154,7 +162,7 @@ def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_confi
     assert pf.total_value > 1000, "Total value should increase with positive trades"
     assert pf.nav > 0, "NAV should be greater than 0 after trades"
 
-    vbt = pf.as_vbt_pf()
+    vbt = pf.as_vbt_pf(multi_tic_data)
     assert vbt is not None, "VectorBT portfolio should be created"
     assert pf.vbt_pf == vbt, "VectorBT portfolio should be stored in the portfolio"
 
@@ -202,26 +210,29 @@ def test_cash_limit(constraints_portfolio_config):
                 for _ in range(2)
             ],
             "symbol": ["AAPL", "NVDA"] * 3,
-            "close": [10, 10, 10, 10, 10, 10],
-            "size": [101, 0, -101, 0, 51, 51],
+            "close": [10.0, 10.0, 10.0, 10.0, 10.0, 10.0],
+            "size": [101.0, 0.0, -101.0, 0.0, 51.0, 51.0],
         }
-    ).set_index(["timestamp", "symbol"])
+    ).set_index(["symbol"])
+    df["price"] = df["close"]
+    df["profit"] = 0.0
+    df["action"] = 0.0
 
-    ret = pf.step(df.iloc[0:2]["close"], df.iloc[0:2])
+    ret = pf.step(df.iloc[0:2])
     np.testing.assert_array_equal(
         ret["scaled_actions"],
         [100.0, 0.0],
         "Action should be scaled to max position size",
     )
 
-    ret = pf.step(df.iloc[2:4]["close"], df.iloc[2:4])
+    ret = pf.step(df.iloc[2:4])
     np.testing.assert_array_equal(
         ret["scaled_actions"],
         [-100.0, 0.0],
         "Action should be scaled to max position size",
     )
 
-    ret = pf.step(df.iloc[4:6]["close"], df.iloc[4:6])
+    ret = pf.step(df.iloc[4:6])
     np.testing.assert_array_equal(
         ret["scaled_actions"],
         [50.0, 50.0],
@@ -236,6 +247,9 @@ def normalized_actions():
         "symbol": ["AAPL"] * 5,
         "close": [10, 10, 10, 10, 10],
         "action": [1.0, 0.1, -1.0, 0.5, 0],
+        "price": [10, 10, 10, 10, 10],
+        "size": [0.0, 0.0, 0.0, 0.0, 0.0],
+        "profit": [0.0, 0.0, 0.0, 0.0, 0.0],
     }
     return pd.DataFrame(data)
 
@@ -262,13 +276,16 @@ def test_scale_actions(constraints_portfolio_config, normalized_actions):
     assert scaled[0] == 5.0
 
 
-def test_positions(multi_tic_data, dates, portfolio_config, expected_positions):
+def test_portfolio_positions(
+    multi_tic_data, dates, portfolio_config, expected_positions
+):
     portfolio_config.initial_cash = 1000
+    portfolio_config.max_positions = 5
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
     for i, date in enumerate(dates):
-        pf.update_position_batch(multi_tic_data.loc[[date]])
+        pf.update_position_batch(multi_tic_data.loc[date])
         np.testing.assert_array_equal(
-            expected_positions[:, i], pf.get_positions().as_numpy()
+            expected_positions[:, i], pf.get_positions()["holdings"]
         )
 
 
@@ -293,9 +310,7 @@ def test_discrete_mode(normalized_multi_tic_data, dates, portfolio_config):
 
     for i, date in enumerate(dates):
         pf.step(
-            normalized_multi_tic_data.loc[[date]]["close"].values,
-            normalized_multi_tic_data.loc[[date]],
+            normalized_multi_tic_data.loc[date],
             normalized_actions=True,
         )
         np.testing.assert_array_equal(pf.state(), expected_positions[i])
-    print(pf.orders())
