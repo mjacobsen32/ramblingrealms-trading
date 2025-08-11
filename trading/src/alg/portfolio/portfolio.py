@@ -92,6 +92,7 @@ class Portfolio:
         """
         Enforce trade rules on the actions.
         From trade sizes to actual trade sizes based on configuration and current portfolio state.
+        @TODO clean up and make more efficient
         """
         logging.debug("Raw Action: %s", df["size"])
 
@@ -117,12 +118,7 @@ class Portfolio:
 
         buy_limit = self.cfg.trade_limit_percent * self.total_value
 
-        # Compute per-trade cost
-        # Use numpy for faster computation
-        buy_indices = np.where(buy_mask)[0]
-        buy_sizes = df["size"].values[buy_indices]
-        buy_prices = prices[buy_indices]
-        buy_values = buy_sizes * buy_prices
+        buy_values = df.loc[buy_mask, "size"] * prices[buy_mask]
 
         # Cap each trade at buy_limit
         capped_values = np.minimum(buy_values, buy_limit)
@@ -137,17 +133,10 @@ class Portfolio:
         # Calculate the maximum shares allowed by hmax and buy_limit for each buy
         max_shares_hmax = self.cfg.hmax // prices[buy_mask]
         max_shares_buy_limit = buy_limit // prices[buy_mask]
-        # Use np.minimum with out parameter to avoid extra allocation
-        np.minimum(max_shares_hmax, max_shares_buy_limit, out=max_shares_hmax)
-        max_shares = max_shares_hmax
+        max_shares = np.minimum(max_shares_hmax, max_shares_buy_limit)
 
         # Clip the size to not exceed the minimum of both limits
-        # df["size"] = df["size"].where(~buy_mask, df["size"].clip(lower=0, upper=max_shares))
-        size_values = df["size"].values
-        buy_indices = np.where(buy_mask)[0]
-        size_values[buy_indices] = np.clip(size_values[buy_indices], 0, max_shares)
-        df.loc[:, "size"] = size_values
-
+        df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
         logging.debug("Scaled Actions: %s", df["size"])
 
@@ -162,6 +151,7 @@ class Portfolio:
         """
         Scale the actions to the maximum position size.
         From signal strength to a desired trade size
+        @TODO clean up and make more efficient
         """
         # Find actions above threshold
         above_thresh = df["action"].abs() > self.cfg.action_threshold
@@ -192,6 +182,7 @@ class Portfolio:
     def update_position_batch(self, df: pd.DataFrame) -> float:
         """
         Update positions for a batch of tickers at a given timestamp.
+        @TODO clean up and make more efficient
         """
         # Reduce df to a single datetime index (symbols only)
         df, step_profit = self._positions.step(df)
@@ -210,6 +201,7 @@ class Portfolio:
         1. scale actions to trade size
         2. enforce trade limits
         3. update positions
+        @TODO clean up and make more efficient
         """
         if normalized_actions:
             df.loc[:, "size"] = self.scale_actions(

@@ -230,7 +230,6 @@ class PositionManager:
 
         self.df.loc[buy_mask, "holdings"] += df.loc[buy_mask, "size"]
         self.df.loc[buy_mask, "position_counts"] += np.sign(df.loc[buy_mask, "size"])
-        # df.loc[buy_mask, "size"] = df.loc[buy_mask, "size"]
 
         self.df.loc[sell_mask, "holdings"] += exit_view["size"]
         self.df.loc[sell_mask, "position_counts"] += np.sign(exit_view["size"])
