@@ -1,8 +1,4 @@
-import pickle
-
 import pandas as pd
-import vectorbt as vbt
-from rich import print as rprint
 
 from trading.cli.alg.config import BackTestConfig
 from trading.src.alg.portfolio.portfolio import Portfolio

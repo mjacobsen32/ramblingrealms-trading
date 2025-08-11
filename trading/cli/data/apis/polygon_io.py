@@ -61,4 +61,4 @@ def pull_data(
         elif file_type is FileType.csv:
             df.to_csv(output_file, index=False)
     else:
-        rprint(df)
+        logging.info("Fetched DataFrame:\n%s", df)

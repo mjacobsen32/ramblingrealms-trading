@@ -121,14 +121,6 @@ def test_basic_profit_max(
     strong_negative = rf.compute_reward(strong_negative_portfolio)
     rf.reset()
     mild_negative = rf.compute_reward(mild_negative_portfolio)
-    print(
-        f"Strong Profit: {strong_profit}, Mild Profit: {mild_profit}, "
-        f"Strong Negative: {strong_negative}, Mild Negative: {mild_negative}"
-    )
-    print(strong_profitable_portfolio)
-    print(strong_negative_portfolio)
-    print(mild_profitable_portfolio)
-    print(mild_negative_portfolio)
     assert strong_profit > 0.5
     assert mild_profit > 0.00
     assert strong_negative < -0.5
