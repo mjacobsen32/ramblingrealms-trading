@@ -11,96 +11,147 @@ class PositionType(str, Enum):
     SHORT = "short"
 
 
-class Position:
+class Position(np.ndarray):
     """
-    Represents a position in the portfolio.
+    Represents a position in the portfolio, backed by a numpy array.
     """
 
-    def __init__(
-        self, symbol: str, size: float, price: float, enter_date: pd.Timestamp
+    COLS = [
+        "symbol",
+        "lot_size",
+        "enter_price",
+        "enter_date",
+        "exit_date",
+        "exit_price",
+        "exit_size",
+        "position_type",
+    ]
+    IDX_SYMBOL = 0
+    IDX_LOT_SIZE = 1
+    IDX_ENTER_DATE = 2
+    IDX_ENTER_PRICE = 3
+    IDX_EXIT_DATE = 4
+    IDX_EXIT_PRICE = 5
+    IDX_EXIT_SIZE = 6
+    IDX_POSITION_TYPE = 7
+
+    def __new__(
+        cls, symbol: str, lot_size: float, enter_price: float, enter_date: pd.Timestamp
     ):
-        self.symbol = symbol
-        self.position_type = PositionType.LONG if size > 0 else PositionType.SHORT
-        self.size = size
-        self.enter_price = price
-        self.enter_date = enter_date
-        self.exit_date = None
+        data = [
+            symbol,  # symbol
+            lot_size,  # lot_size
+            enter_date,  # enter_date
+            enter_price,  # enter_price
+            None,  # exit_date (default)
+            None,  # exit_price (default)
+            0.0,  # exit_size (default)
+            1,  # position_type (default to LONG)
+        ]
+        obj = np.asarray(data, dtype=object).view(cls)
+        return obj
+
+    @property
+    def symbol(self) -> str:
+        return self[self.IDX_SYMBOL]
+
+    @property
+    def lot_size(self) -> float:
+        return self[self.IDX_LOT_SIZE]
+
+    @property
+    def enter_price(self) -> float:
+        return self[self.IDX_ENTER_PRICE]
+
+    @property
+    def exit_price(self) -> float | None:
+        return self[self.IDX_EXIT_PRICE]
+
+    @property
+    def enter_date(self) -> pd.Timestamp:
+        return self[self.IDX_ENTER_DATE]
+
+    @property
+    def exit_date(self) -> pd.Timestamp | None:
+        return self[self.IDX_EXIT_DATE]
+
+    @property
+    def exit_size(self) -> float | None:
+        return self[self.IDX_EXIT_SIZE]
+
+    @property
+    def position_type(self) -> PositionType:
+        return (
+            PositionType.LONG
+            if self[self.IDX_POSITION_TYPE] > 0
+            else PositionType.SHORT
+        )
 
     def exit(
-        self, exit_date: pd.Timestamp, price: float, partial_exit: float | None = None
+        self, exit_date: pd.Timestamp, price: float, exit_size: float | None = None
     ):
-        """
-        Mark the position as exited.
-        """
-        self.exit_date = exit_date
-        self.exit_price = price
-        self.partial_exit = partial_exit
+        self[self.IDX_EXIT_DATE] = exit_date
+        self[self.IDX_EXIT_PRICE] = price
+        if exit_size is not None:
+            self[self.IDX_EXIT_SIZE] = exit_size
         return self.profit()
 
     def profit(self) -> float:
-        """
-        Calculate the profit from the position.
-        """
-        if self.exit_date is None:
+        if self.exit_price is None or self.enter_price is None:
             return 0.0
-        return (self.exit_price - self.enter_price) * (
-            self.size if self.partial_exit is None else self.partial_exit
+        return (
+            (self.exit_price - self.enter_price) * self.exit_size
+            if self.exit_size is not None
+            else self.lot_size
         )
 
     def __repr__(self):
-        return f"Position(symbol={self.symbol}, size={self.size}, enter_price={self.enter_price}, enter_date={self.enter_date}, exit_date={self.exit_date}, exit_price={self.exit_price})"
+        return (
+            "Position(symbol_idx=%s, size=%s, enter_price=%s, enter_date=%s, "
+            "exit_date=%s, exit_price=%s, exit_size=%s, position_type=%s)"
+            % (
+                getattr(self, "symbol_idx", None),
+                getattr(self, "size", None),
+                self.enter_price,
+                self.enter_date,
+                self.exit_date,
+                self.exit_price,
+                self.exit_size,
+                self.position_type,
+            )
+        )
 
 
-class PositionView:
-    """
-    A view of positions for a specific symbol.
-    """
-
-    def __init__(self):
-        self.size = 0.0
-        self.rolling_return = 0.0
-
-    def __iadd__(self, size: float):
-        self.size += size
-        return self
-
-    def __isub__(self, size: float):
-        self.size -= size
-        return self
-
-    def __repr__(self):
-        return f"PositionView(size={self.size}, rolling_return={self.rolling_return})"
-
-
-class PositionManager(defaultdict):
-    def __init__(self, symbols: list[str], maintain_history: bool = True):
-        super().__init__(deque)
-        self.position_view = defaultdict(PositionView)
+class PositionManager:
+    def __init__(self, symbols: list[str], max_lots: int = 1):
         self.symbols = symbols
-        self.history: defaultdict[str, deque[Position]] | None
-
-        if maintain_history:
-            self.history = defaultdict(deque)
-        else:
-            self.history = None
-        for symbol in symbols:
-            self[symbol] = deque()
-            self.position_view[symbol] = PositionView()
+        self.max_lots = max_lots
+        self.df = pd.DataFrame(
+            {
+                "holdings": np.zeros(len(symbols), dtype=np.float32),
+                "position_counts": np.zeros(len(symbols), dtype=np.int32),
+                "rolling_profit": np.zeros(len(symbols), dtype=np.float32),
+            },
+            index=symbols,
+        )
+        self.positions: dict[str, deque[Position]] = {
+            symbol: deque(maxlen=max_lots) for symbol in symbols
+        }
         logging.info("Initializing PositionManager for symbols: %s", symbols)
-        logging.info("%s", self.history)
+
+    def __getitem__(self, key):
+        """
+        Allow access to the internal DataFrame using the [] accessor.
+        """
+        return self.df[key]
 
     def to_csv(self, path: str):
         """
         Save the positions to a CSV file.
         """
         data = []
-        if self.history is None:
-            logging.warning("No history to save.")
-            return
 
-        for symbol, positions in self.items():
-            self.history[symbol].extend(positions)
-        for symbol, positions in self.history.items():
+        for symbol, positions in self.positions.items():
             for position in positions:
                 data.append(
                     {
@@ -119,77 +170,83 @@ class PositionManager(defaultdict):
         """
         Reset the position manager.
         """
-        self.clear()
-        self.position_view.clear()
-        if self.history is not None:
-            self.history.clear()
+        self.df["holdings"] = 0.0
+        self.df["position_counts"] = 0
+        self.df["rolling_profit"] = 0.0
+        self.positions = {symbol: deque() for symbol in self.symbols}
 
-    def as_numpy(self) -> np.ndarray:
-        return np.array(
-            [self.position_view[symbol].size for symbol in self.symbols],
-            dtype=np.float32,
-        )
+    def append(self, df: pd.DataFrame):
+        for sym, row in df.iterrows():
+            self.positions[sym].append(
+                Position(
+                    symbol=str(sym),
+                    lot_size=row["size"],
+                    enter_price=row["price"],
+                    enter_date=row["timestamp"],
+                )
+            )
 
-    def positions_held_as_numpy(self) -> np.ndarray:
-        return np.array(
-            [len(self[symbol]) for symbol in self.symbols],
-            dtype=np.int32,
-        )
+    def exit_positions(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Exit positions based on the provided DataFrame.
+        """
+        step_profit = 0.0
+        df["profit"] = 0.0
+        for sym, row in df.iterrows():
+            remaining_lot = -row["size"]  # total to sell
+            queue = self.positions[sym]
+            len_positions = len(queue)
+            profit = 0.0
+            while remaining_lot > 0 and len(queue) > 0:
+                max_to_take = min(queue[0][Position.IDX_EXIT_SIZE], remaining_lot)
+                remaining_lot -= max_to_take
+                queue[0][Position.IDX_EXIT_SIZE] -= max_to_take
+                position = (
+                    queue.popleft()
+                    if queue[0][Position.IDX_EXIT_SIZE] == 0
+                    else queue[0]
+                )
+                profit += position.exit(
+                    exit_date=row["timestamp"],
+                    price=row["price"],
+                    exit_size=max_to_take,
+                )
+            step_profit += profit
+            row.loc["profit"] = profit
+            row.loc["size"] = row["size"] + remaining_lot
+            row.loc["positions_counts"] = len(queue) - len_positions
+            logging.debug("Exiting position for %s: profit=%s", sym, profit)
+        return df
 
-    def __repr__(self):
-        return f"PositionManager(positions={dict(self)}, history={self.history is not None})"
-
-    def __getitem__(self, item):
-        return super().__getitem__(item)
-
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-
-    def __len__(self):
-        return sum(len(positions) for positions in self.values())
-
-    def step(
-        self, symbol: str, date: pd.Timestamp, size: float, price: float
-    ) -> tuple[bool, float, float]:
+    def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:
         """
         Step through the position manager.
         Return a set indicating if a position was exited and the profit from that position.
         """
-        profit = 0.0
-        actual_size = 0.0
-        self.position_view[symbol].size += size
-        if symbol not in self:
-            self[symbol] = deque()
-        if size > 0.0:
-            # BUY Push new position
-            self[symbol].append(Position(symbol, size, price, date))
-            actual_size = size
-        elif size < 0.0:
-            # SELL Close as many positions as needed
-            remaining_shares = -size
-            while remaining_shares > 0 and len(self[symbol]) > 0:
-                if remaining_shares >= self[symbol][0].size:
-                    # Close the entire position
-                    position = self[symbol].popleft()
-                    remaining_shares -= position.size
-                    profit += position.exit(date, price)
-                    if self.history is not None:
-                        self.history[symbol].append(position)
-                else:
-                    # Close a partial position
-                    position = self[symbol][0]
-                    position.size -= remaining_shares
-                    profit += position.exit(date, price, partial_exit=remaining_shares)
-                    remaining_shares = 0.0
-                    if self.history is not None:
-                        self.history[symbol].append(position)
-            actual_size = size - remaining_shares
-            self.position_view[symbol].rolling_return += profit
-            return True, actual_size, profit
-        return False, actual_size, profit
+        buy_mask = (df["size"] > 0) & (self.df["position_counts"] < self.max_lots)
+        self.append(df[buy_mask])
+
+        sell_mask = (df["size"] < 0) & (self.df["holdings"] > 0)
+        exit_view = self.exit_positions(df[sell_mask])
+
+        self.df.loc[buy_mask, "holdings"] += df.loc[buy_mask, "size"]
+        self.df.loc[buy_mask, "position_counts"] += np.sign(df.loc[buy_mask, "size"])
+        # df.loc[buy_mask, "size"] = df.loc[buy_mask, "size"]
+
+        self.df.loc[sell_mask, "holdings"] += exit_view["size"]
+        self.df.loc[sell_mask, "position_counts"] += np.sign(exit_view["size"])
+        self.df.loc[sell_mask, "rolling_profit"] += exit_view["profit"]
+
+        print(buy_mask.to_list(), sell_mask.to_list())
+        df.loc[sell_mask, "size"] = exit_view["size"]
+        df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
+
+        print(df["size"].to_list())
+
+        return df, exit_view["profit"].sum()
 
     def nav(self, prices: pd.Series) -> float:
         """
         Calculate the net asset value (NAV) of the portfolio.
         """
-        return (self.as_numpy() * prices).sum()
+        return (self.df["holdings"] * prices).sum()

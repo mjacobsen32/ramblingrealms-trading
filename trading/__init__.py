@@ -1,3 +1,6 @@
+# import cudf.pandas
+# cudf.pandas.install()
+
 from gymnasium.envs.registration import register
 
 register(

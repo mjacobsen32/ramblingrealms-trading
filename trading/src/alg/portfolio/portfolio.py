@@ -38,7 +38,7 @@ class Portfolio:
         self.df = pd.DataFrame()
         self.vbt_pf: vbt.Portfolio | None = None
         self.symbols = symbols
-        self._positions = PositionManager(symbols=symbols, maintain_history=True)
+        self._positions = PositionManager(symbols=symbols, max_lots=cfg.max_positions)
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
 
     def as_vbt_pf(self) -> vbt.Portfolio:
@@ -49,6 +49,7 @@ class Portfolio:
             return self.vbt_pf
 
         self.df.reset_index(level="symbol", inplace=True)
+        self.df.set_index(["timestamp"], inplace=True)
         price = self.df.pivot(columns="symbol", values="close")
         close = self.df.pivot(columns="symbol", values="close")
         size = self.df.pivot(columns="symbol", values="size")
@@ -71,7 +72,7 @@ class Portfolio:
         Returns:
             pd.Series: [internal_cash, positions].
         """
-        return np.concatenate([[self.cash], self._positions.as_numpy()])
+        return np.concatenate([[self.cash], self._positions["holdings"]])
 
     def net_value(self) -> float:
         """
@@ -91,19 +92,13 @@ class Portfolio:
         """
         logging.debug("Raw Action: %s", df["size"])
 
-        max_positions_mask = (
-            self._positions.positions_held_as_numpy() < self.cfg.max_positions
-            if self.cfg.max_positions is not None
-            else True
-        )
-
-        buy_mask = max_positions_mask & (df["size"] > 0)
+        buy_mask = df["size"] > 0
         sell_mask = df["size"] < 0
         """
             No short selling / no negative positions allowed (yet)
         """
 
-        positions = self._positions.as_numpy()
+        positions = self._positions["holdings"]
         if sell_mode == SellMode.CONTINUOUS:
             # Sell proportionally based on signal strength
             df.loc[sell_mask, "size"] = np.clip(
@@ -195,26 +190,13 @@ class Portfolio:
         """
         Update positions for a batch of tickers at a given timestamp.
         """
-        step_profit = 0.0
-        trade_mask = df["size"] != 0
+        # Reduce df to a single datetime index (symbols only)
+        df, step_profit = self._positions.step(df)
 
-        for multi_index, row in df[trade_mask].iterrows():
-            _, actual_size, profit = self._positions.step(
-                multi_index[1], multi_index[0], row["size"], row["close"]
-            )
-            step_profit += profit
-            df.at[multi_index, "size"] = actual_size
-            logging.debug(
-                "Updating position for %s on %s: size=%s, actual_size=%s, profit=%s",
-                multi_index[1],
-                multi_index[0],
-                row["size"],
-                actual_size,
-                profit,
-            )
-
-        self.df = pd.concat([self.df, df.loc[:, ["close", "size"]]], axis=0)
-        self.cash = self.cash + -(df["size"] * df["close"]).sum()
+        self.df = pd.concat(
+            [self.df, df.loc[:, ["close", "size", "timestamp"]]], axis=0
+        )
+        self.cash = self.cash - (df["size"] * df["close"]).sum()
         self.nav = self._positions.nav(df["close"])
         self.total_value = self.cash + self.nav
 
@@ -222,9 +204,7 @@ class Portfolio:
 
         return step_profit
 
-    def step(
-        self, prices: np.ndarray, df: pd.DataFrame, normalized_actions: bool = False
-    ) -> dict:
+    def step(self, df: pd.DataFrame, normalized_actions: bool = False) -> dict:
         """
         Scale the actions and take a step in the portfolio environment.
         1. scale actions to trade size
@@ -232,9 +212,11 @@ class Portfolio:
         3. update positions
         """
         if normalized_actions:
-            df["size"] = self.scale_actions(df, prices, self.cfg.trade_mode)
+            df["size"] = self.scale_actions(df, df["price"].values, self.cfg.trade_mode)
 
-        df.loc[:, "size"] = self.enforce_trade_rules(df, prices, self.cfg.sell_mode)
+        df.loc[:, "size"] = self.enforce_trade_rules(
+            df, df["price"].values, self.cfg.sell_mode
+        )
         step_profit = self.update_position_batch(df=df)
         return {
             "scaled_actions": df["size"].values,
@@ -394,7 +376,7 @@ class Portfolio:
         """
         return f"Portfolio(initial_cash={self.initial_cash}, total_value={self.total_value}, cash={self.cash}, nav={self.nav}, df_shape={self.df.shape})"
 
-    def get_positions(self) -> defaultdict:
+    def get_positions(self) -> PositionManager:
         """
         Return the current positions in the portfolio.
         """

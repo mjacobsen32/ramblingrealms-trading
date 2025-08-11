@@ -181,8 +181,8 @@ class PortfolioConfig(BaseModel):
     sell_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
-    max_positions: int | None = Field(
-        None,
+    max_positions: int = Field(
+        1,
         description="Maximum number of open positions per asset at any time",
     )
     trade_mode: TradeMode = Field(

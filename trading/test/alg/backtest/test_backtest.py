@@ -12,3 +12,6 @@ def test_backtest_run(backtest):
     assert str(stats["End"]) == "2023-12-27 05:00:00+00:00"
     assert stats["Period"] == pd.Timedelta(days=48)
     assert stats["Total Trades"] > 0
+
+    assert len(pf.orders()) > 0
+    assert len(pf.trades()) > 0

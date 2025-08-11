@@ -85,6 +85,8 @@ class TradingEnv(gym.Env):
         """
         self.data = data.copy()
         self.data["size"] = 0  # Initialize size column for trades
+        self.data["price"] = self.data["close"]
+        self.data["timestamp"] = self.data.index.get_level_values("timestamp")
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
         self.max_steps = len(self.timestamps) - 1
 
@@ -172,17 +174,12 @@ class TradingEnv(gym.Env):
                 {},
             )
 
-        prices = self.data.loc[self.observation_timestamp[self.observation_index]][
-            "close"
-        ].to_numpy()
-
-        date_slice = self.data.loc[[self.observation_timestamp[self.observation_index]]]
+        date_slice = self.data.loc[self.observation_timestamp[self.observation_index]]
 
         date_slice["action"] = action
         logging.debug("action: %s, date_slice: %s", action, date_slice)
-        profit = self.pf.step(
-            prices=prices, df=date_slice, normalized_actions=True
-        )  # heaviest
+        print(date_slice)
+        profit = self.pf.step(df=date_slice, normalized_actions=True)  # heaviest
 
         ret_info = {"net_value": self.pf.net_value(), "profit_change": profit}
 
