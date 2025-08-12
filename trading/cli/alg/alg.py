@@ -51,7 +51,7 @@ def train(
         fetch_data=fetch_data,
     )
     trade_env = TradingEnv(
-        data=data_loader.get_train_test()[1],
+        data=data_loader.get_train_test()[0],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
         time_step=tuple(

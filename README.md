@@ -10,3 +10,6 @@ Read the full documentation on [Read the Docs](https://ramblingrealms-trading.re
 #### With Speedscope:
 `py-spy record -f speedscope -o profile.svg -- <command>`
 eg. `py-spy record -f speedscope -o profile.svg -- rr_trading alg train -c ./trading/configs/multi_ticker_ppo.json`
+
+## Tensorboard
+tensorboard --logdir <path/to/out/dir>
