@@ -4,12 +4,12 @@
         "reward_scaling": 1e6
     },
     "portfolio_config":{
-        "initial_cash": 1000000,
+        "initial_cash": 1e6,
         "buy_cost_pct": 0.001,
         "sell_cost_pct": 0.001,
         "turbulence_threshold": null,
         "max_positions": 1,
-        "hmax": 250000,
+        "hmax": 1e6,
         "trade_mode": "discrete",
         "sell_mode": "discrete",
         "action_threshold": 0.1,

@@ -97,13 +97,9 @@ class Position(np.ndarray):
         return self.profit()
 
     def profit(self) -> float:
-        if self.exit_price is None or self.enter_price is None:
-            return 0.0
         return (
-            (self.exit_price - self.enter_price) * self.exit_size
-            if self.exit_size is not None
-            else self.lot_size
-        )
+            self.exit_price if self.exit_price is not None else 0
+        ) - self.enter_price * (self.exit_size if self.exit_size is not None else 0)
 
     def __repr__(self):
         return (
@@ -190,31 +186,31 @@ class PositionManager:
         """
         Exit positions based on the provided DataFrame.
         """
-        step_profit = 0.0
-        for sym, row in df.iterrows():
-            remaining_lot = -row["size"]  # total to sell
+        for row in df.itertuples(index=True):
+            sym = row.Index
+            remaining_lot = -row.size  # total to sell
             queue = self.positions[sym]
             len_positions = len(queue)
             profit = 0.0
             while remaining_lot > 0 and len(queue) > 0:
-                max_to_take = min(queue[0][Position.IDX_EXIT_SIZE], remaining_lot)
+                max_to_take = min(queue[0][Position.IDX_LOT_SIZE], remaining_lot)
                 remaining_lot -= max_to_take
-                queue[0][Position.IDX_EXIT_SIZE] -= max_to_take
+                queue[0][Position.IDX_LOT_SIZE] -= max_to_take
                 position = (
                     queue.popleft()
-                    if queue[0][Position.IDX_EXIT_SIZE] == 0
+                    if queue[0][Position.IDX_LOT_SIZE] == 0
                     else queue[0]
                 )
                 profit += position.exit(
-                    exit_date=row["timestamp"],
-                    price=row["price"],
+                    exit_date=row.timestamp,
+                    price=row.price,
                     exit_size=max_to_take,
                 )
-            step_profit += profit
-            row.loc["profit"] = profit
-            row.loc["size"] = row["size"] + remaining_lot
-            row.loc["positions_counts"] = len(queue) - len_positions
+            df.at[row.Index, "profit"] = profit
+            df.at[row.Index, "size"] = row.size + remaining_lot
+            df.at[row.Index, "position_counts"] = len(queue) - len_positions
             logging.debug("Exiting position for %s: profit=%s", sym, profit)
+
         return df
 
     def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:

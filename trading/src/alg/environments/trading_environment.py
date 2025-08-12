@@ -121,7 +121,7 @@ class TradingEnv(gym.Env):
             .to_numpy()
             .flatten()
         )
-        prices = self.data.loc[[self.observation_timestamp[i]]]["close"].to_numpy()
+        prices = self.data.loc[[self.observation_timestamp[i]]]["price"].to_numpy()
         portfolio_state = np.asarray(self.pf.state())
         logging.debug(
             "Portfolio state: %s\nPrices: %s\nIndicators: %s",
@@ -179,20 +179,21 @@ class TradingEnv(gym.Env):
 
         date_slice.loc[:, "action"] = action
         logging.debug("action: %s, date_slice: %s", action, date_slice)
-        realized_step_profit = self.pf.step(df=date_slice, normalized_actions=True)
+        d = self.pf.step(df=date_slice, normalized_actions=True)
 
         ret_info = {
             "net_value": self.pf.net_value(),
-            "profit_change": realized_step_profit,
+            "profit_change": d["profit"],
         }
 
         logging.debug("Env State: %s", self)
         logging.debug("Portfolio State: %s", self.pf)
+        logging.debug("Step Profit: %s", d["profit"])
 
         ret = (
             self._get_observation(),
             self.reward_function.compute_reward(
-                pf=self.pf, df=date_slice, realized_profit=realized_step_profit
+                pf=self.pf, df=date_slice, realized_profit=d["profit"]
             ),
             self.terminal,
             False,

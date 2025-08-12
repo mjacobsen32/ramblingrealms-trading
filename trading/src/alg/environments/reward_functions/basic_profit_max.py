@@ -47,7 +47,7 @@ class BasicRealizedProfitMax(RewardFunction):
     def compute_reward(
         self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
     ) -> float:
-        normalized_profit = np.tanh(realized_profit)
+        normalized_profit = np.tanh(realized_profit / self.cfg.reward_scaling)
         if (
             np.isnan(normalized_profit)
             or normalized_profit <= -1.0

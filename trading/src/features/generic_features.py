@@ -224,6 +224,31 @@ class Feature(BaseModel):
             df[c] = df.groupby(level="symbol", group_keys=False)[c].apply(func)
         return df
 
+    def _safe_group_apply(self, df: pd.DataFrame, col: str, func) -> pd.Series:
+        has_symbol = "symbol" in (df.index.names or [])
+        if has_symbol:
+            series_list: List[pd.Series] = []
+            for _, group in df.groupby(level="symbol"):
+                s = group[col]
+                res = func(s)
+                if isinstance(res, pd.Series):
+                    res = res.reindex(s.index)
+                else:  # scalar or other
+                    res = pd.Series(np.full(len(s), res), index=s.index)
+                res.name = col
+                series_list.append(res)
+            combined = pd.concat(series_list).sort_index()
+            return combined  # type: ignore[return-value]
+        # single ticker
+        s = df[col]
+        res = func(s)
+        if isinstance(res, pd.Series):
+            res = res.reindex(s.index)
+        else:
+            res = pd.Series(np.full(len(s), res), index=s.index)
+        res.name = col
+        return res  # type: ignore[return-value]
+
     def normalize_columns(self, df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
         """Generic normalization (zscore -> sigmoid) for columns, per symbol.
         Skips reserved columns.
@@ -251,42 +276,36 @@ class Candle(Feature):
         return ["open", "high", "low", "close", "volume", "trade_count", "vwap"]
 
     def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Normalize the candle data by scaling the OHLCV values.
-        Args:
-            df (pd.DataFrame): DataFrame containing candle data.
-        Returns:
-            pd.DataFrame: Normalized DataFrame with scaled values.
-        """
         sigmoid = expit
-        df["open"] = (
-            df.groupby(level="symbol")["open"].pct_change().fillna(0.0).pipe(sigmoid)
-        )
-        df["high"] = (
-            df.groupby(level="symbol")["high"].pct_change().fillna(0.0).pipe(sigmoid)
-        )
-        df["low"] = (
-            df.groupby(level="symbol")["low"].pct_change().fillna(0.0).pipe(sigmoid)
-        )
-        df["close"] = (
-            df.groupby(level="symbol")["close"].pct_change().fillna(0.0).pipe(sigmoid)
-        )
-        df["trade_count"] = (
-            df.groupby(level="symbol")["trade_count"]
-            .pct_change()
-            .fillna(0.0)
-            .pipe(sigmoid)
-        )
-        df["vwap"] = (
-            df.groupby(level="symbol")["vwap"].pct_change().fillna(0.0).pipe(sigmoid)
-        )
-        df["volume"] = (
-            df.groupby(level="symbol")["volume"]
-            .pct_change()
-            .fillna(0.0)
-            .pipe(sigmoid)
-            .transform(np.log1p)
-        )
+        has_symbol = "symbol" in (df.index.names or [])
+
+        def pct_sig(series_name):
+            s = df[series_name]
+            if has_symbol:
+                df[series_name] = (
+                    df.groupby(level="symbol")[series_name]
+                    .pct_change()
+                    .fillna(0.0)
+                    .pipe(sigmoid)
+                )
+            else:
+                df[series_name] = s.pct_change().fillna(0.0).pipe(sigmoid)
+
+        for c in ["open", "high", "low", "close", "trade_count", "vwap"]:
+            pct_sig(c)
+        # volume special
+        if has_symbol:
+            df["volume"] = (
+                df.groupby(level="symbol")["volume"]
+                .pct_change()
+                .fillna(0.0)
+                .pipe(sigmoid)
+                .transform(np.log1p)
+            )
+        else:
+            df["volume"] = (
+                df["volume"].pct_change().fillna(0.0).pipe(sigmoid).transform(np.log1p)
+            )
         return df
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
@@ -330,18 +349,13 @@ class MovingWindow(Feature):
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         df[self.name] = self.operation(df, self.field, self.period)
         df = self.clean_columns(self.get_feature_names(), df)
-        # normalize relative to raw close when appropriate
         if self.field == "close" and "close_raw" in df.columns:
-            # Express moving value as ratio to raw close then sigmoid(zscore)
-            ratio_col = f"{self.name}"
-
-            def _norm(group):
-                base = group["close_raw"]
-                val = group[ratio_col]
-                ratio = val / (base + 1e-12)
-                return expit(self._zscore(ratio))
-
-            df[ratio_col] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+            ratio_series = df[self.name] / (df["close_raw"] + 1e-12)
+            if "symbol" in (df.index.names or []):
+                grouped = ratio_series.groupby(level="symbol")
+                df[self.name] = grouped.transform(lambda x: expit(self._zscore(x)))
+            else:
+                df[self.name] = expit(self._zscore(ratio_series))
         else:
             df = self.normalize(df)
         return df
@@ -381,11 +395,11 @@ class ATR(Feature):
         df = self.clean_columns(self.get_feature_names(), df)
         if "close_raw" in df.columns:
 
-            def _norm(group):
-                val = group[self.name] / (group["close_raw"] + 1e-12)
-                return expit(self._zscore(val))
+            def _norm(s: pd.Series):
+                rel = s / (df.loc[s.index, "close_raw"] + 1e-12)
+                return expit(self._zscore(rel))
 
-            df[self.name] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+            df[self.name] = self._safe_group_apply(df, self.name, _norm)
         else:
             df = self.normalize(df)
         return df
@@ -496,18 +510,17 @@ class BollingerBands(Feature):
         df[f"{self.name}_lower"] = bbands.lower  # type: ignore[attr-defined]
         df[f"{self.name}_mid"] = bbands.middle  # type: ignore[attr-defined]
         df = self.clean_columns(self.get_feature_names(), df)
-        # Convert to relative distances and normalize
         if "close_raw" in df.columns:
             for part in ["upper", "lower", "mid"]:
                 col = f"{self.name}_{part}"
 
-                def _norm(group):
-                    rel = (group[col] - group["close_raw"]) / (
-                        group["close_raw"] + 1e-12
+                def _norm(s: pd.Series, _col=col):
+                    rel = (s - df.loc[s.index, "close_raw"]) / (
+                        df.loc[s.index, "close_raw"] + 1e-12
                     )
                     return expit(self._zscore(rel))
 
-                df[col] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+                df[col] = self._safe_group_apply(df, col, _norm)
         else:
             df = self.normalize(df)
         return df
@@ -543,11 +556,11 @@ class MSTD(Feature):
         df = self.clean_columns(self.get_feature_names(), df)
         if "close_raw" in df.columns:
 
-            def _norm(group):
-                rel = group[self.name] / (group["close_raw"] + 1e-12)
+            def _norm(s: pd.Series):
+                rel = s / (df.loc[s.index, "close_raw"] + 1e-12)
                 return expit(self._zscore(rel))
 
-            df[self.name] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+            df[self.name] = self._safe_group_apply(df, self.name, _norm)
         else:
             df = self.normalize(df)
         return df
@@ -570,12 +583,11 @@ class OBV(Feature):
         ).obv  # type: ignore[attr-defined]
         df = self.clean_columns(self.get_feature_names(), df)
 
-        # Use pct_change sigmoid then optional zscore-sigmoid on cumulative
-        def _norm(group):
-            pct = group[self.name].pct_change().fillna(0.0)
+        def _norm(s: pd.Series):
+            pct = s.pct_change().fillna(0.0)
             return expit(self._zscore(pct))
 
-        df[self.name] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+        df[self.name] = self._safe_group_apply(df, self.name, _norm)
         return df
 
 
@@ -599,7 +611,6 @@ class Stochastic(Feature):
         return [f"{self.name}_k", f"{self.name}_d", self.name]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        # Use raw high/low/close if available
         high_src = df.get(self.field_high + "_raw", df[self.field_high])
         low_src = df.get(self.field_low + "_raw", df[self.field_low])
         close_src = df.get(self.field_close + "_raw", df[self.field_close])
@@ -611,30 +622,21 @@ class Stochastic(Feature):
             d_window=self.d_window,
             d_ewm=self.ewm,
         )
-        raw_k = kd.percent_k  # type: ignore[attr-defined]
-        raw_d = kd.percent_d  # type: ignore[attr-defined]
-        df[self.name + "_k"] = raw_k
-        df[self.name + "_d"] = raw_d
-        # oscillator raw difference (-100..100)
-        df[self.name] = raw_k - raw_d
+        df[self.name + "_k"] = kd.percent_k  # type: ignore[attr-defined]
+        df[self.name + "_d"] = kd.percent_d  # type: ignore[attr-defined]
+        df[self.name] = df[self.name + "_k"] - df[self.name + "_d"]
         df = self.clean_columns(self.get_feature_names(), df)
-        # Scale %K and %D to 0..1 without clipping to preserve variation
         df[self.name + "_k"] = df[self.name + "_k"] / 100.0
         df[self.name + "_d"] = df[self.name + "_d"] / 100.0
-        # Convert oscillator to -1..1 by dividing by 100
         df[self.name] = (df[self.name] / 100.0).clip(-1.0, 1.0)
 
-        # Optional mild smoothing / de-saturation: apply per-symbol rolling zscore on oscillator diff if variance tiny
-        def _desat(group):
-            if group.std(ddof=0) < 1e-6:
-                return group  # keep if already varied
-            z = (group - group.mean()) / (group.std(ddof=0) + 1e-12)
-            # squash lightly to (-1,1)
+        def _desat(s: pd.Series):
+            if s.std(ddof=0) < 1e-6:
+                return s
+            z = (s - s.mean()) / (s.std(ddof=0) + 1e-12)
             return np.tanh(z)
 
-        df[self.name] = df.groupby(level="symbol", group_keys=False)[self.name].apply(
-            _desat
-        )
+        df[self.name] = self._safe_group_apply(df, self.name, _desat)
         return df
 
 
@@ -718,7 +720,14 @@ class Turbulence(Feature):
 
         df = self.clean_columns(self.get_feature_names(), df)
         # Normalize (zscore -> sigmoid) per symbol
-        grouped = df.groupby(level="symbol")[self.name]
-        df[self.name] = grouped.transform(lambda x: expit(self._zscore(x)))
+        grouped = (
+            df.groupby(level="symbol")[self.name]
+            if "symbol" in (df.index.names or [])
+            else None
+        )
+        if grouped is not None:
+            df[self.name] = grouped.transform(lambda x: expit(self._zscore(x)))
+        else:
+            df[self.name] = expit(self._zscore(df[self.name]))
 
         return df

@@ -187,8 +187,8 @@ class Portfolio:
         # Reduce df to a single datetime index (symbols only)
         df, step_profit = self._positions.step(df)
 
-        self.cash = self.cash - (df["size"] * df["close"]).sum()
-        self.nav = self._positions.nav(df["close"])
+        self.cash = self.cash - (df["size"] * df["price"]).sum()
+        self.nav = self._positions.nav(df["price"])
         self.total_value = self.cash + self.nav
 
         logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
