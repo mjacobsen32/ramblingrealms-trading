@@ -85,10 +85,9 @@ class TradingEnv(gym.Env):
         """
         self.data = data.copy()
         self.data["size"] = 0.0
-        self.data["price"] = self.data["close"]
-        self.data["profit"] = 0.0  # Initialize profit column
-        self.data["timestamp"] = self.data.index.get_level_values("timestamp")
+        self.data["profit"] = 0.0
         self.data["action"] = 0.0  # Initialize action column
+        self.data["timestamp"] = self.data.index.get_level_values("timestamp")
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
         self.max_steps = len(self.timestamps) - 1
 

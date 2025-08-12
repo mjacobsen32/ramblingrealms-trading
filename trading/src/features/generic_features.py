@@ -7,6 +7,7 @@ import vectorbt as vbt
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, model_validator
 from scipy.spatial.distance import mahalanobis
+from scipy.special import expit
 
 
 class FeatureType(str, Enum):
@@ -189,6 +190,57 @@ class Feature(BaseModel):
             sub.fill_strategy = fill_strategy
         return sub
 
+    # ---------------------- Normalization Utilities ---------------------- #
+    @staticmethod
+    def _zscore(s: pd.Series) -> pd.Series:
+        mu = s.mean()
+        std = s.std(ddof=0)
+        if std == 0 or np.isnan(std):
+            return pd.Series(0.0, index=s.index)
+        return (s - mu) / (std + 1e-12)
+
+    @staticmethod
+    def _robust_zscore(s: pd.Series) -> pd.Series:
+        med = s.median()
+        mad = (s - med).abs().median()
+        if mad == 0 or np.isnan(mad):
+            return pd.Series(0.0, index=s.index)
+        return (s - med) / (1.4826 * mad + 1e-12)
+
+    @staticmethod
+    def _minmax(s: pd.Series) -> pd.Series:
+        mn = s.min()
+        mx = s.max()
+        if mx - mn == 0 or np.isnan(mx - mn):
+            return pd.Series(0.5, index=s.index)
+        return (s - mn) / (mx - mn)
+
+    @staticmethod
+    def _sigmoid_pct_change(s: pd.Series) -> pd.Series:
+        return expit(s.pct_change().fillna(0.0))
+
+    def _group_apply(self, df: pd.DataFrame, cols: List[str], func) -> pd.DataFrame:
+        for c in cols:
+            df[c] = df.groupby(level="symbol", group_keys=False)[c].apply(func)
+        return df
+
+    def normalize_columns(self, df: pd.DataFrame, cols: List[str]) -> pd.DataFrame:
+        """Generic normalization (zscore -> sigmoid) for columns, per symbol.
+        Skips reserved columns.
+        """
+        reserved = {"symbol", "timestamp", "price", "close_raw"}
+        cols = [c for c in cols if c not in reserved and c in df.columns]
+        if not cols:
+            return df
+        for c in cols:
+            grouped = df.groupby(level="symbol")[c]
+            df[c] = grouped.transform(lambda x: expit(self._zscore(x)))
+        return df
+
+    # Hook method for subclasses to override
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
+        return self.normalize_columns(df, self.get_feature_names())
+
 
 class Candle(Feature):
     """
@@ -198,8 +250,62 @@ class Candle(Feature):
     def get_feature_names(self) -> List[str]:
         return ["open", "high", "low", "close", "volume", "trade_count", "vwap"]
 
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Normalize the candle data by scaling the OHLCV values.
+        Args:
+            df (pd.DataFrame): DataFrame containing candle data.
+        Returns:
+            pd.DataFrame: Normalized DataFrame with scaled values.
+        """
+        sigmoid = expit
+        df["open"] = (
+            df.groupby(level="symbol")["open"].pct_change().fillna(0.0).pipe(sigmoid)
+        )
+        df["high"] = (
+            df.groupby(level="symbol")["high"].pct_change().fillna(0.0).pipe(sigmoid)
+        )
+        df["low"] = (
+            df.groupby(level="symbol")["low"].pct_change().fillna(0.0).pipe(sigmoid)
+        )
+        df["close"] = (
+            df.groupby(level="symbol")["close"].pct_change().fillna(0.0).pipe(sigmoid)
+        )
+        df["trade_count"] = (
+            df.groupby(level="symbol")["trade_count"]
+            .pct_change()
+            .fillna(0.0)
+            .pipe(sigmoid)
+        )
+        df["vwap"] = (
+            df.groupby(level="symbol")["vwap"].pct_change().fillna(0.0).pipe(sigmoid)
+        )
+        df["volume"] = (
+            df.groupby(level="symbol")["volume"]
+            .pct_change()
+            .fillna(0.0)
+            .pipe(sigmoid)
+            .transform(np.log1p)
+        )
+        return df
+
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        return self.clean_columns(self.get_feature_names(), data)
+        cleaned = self.clean_columns(self.get_feature_names(), data)
+        # preserve raw values prior to normalization (add open/high/low)
+        (
+            cleaned["open_raw"],
+            cleaned["high_raw"],
+            cleaned["low_raw"],
+            cleaned["close_raw"],
+        ) = (
+            cleaned["open"],
+            cleaned["high"],
+            cleaned["low"],
+            cleaned["close"],
+        )
+        cleaned["price"] = cleaned["close"]  # reference price
+        cleaned = self.normalize(cleaned)
+        return cleaned
 
     TYPE: ClassVar[FeatureType] = FeatureType.CANDLE
     open: float = Field(default=0.0, description="Open price of the candle")
@@ -223,7 +329,22 @@ class MovingWindow(Feature):
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         df[self.name] = self.operation(df, self.field, self.period)
-        return self.clean_columns(self.get_feature_names(), df)
+        df = self.clean_columns(self.get_feature_names(), df)
+        # normalize relative to raw close when appropriate
+        if self.field == "close" and "close_raw" in df.columns:
+            # Express moving value as ratio to raw close then sigmoid(zscore)
+            ratio_col = f"{self.name}"
+
+            def _norm(group):
+                base = group["close_raw"]
+                val = group[ratio_col]
+                ratio = val / (base + 1e-12)
+                return expit(self._zscore(ratio))
+
+            df[ratio_col] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+        else:
+            df = self.normalize(df)
+        return df
 
     TYPE: ClassVar[FeatureType] = FeatureType.MOVING_WINDOW
     period: int = Field(
@@ -248,13 +369,26 @@ class ATR(Feature):
     field_close: str = Field("close", description="Field for close prices")
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        close_src = df.get(self.field_close + "_raw", df[self.field_close])
+        high_src = df.get(self.field_high + "_raw", df[self.field_high])
+        low_src = df.get(self.field_low + "_raw", df[self.field_low])
         df[self.name] = vbt.ATR.run(
-            high=df[self.field_high],
-            low=df[self.field_low],
-            close=df[self.field_close],
+            high=high_src,
+            low=low_src,
+            close=close_src,
             window=self.period,
-        ).atr
-        return self.clean_columns(self.get_feature_names(), df)
+        ).atr  # type: ignore[attr-defined]
+        df = self.clean_columns(self.get_feature_names(), df)
+        if "close_raw" in df.columns:
+
+            def _norm(group):
+                val = group[self.name] / (group["close_raw"] + 1e-12)
+                return expit(self._zscore(val))
+
+            df[self.name] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+        else:
+            df = self.normalize(df)
+        return df
 
 
 class RSI(Feature):
@@ -268,12 +402,20 @@ class RSI(Feature):
     ewm: bool = Field(False, description="Use Exponential Weighted Average for RSI")
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        price = (
+            df.get("close_raw", df[self.field])
+            if self.field == "close"
+            else df[self.field]
+        )
         df[self.name] = vbt.RSI.run(
-            close=df[self.field],
+            close=price,
             window=self.period,
             ewm=self.ewm,
-        ).rsi
-        return self.clean_columns(self.get_feature_names(), df)
+        ).rsi  # type: ignore[attr-defined]
+        df = self.clean_columns(self.get_feature_names(), df)
+        # Scale RSI 0-1
+        df[self.name] = df[self.name] / 100.0
+        return df
 
 
 class MACD(Feature):
@@ -298,18 +440,28 @@ class MACD(Feature):
         return [f"{self.name}", f"{self.name}_signal", f"{self.name}_hist"]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        price = (
+            df.get("close_raw", df[self.field])
+            if self.field == "close"
+            else df[self.field]
+        )
         macd = vbt.MACD.run(
-            close=df[self.field],
+            close=price,
             fast_window=self.fast_period,
             slow_window=self.slow_period,
             signal_window=self.signal_period,
             macd_ewm=self.ewm,
             signal_ewm=self.signal_ewm,
         )
-        df[f"{self.name}"] = macd.macd
-        df[f"{self.name}_signal"] = macd.signal
-        df[f"{self.name}_hist"] = macd.macd - macd.signal
-        return self.clean_columns(self.get_feature_names(), df)
+        df[f"{self.name}"] = macd.macd  # type: ignore[attr-defined]
+        df[f"{self.name}_signal"] = macd.signal  # type: ignore[attr-defined]
+        df[f"{self.name}_hist"] = macd.macd - macd.signal  # type: ignore[attr-defined]
+        df = self.clean_columns(self.get_feature_names(), df)
+        # zscore -> sigmoid per column
+        for c in self.get_feature_names():
+            grouped = df.groupby(level="symbol")[c]
+            df[c] = grouped.transform(lambda x: expit(self._zscore(x)))
+        return df
 
 
 class BollingerBands(Feature):
@@ -329,16 +481,36 @@ class BollingerBands(Feature):
         return [f"{self.name}_upper", f"{self.name}_lower", f"{self.name}_mid"]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        price = (
+            df.get("close_raw", df[self.field])
+            if self.field == "close"
+            else df[self.field]
+        )
         bbands = vbt.BBANDS.run(
-            close=df[self.field],
+            close=price,
             window=self.period,
             ewm=self.ewm,
             alpha=self.alpha,
         )
-        df[f"{self.name}_upper"] = bbands.upper
-        df[f"{self.name}_lower"] = bbands.lower
-        df[f"{self.name}_mid"] = bbands.middle
-        return self.clean_columns(self.get_feature_names(), df)
+        df[f"{self.name}_upper"] = bbands.upper  # type: ignore[attr-defined]
+        df[f"{self.name}_lower"] = bbands.lower  # type: ignore[attr-defined]
+        df[f"{self.name}_mid"] = bbands.middle  # type: ignore[attr-defined]
+        df = self.clean_columns(self.get_feature_names(), df)
+        # Convert to relative distances and normalize
+        if "close_raw" in df.columns:
+            for part in ["upper", "lower", "mid"]:
+                col = f"{self.name}_{part}"
+
+                def _norm(group):
+                    rel = (group[col] - group["close_raw"]) / (
+                        group["close_raw"] + 1e-12
+                    )
+                    return expit(self._zscore(rel))
+
+                df[col] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+        else:
+            df = self.normalize(df)
+        return df
 
 
 class MSTD(Feature):
@@ -358,12 +530,27 @@ class MSTD(Feature):
     )
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        price = (
+            df.get("close_raw", df[self.field])
+            if self.field == "close"
+            else df[self.field]
+        )
         df[self.name] = vbt.MSTD.run(
-            close=df[self.field],
+            close=price,
             window=self.window,
             ewm=self.ewm,
-        ).mstd
-        return self.clean_columns(self.get_feature_names(), df)
+        ).mstd  # type: ignore[attr-defined]
+        df = self.clean_columns(self.get_feature_names(), df)
+        if "close_raw" in df.columns:
+
+            def _norm(group):
+                rel = group[self.name] / (group["close_raw"] + 1e-12)
+                return expit(self._zscore(rel))
+
+            df[self.name] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+        else:
+            df = self.normalize(df)
+        return df
 
 
 class OBV(Feature):
@@ -376,11 +563,20 @@ class OBV(Feature):
     field_volume: str = Field("volume", description="Field for volume")
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        price = df.get("close_raw", df[self.field_close])
         df[self.name] = vbt.OBV.run(
-            close=df[self.field_close],
+            close=price,
             volume=df[self.field_volume],
-        ).obv
-        return self.clean_columns(self.get_feature_names(), df)
+        ).obv  # type: ignore[attr-defined]
+        df = self.clean_columns(self.get_feature_names(), df)
+
+        # Use pct_change sigmoid then optional zscore-sigmoid on cumulative
+        def _norm(group):
+            pct = group[self.name].pct_change().fillna(0.0)
+            return expit(self._zscore(pct))
+
+        df[self.name] = df.groupby(level="symbol", group_keys=False).apply(_norm)
+        return df
 
 
 class Stochastic(Feature):
@@ -403,18 +599,43 @@ class Stochastic(Feature):
         return [f"{self.name}_k", f"{self.name}_d", self.name]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        # Use raw high/low/close if available
+        high_src = df.get(self.field_high + "_raw", df[self.field_high])
+        low_src = df.get(self.field_low + "_raw", df[self.field_low])
+        close_src = df.get(self.field_close + "_raw", df[self.field_close])
         kd = vbt.STOCH.run(
-            high=df[self.field_high],
-            low=df[self.field_low],
-            close=df[self.field_close],
+            high=high_src,
+            low=low_src,
+            close=close_src,
             k_window=self.k_window,
             d_window=self.d_window,
             d_ewm=self.ewm,
         )
-        df[self.name + "_k"] = kd.percent_k
-        df[self.name + "_d"] = kd.percent_d
-        df[self.name] = kd.percent_k - kd.percent_d  # Stochastic Oscillator value
-        return self.clean_columns(self.get_feature_names(), df)
+        raw_k = kd.percent_k  # type: ignore[attr-defined]
+        raw_d = kd.percent_d  # type: ignore[attr-defined]
+        df[self.name + "_k"] = raw_k
+        df[self.name + "_d"] = raw_d
+        # oscillator raw difference (-100..100)
+        df[self.name] = raw_k - raw_d
+        df = self.clean_columns(self.get_feature_names(), df)
+        # Scale %K and %D to 0..1 without clipping to preserve variation
+        df[self.name + "_k"] = df[self.name + "_k"] / 100.0
+        df[self.name + "_d"] = df[self.name + "_d"] / 100.0
+        # Convert oscillator to -1..1 by dividing by 100
+        df[self.name] = (df[self.name] / 100.0).clip(-1.0, 1.0)
+
+        # Optional mild smoothing / de-saturation: apply per-symbol rolling zscore on oscillator diff if variance tiny
+        def _desat(group):
+            if group.std(ddof=0) < 1e-6:
+                return group  # keep if already varied
+            z = (group - group.mean()) / (group.std(ddof=0) + 1e-12)
+            # squash lightly to (-1,1)
+            return np.tanh(z)
+
+        df[self.name] = df.groupby(level="symbol", group_keys=False)[self.name].apply(
+            _desat
+        )
+        return df
 
 
 class Turbulence(Feature):
@@ -434,9 +655,13 @@ class Turbulence(Feature):
         # Calculate returns for multiple periods
         returns_matrix = []
         for period in self.return_periods:
-            returns = df[self.field].pct_change(periods=period).dropna()
+            base_close = (
+                df.get("close_raw", df[self.field])
+                if self.field == "close"
+                else df[self.field]
+            )
+            returns = base_close.pct_change(periods=period).dropna()
             returns_matrix.append(returns)
-
         # Align all return series to the same length
         min_length = min(len(r) for r in returns_matrix)
         returns_df = pd.DataFrame(
@@ -445,9 +670,7 @@ class Turbulence(Feature):
                 for period, r in zip(self.return_periods, returns_matrix)
             }
         )
-
         turbulence_values = []
-
         for i in range(len(returns_df)):
             if i < self.lookback:
                 turbulence_values.append(np.nan)
@@ -493,4 +716,9 @@ class Turbulence(Feature):
         ) + turbulence_values
         df[self.name] = result_values
 
-        return self.clean_columns(self.get_feature_names(), df)
+        df = self.clean_columns(self.get_feature_names(), df)
+        # Normalize (zscore -> sigmoid) per symbol
+        grouped = df.groupby(level="symbol")[self.name]
+        df[self.name] = grouped.transform(lambda x: expit(self._zscore(x)))
+
+        return df

@@ -190,3 +190,10 @@ class DataLoader:
         )
 
         return train, test
+
+    def to_csv(self, path: str):
+        """
+        Saves the DataFrame to a CSV file.
+        """
+        self.df.to_csv(path, index=True)
+        logging.info("Data saved to %s", path)
