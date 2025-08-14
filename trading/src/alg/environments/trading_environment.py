@@ -179,6 +179,7 @@ class TradingEnv(gym.Env):
 
         date_slice.loc[:, "action"] = action
         logging.debug("action: %s, date_slice: %s", action, date_slice)
+
         d = self.pf.step(df=date_slice, normalized_actions=True)
 
         ret_info = {

@@ -4,6 +4,7 @@ from typing import Optional
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC
 
 from trading.cli.alg.config import AgentConfig, ProjectPath
+from trading.src.alg.agents.lr_schedule import BaseLRSchedule
 from trading.src.alg.environments.trading_environment import TradingEnv
 
 AGENT_REGISTRY = {"ppo": PPO, "a2c": A2C, "dqn": DQN, "ddpg": DDPG, "sac": SAC}
@@ -40,8 +41,11 @@ class Agent:
             raise ValueError(f"Unsupported algorithm: {algo}")
         AgentClass = AGENT_REGISTRY[algo]
 
+        lr = BaseLRSchedule(config.kwargs.get("learning_rate", 0.1))
+        config.kwargs.pop("learning_rate", None)
         return AgentClass(
             env=env,
+            learning_rate=lr,
             tensorboard_log=(
                 ProjectPath.OUT_DIR / "tensorboard" if ProjectPath.OUT_DIR else None
             ),
