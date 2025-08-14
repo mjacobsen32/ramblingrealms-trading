@@ -54,7 +54,7 @@ class Portfolio:
         self.df.reset_index(level="symbol", inplace=True)
         self.df.set_index(["timestamp"], inplace=True)
         price = self.df.pivot(columns="symbol", values="price")
-        close = self.df.pivot(columns="symbol", values="close_raw")
+        close = self.df.pivot(columns="symbol", values="close")
         size = self.df.pivot(columns="symbol", values="size")
 
         self.vbt_pf = vbt.Portfolio.from_orders(

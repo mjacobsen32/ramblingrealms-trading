@@ -247,6 +247,7 @@ class Candle(Feature):
         df["low_norm"] = df["low"].pct_change().fillna(0.0)
         df["close_norm"] = df["close"].pct_change().fillna(0.0)
         df["vwap_norm"] = df["vwap"].pct_change().fillna(0.0)
+        df["price"] = df["close"]
 
         # large swings, so we log the percent change, and pipe to z-score
         df["trade_count_norm"] = (
