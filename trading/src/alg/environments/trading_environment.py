@@ -90,6 +90,7 @@ class TradingEnv(gym.Env):
         self.data["timestamp"] = self.data.index.get_level_values("timestamp")
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
         self.max_steps = len(self.timestamps) - 1
+        self.stats = pd.DataFrame(index=self.timestamps, columns=["returns"])
 
     def _reset_internal_states(self):
         self.observation_index = 0
@@ -182,6 +183,10 @@ class TradingEnv(gym.Env):
 
         d = self.pf.step(df=date_slice, normalized_actions=True)
 
+        self.stats.loc[
+            self.observation_timestamp[self.observation_index], "returns"
+        ] = (self.pf.total_value - self.pf.initial_cash) / self.pf.initial_cash
+
         ret_info = {
             "net_value": self.pf.net_value(),
             "profit_change": d["profit"],
@@ -191,10 +196,11 @@ class TradingEnv(gym.Env):
         logging.debug("Portfolio State: %s", self.pf)
         logging.debug("Step Profit: %s", d["profit"])
 
+        stats_slice = self.stats.iloc[0 : self.observation_index + 1]
         ret = (
             self._get_observation(),
             self.reward_function.compute_reward(
-                pf=self.pf, df=date_slice, realized_profit=d["profit"]
+                pf=self.pf, df=stats_slice, realized_profit=d["profit"]
             ),
             self.terminal,
             False,

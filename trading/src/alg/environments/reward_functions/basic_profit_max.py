@@ -55,3 +55,24 @@ class BasicRealizedProfitMax(RewardFunction):
         ):
             logging.warning("Normalized profit is %s", normalized_profit)
         return normalized_profit
+
+
+import quantstats as qs
+
+
+class SharpeRatio(RewardFunction):
+    def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
+        super().__init__(cfg, initial_state=initial_state)
+        self.initial_state = initial_state
+        self.risk_free_rate = cfg.kwargs.get("risk_free_rate", 0.2)
+
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        pd.set_option("future.no_silent_downcasting", True)
+        sharpe = qs.stats.sharpe(df["returns"], rf=self.risk_free_rate)
+        if np.isnan(sharpe) or np.isinf(sharpe):
+            # Not a warning as this is expected when length is < ~~ 3
+            logging.debug("Raw Sharpe Ratio is NaN or Inf")
+            return 0.0
+        return sharpe

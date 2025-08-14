@@ -47,6 +47,7 @@ dependencies = [
     "kaleido (<=0.2.1)",
     "anywidget (>=0.9.18,<0.10.0)",
     "cudf-cu12 (>=25.8.0,<26.0.0)",
+    "quantstats (>=0.0.70,<0.0.71)",
 ]
 
 [project.urls]

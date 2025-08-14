@@ -41,7 +41,7 @@ class Agent:
             raise ValueError(f"Unsupported algorithm: {algo}")
         AgentClass = AGENT_REGISTRY[algo]
 
-        lr = BaseLRSchedule(config.kwargs.get("learning_rate", 0.1))
+        lr = BaseLRSchedule.create(config.kwargs.get("learning_rate", 0.1))
         config.kwargs.pop("learning_rate", None)
         return AgentClass(
             env=env,

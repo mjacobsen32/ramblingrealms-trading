@@ -153,6 +153,10 @@ class RewardConfig(BaseModel):
     reward_scaling: float = Field(
         1e4, description="Scaling factor for the reward function"
     )
+    kwargs: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional keyword arguments for the reward function",
+    )
 
 
 class TradeMode(str, Enum):

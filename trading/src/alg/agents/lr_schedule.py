@@ -40,6 +40,4 @@ class LinearLRSchedule(BaseLRSchedule):
         :param progress_remaining: (float)
         :return: (float)
         """
-        lr = progress_remaining * self.initial_value
-        logging.info("Learning Rate: %f", lr)
-        return lr
+        return progress_remaining * self.initial_value

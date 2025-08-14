@@ -1,7 +1,10 @@
 {
     "reward_config":{
-        "type": "basic_profit_max",
-        "reward_scaling": 1e6
+        "type": "sharpe_ratio",
+        "reward_scaling": 1e6,
+        "kwargs": {
+            "risk_free_rate": 0.02
+        }
     },
     "portfolio_config":{
         "initial_cash": 1e6,
