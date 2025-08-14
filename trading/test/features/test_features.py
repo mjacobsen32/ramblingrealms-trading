@@ -9,6 +9,8 @@ def sin_wave_time_series():
     import matplotlib.pyplot as plt
     import pandas as pd
 
+    np.random.seed(42)  # For reproducibility
+
     n = 100
     amplitude = 1.0
     offset = 2.0
@@ -18,13 +20,19 @@ def sin_wave_time_series():
     high_values = close_values + 0.1 * np.random.randn(n)
     low_values = close_values - 0.1 * np.random.randn(n)
     volume_values = np.random.randint(1, 100, n)
+    open_values = close_values + 0.05 * np.random.randn(n)
+    trade_count_values = np.random.randint(1, 1000, n)
+    vwap_values = (close_values * volume_values).cumsum() / volume_values.cumsum()
 
     return pd.DataFrame(
         {
-            "close": close_values,
+            "open": open_values,
             "high": high_values,
             "low": low_values,
+            "close": close_values,
             "volume": volume_values,
+            "trade_count": trade_count_values,
+            "vwap": vwap_values,
         }
     )
 
@@ -41,6 +49,47 @@ def moving_average():
         field="close",
         operation=OperationType.MEAN,
     )
+
+
+@pytest.fixture
+def candle():
+    return Candle(
+        type=FeatureType.CANDLE,
+        name="candle",
+        enabled=True,
+        source="test",
+        fill_strategy=FillStrategy.DROP,
+    )
+
+
+def test_candle(sin_wave_time_series, candle):
+    res = candle.to_df(sin_wave_time_series, sin_wave_time_series)
+    assert "open" in res.columns
+    assert "high" in res.columns
+    assert "low" in res.columns
+    assert "close" in res.columns
+    assert "volume" in res.columns
+    assert "trade_count" in res.columns
+    assert "vwap" in res.columns
+
+    assert "open_norm" in res.columns
+    assert "high_norm" in res.columns
+    assert "low_norm" in res.columns
+    assert "close_norm" in res.columns
+    assert "volume_norm" in res.columns
+    assert "trade_count_norm" in res.columns
+    assert "vwap_norm" in res.columns
+
+    assert ((res["open_norm"] >= -4.0) & (res["open_norm"] <= 4.0)).all()
+    assert ((res["high_norm"] >= -4.0) & (res["high_norm"] <= 4.0)).all()
+    assert ((res["low_norm"] >= -4.0) & (res["low_norm"] <= 4.0)).all()
+    assert ((res["close_norm"] >= -4.0) & (res["close_norm"] <= 4.0)).all()
+    assert ((res["vwap_norm"] >= -4.0) & (res["vwap_norm"] <= 4.0)).all()
+
+    assert ((res["volume_norm"] >= -5.0) & (res["volume_norm"] <= 5.0)).all()
+    assert ((res["trade_count_norm"] >= -7.0) & (res["trade_count_norm"] <= 7.0)).all()
+
+    assert len(res) == 100
 
 
 def test_feature_rolling_mean_drop(sin_wave_time_series, moving_average):
@@ -114,6 +163,7 @@ def test_feature_atr(sin_wave_time_series, atr):
     assert len(res) == 100
     assert res["atr"][0] == res["atr"][13]
     assert res["atr"].isnull().sum() == 0
+    assert res["atr_norm"].isnull().sum() == 0
 
 
 @pytest.fixture
@@ -136,9 +186,17 @@ def test_feature_bollinger_bands(sin_wave_time_series, bollinger_bands):
     assert len(res) == 100
     assert "bollinger_bands_upper" in res.columns
     assert "bollinger_bands_lower" in res.columns
+    assert "bollinger_bands_mid" in res.columns
+    assert "bollinger_bands_norm_upper" in res.columns
+    assert "bollinger_bands_norm_lower" in res.columns
+    assert "bollinger_bands_norm_mid" in res.columns
     assert (res["bollinger_bands_upper"] >= res["bollinger_bands_lower"]).all()
     assert res["bollinger_bands_upper"].isnull().sum() == 0
     assert res["bollinger_bands_lower"].isnull().sum() == 0
+    assert res["bollinger_bands_mid"].isnull().sum() == 0
+    assert res["bollinger_bands_norm_upper"].isnull().sum() == 0
+    assert res["bollinger_bands_norm_lower"].isnull().sum() == 0
+    assert res["bollinger_bands_norm_mid"].isnull().sum() == 0
 
 
 @pytest.fixture
@@ -160,14 +218,30 @@ def macd():
 
 def test_feature_macd(sin_wave_time_series, macd):
     res = macd.to_df(sin_wave_time_series, None)
+    res[
+        [
+            "macd",
+            "macd_signal",
+            "macd_hist",
+            "macd_norm",
+            "macd_norm_signal",
+            "macd_norm_hist",
+        ]
+    ].to_csv("/home/matthew-jacobsen/dev/ramblingrealms-trading/data/macd_test.csv")
     assert len(res) == 100
     assert "macd" in res.columns
     assert "macd_signal" in res.columns
     assert "macd_hist" in res.columns
+    assert "macd_norm" in res.columns
+    assert "macd_norm_signal" in res.columns
+    assert "macd_norm_hist" in res.columns
     assert (res["macd"] >= res["macd_signal"]).any() or (
         res["macd"] < res["macd_signal"]
     ).any()
     assert res["macd"].isnull().sum() == 0
+    assert res["macd_norm"].isnull().sum() == 0
+    assert res["macd_norm_signal"].isnull().sum() == 0
+    assert res["macd_norm_hist"].isnull().sum() == 0
 
 
 @pytest.fixture
