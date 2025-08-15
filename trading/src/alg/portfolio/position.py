@@ -208,7 +208,6 @@ class PositionManager:
                 )
             df.at[row.Index, "profit"] = profit
             df.at[row.Index, "size"] = row.size + remaining_lot
-            df.at[row.Index, "position_counts"] = len(queue) - len_positions
             logging.debug("Exiting position for %s: profit=%s", sym, profit)
 
         return df

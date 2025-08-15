@@ -7,7 +7,9 @@ from trading.src.alg.environments.reward_functions.base_reward_function import (
 from trading.src.alg.environments.reward_functions.basic_profit_max import (
     BasicProfitMax,
     BasicRealizedProfitMax,
+    CalmarRatio,
     SharpeRatio,
+    SortinoRatio,
 )
 
 
@@ -21,5 +23,9 @@ def factory_method(cfg: RewardConfig, initial_state: np.ndarray) -> RewardFuncti
         return BasicRealizedProfitMax(cfg, initial_state=initial_state)
     elif cfg.type == "sharpe_ratio":
         return SharpeRatio(cfg, initial_state=initial_state)
+    elif cfg.type == "sortino_ratio":
+        return SortinoRatio(cfg, initial_state=initial_state)
+    elif cfg.type == "calmar_ratio":
+        return CalmarRatio(cfg, initial_state=initial_state)
     else:
         raise ValueError(f"Unknown reward function: {cfg.type}")

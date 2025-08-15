@@ -90,7 +90,9 @@ class TradingEnv(gym.Env):
         self.data["timestamp"] = self.data.index.get_level_values("timestamp")
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
         self.max_steps = len(self.timestamps) - 1
-        self.stats = pd.DataFrame(index=self.timestamps, columns=["returns"])
+        self.stats = pd.DataFrame(
+            0.0, index=self.timestamps, columns=["returns"], dtype=np.float32
+        )
 
     def _reset_internal_states(self):
         self.observation_index = 0
@@ -183,9 +185,16 @@ class TradingEnv(gym.Env):
 
         d = self.pf.step(df=date_slice, normalized_actions=True)
 
+        previous_net_value = (
+            self.stats.loc[
+                self.observation_timestamp[self.observation_index - 1], "net_value"
+            ]
+            if self.observation_index > 0
+            else self.pf.initial_cash
+        )
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "returns"
-        ] = (self.pf.total_value - self.pf.initial_cash) / self.pf.initial_cash
+        ] = (self.pf.net_value() - previous_net_value) / previous_net_value
 
         ret_info = {
             "net_value": self.pf.net_value(),

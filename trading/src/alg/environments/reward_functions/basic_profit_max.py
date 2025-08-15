@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+import quantstats as qs
 
 from trading.cli.alg.config import RewardConfig
 from trading.src.alg.environments.reward_functions.base_reward_function import (
@@ -57,9 +58,6 @@ class BasicRealizedProfitMax(RewardFunction):
         return normalized_profit
 
 
-import quantstats as qs
-
-
 class SharpeRatio(RewardFunction):
     def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
         super().__init__(cfg, initial_state=initial_state)
@@ -72,7 +70,40 @@ class SharpeRatio(RewardFunction):
         pd.set_option("future.no_silent_downcasting", True)
         sharpe = qs.stats.sharpe(df["returns"], rf=self.risk_free_rate)
         if np.isnan(sharpe) or np.isinf(sharpe):
-            # Not a warning as this is expected when length is < ~~ 3
             logging.debug("Raw Sharpe Ratio is NaN or Inf")
             return 0.0
         return sharpe
+
+
+class SortinoRatio(RewardFunction):
+    def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
+        super().__init__(cfg, initial_state=initial_state)
+        self.initial_state = initial_state
+        self.risk_free_rate = cfg.kwargs.get("risk_free_rate", 0.2)
+
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        pd.set_option("future.no_silent_downcasting", True)
+        sortino = qs.stats.sortino(df["returns"], rf=self.risk_free_rate)
+        if np.isnan(sortino) or np.isinf(sortino):
+            logging.debug("Raw Sortino Ratio is NaN or Inf")
+            return 0.0
+        return sortino
+
+
+class CalmarRatio(RewardFunction):
+    def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
+        super().__init__(cfg, initial_state=initial_state)
+        self.initial_state = initial_state
+        self.risk_free_rate = cfg.kwargs.get("risk_free_rate", 0.2)
+
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        pd.set_option("future.no_silent_downcasting", True)
+        calmar = qs.stats.calmar(df["returns"])
+        if np.isnan(calmar) or np.isinf(calmar):
+            logging.debug("Raw Calmar Ratio is NaN or Inf")
+            return 0.0
+        return calmar
