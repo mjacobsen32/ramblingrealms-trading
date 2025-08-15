@@ -9,7 +9,7 @@ from alpaca.data.timeframe import TimeFrameUnit
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import VecNormalize
 
-from trading.cli.alg.config import SellMode, StockEnv, TradeMode
+from trading.cli.alg.config import StockEnv, TradeMode
 from trading.src.alg.environments.reward_functions.reward_function_factory import (
     factory_method,
 )
@@ -64,12 +64,13 @@ class TradingEnv(gym.Env):
             )  # technical indicators for each stock
         )
         logging.info(
-            "State space: %s, Features (%s): %s, Stock Dimension: %s, action space: %s",
+            "State space: %s, Features (%s): %s, Stock Dimension: %s, action space: %s, lookback window: %i",
             state_space,
             len(self.feature_cols),
             self.feature_cols,
             self.stock_dimension,
             self.action_space.shape,
+            self.cfg.lookback_window,
         )
         # State space (cash + owned shares + prices + indicators)
         self.observation_space = spaces.Box(

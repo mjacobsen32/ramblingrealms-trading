@@ -46,7 +46,7 @@ class Position(np.ndarray):
             None,  # exit_date (default)
             None,  # exit_price (default)
             0.0,  # exit_size (default)
-            1,  # position_type (default to LONG)
+            PositionType.LONG,  # position_type (default to LONG)
         ]
         obj = np.asarray(data, dtype=object).view(cls)
         return obj
@@ -81,11 +81,7 @@ class Position(np.ndarray):
 
     @property
     def position_type(self) -> PositionType:
-        return (
-            PositionType.LONG
-            if self[self.IDX_POSITION_TYPE] > 0
-            else PositionType.SHORT
-        )
+        return self[self.IDX_POSITION_TYPE]
 
     def exit(
         self, exit_date: pd.Timestamp, price: float, exit_size: float | None = None
@@ -98,16 +94,46 @@ class Position(np.ndarray):
 
     def profit(self) -> float:
         return (
-            self.exit_price if self.exit_price is not None else 0
-        ) - self.enter_price * (self.exit_size if self.exit_size is not None else 0)
+            (self.exit_price if self.exit_price is not None else 0) - self.enter_price
+        ) * (self.exit_size if self.exit_size is not None else 0)
+
+    def __iter__(self):
+        return iter(
+            [
+                self.symbol,
+                self.lot_size,
+                self.enter_price,
+                self.enter_date,
+                self.exit_date,
+                self.exit_price,
+                self.exit_size,
+                self.position_type,
+            ]
+        )
+
+    def __str__(self):
+        return (
+            "Position(symbol=%s, lot_size=%s, enter_price=%s, enter_date=%s, "
+            "exit_date=%s, exit_price=%s, exit_size=%s, position_type=%s)"
+            % (
+                self.symbol,
+                self.lot_size,
+                self.enter_price,
+                self.enter_date,
+                self.exit_date,
+                self.exit_price,
+                self.exit_size,
+                self.position_type,
+            )
+        )
 
     def __repr__(self):
         return (
-            "Position(symbol_idx=%s, size=%s, enter_price=%s, enter_date=%s, "
+            "Position(symbol=%s, size=%s, enter_price=%s, enter_date=%s, "
             "exit_date=%s, exit_price=%s, exit_size=%s, position_type=%s)"
             % (
-                getattr(self, "symbol_idx", None),
-                getattr(self, "size", None),
+                self.symbol,
+                self.lot_size,
                 self.enter_price,
                 self.enter_date,
                 self.exit_date,
@@ -119,9 +145,14 @@ class Position(np.ndarray):
 
 
 class PositionManager:
-    def __init__(self, symbols: list[str], max_lots: int = 1):
+    def __init__(
+        self,
+        symbols: list[str],
+        max_lots: int | None = None,
+        maintain_history: bool = True,
+    ):
         self.symbols = symbols
-        self.max_lots = max_lots
+        self.max_lots: int | None = max_lots
         self.df = pd.DataFrame(
             {
                 "holdings": np.zeros(len(symbols), dtype=np.float32),
@@ -131,8 +162,10 @@ class PositionManager:
             index=symbols,
         )
         self.positions: dict[str, deque[Position]] = {
-            symbol: deque(maxlen=max_lots) for symbol in symbols
+            symbol: deque(maxlen=self.max_lots) for symbol in symbols
         }
+        self.history: list[Position] = []
+        self.maintain_history = maintain_history
         logging.info("Initializing PositionManager for symbols: %s", symbols)
 
     def __getitem__(self, key):
@@ -145,21 +178,9 @@ class PositionManager:
         """
         Save the positions to a CSV file.
         """
-        data = []
-
-        for symbol, positions in self.positions.items():
-            for position in positions:
-                data.append(
-                    {
-                        "symbol": symbol,
-                        "size": position.size,
-                        "enter_price": position.enter_price,
-                        "enter_date": position.enter_date,
-                        "exit_date": getattr(position, "exit_date", None),
-                        "exit_price": getattr(position, "exit_price", None),
-                    }
-                )
-        df = pd.DataFrame(data)
+        for _, queue in self.positions.items():
+            self.history.extend(queue)
+        df = pd.DataFrame(self.history, columns=Position.COLS)
         df.to_csv(path, index=False)
 
     def reset(self):
@@ -169,6 +190,7 @@ class PositionManager:
         self.df["holdings"] = 0.0
         self.df["position_counts"] = 0
         self.df["rolling_profit"] = 0.0
+        self.history = []
         self.positions = {symbol: deque() for symbol in self.symbols}
 
     def append(self, df: pd.DataFrame):
@@ -190,25 +212,30 @@ class PositionManager:
             sym = row.Index
             remaining_lot = -row.size  # total to sell
             queue = self.positions[sym]
-            len_positions = len(queue)
             profit = 0.0
             while remaining_lot > 0 and len(queue) > 0:
                 max_to_take = min(queue[0][Position.IDX_LOT_SIZE], remaining_lot)
                 remaining_lot -= max_to_take
                 queue[0][Position.IDX_LOT_SIZE] -= max_to_take
+
                 position = (
                     queue.popleft()
                     if queue[0][Position.IDX_LOT_SIZE] == 0
                     else queue[0]
                 )
-                profit += position.exit(
+
+                position_profit = position.exit(
                     exit_date=row.timestamp,
                     price=row.price,
                     exit_size=max_to_take,
                 )
+                profit += position_profit
+                if self.maintain_history:
+                    self.history.append(position.copy())
+                logging.debug("Exiting: %s profit=%s", position, position_profit)
+
             df.at[row.Index, "profit"] = profit
             df.at[row.Index, "size"] = row.size + remaining_lot
-            logging.debug("Exiting position for %s: profit=%s", sym, profit)
 
         return df
 
@@ -217,7 +244,9 @@ class PositionManager:
         Step through the position manager.
         Return a set indicating if a position was exited and the profit from that position.
         """
-        buy_mask = (df["size"] > 0) & (self.df["position_counts"] < self.max_lots)
+        buy_mask = (df["size"] > 0) & (
+            (self.max_lots is None) or (self.df["position_counts"] < self.max_lots)
+        )
         self.append(df[buy_mask])
 
         sell_mask = (df["size"] < 0) & (self.df["holdings"] > 0)

@@ -9,7 +9,7 @@ from alpaca.data.timeframe import TimeFrameUnit
 from plotly import io as pio
 from vectorbt import _typing as tp
 
-from trading.cli.alg.config import PortfolioConfig, ProjectPath, SellMode, TradeMode
+from trading.cli.alg.config import PortfolioConfig, ProjectPath, TradeMode
 from trading.src.alg.portfolio.position import Position, PositionManager
 from trading.src.utility.utils import time_frame_unit_to_pd_timedelta
 
@@ -36,7 +36,13 @@ class Portfolio:
         self.nav: float = 0.0
         self.vbt_pf: vbt.Portfolio | None = None
         self.symbols = symbols
-        self._positions = PositionManager(symbols=symbols, max_lots=cfg.max_positions)
+        self._positions = PositionManager(
+            symbols=symbols,
+            max_lots=(
+                None if cfg.trade_mode == TradeMode.CONTINUOUS else cfg.max_positions
+            ),
+        )
+
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
         self.df: pd.DataFrame | None = None
 
@@ -87,7 +93,7 @@ class Portfolio:
         self,
         df: pd.DataFrame,
         prices: np.ndarray,
-        sell_mode: SellMode = SellMode.CONTINUOUS,
+        trade_mode: TradeMode = TradeMode.CONTINUOUS,
     ) -> np.ndarray:
         """
         Enforce trade rules on the actions.
@@ -102,12 +108,12 @@ class Portfolio:
         """
 
         positions = self._positions["holdings"]
-        if sell_mode == SellMode.CONTINUOUS:
+        if trade_mode == TradeMode.CONTINUOUS:
             # Sell proportionally based on signal strength
             df.loc[sell_mask, "size"] = np.clip(
                 df.loc[sell_mask, "size"], -positions[sell_mask], 0
             )
-        elif sell_mode == SellMode.DISCRETE:
+        elif trade_mode == TradeMode.DISCRETE:
             # Sell entire position if sell action is triggered
             df.loc[sell_mask, "size"] = -positions[sell_mask]
 
@@ -209,7 +215,7 @@ class Portfolio:
             )
 
         df.loc[:, "size"] = self.enforce_trade_rules(
-            df, df["price"].values, self.cfg.sell_mode
+            df, df["price"].values, self.cfg.trade_mode
         )
         step_profit = self.update_position_batch(df=df)
         return {

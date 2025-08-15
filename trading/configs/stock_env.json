@@ -12,12 +12,12 @@
         "buy_cost_pct": 0.001,
         "sell_cost_pct": 0.001,
         "turbulence_threshold": null,
-        "max_positions": 1,
+        "max_positions": null,
         "hmax": 1e6,
         "trade_mode": "cont",
-        "sell_mode": "cont",
         "action_threshold": 0.1,
         "trade_limit_percent": 1.0,
-        "short_selling": false
+        "short_selling": false,
+        "maintain_history": true
     }
 }

@@ -111,16 +111,15 @@ def portfolio_config():
     """
     Fixture to create a simple portfolio configuration.
     """
-    from trading.cli.alg.config import PortfolioConfig, SellMode, TradeMode
+    from trading.cli.alg.config import PortfolioConfig, TradeMode
 
     return PortfolioConfig(
         initial_cash=1_000_000,
         hmax=10_000,
         buy_cost_pct=0.001,
         sell_cost_pct=0.001,
-        max_positions=1,
+        max_positions=None,
         trade_mode=TradeMode.CONTINUOUS,
-        sell_mode=SellMode.CONTINUOUS,
         trade_limit_percent=0.1,
     )
 

@@ -168,15 +168,6 @@ class TradeMode(str, Enum):
     CONTINUOUS = "cont"
 
 
-class SellMode(str, Enum):
-    """
-    Enum for sell modes.
-    """
-
-    DISCRETE = "discrete"
-    CONTINUOUS = "cont"
-
-
 class PortfolioConfig(BaseModel):
     initial_cash: int = Field(100_000, description="Starting funds in state space")
     buy_cost_pct: Union[float, List[float]] = Field(
@@ -185,17 +176,13 @@ class PortfolioConfig(BaseModel):
     sell_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
-    max_positions: int = Field(
-        1,
-        description="Maximum number of open positions per asset at any time",
+    max_positions: int | None = Field(
+        None,
+        description="Maximum number of open positions per asset at any time. If None, no limit is applied. Does not apply to Continuous action space",
     )
     trade_mode: TradeMode = Field(
         TradeMode.CONTINUOUS,
         description="Mode for trading: DISCRETE (fixed actions) or CONTINUOUS (scaled based on actions)",
-    )
-    sell_mode: SellMode = Field(
-        SellMode.CONTINUOUS,
-        description="Mode for selling assets: DISCRETE (fixed actions) or CONTINUOUS (scaled based on actions)",
     )
     trade_limit_percent: float = Field(
         0.1,
@@ -208,6 +195,9 @@ class PortfolioConfig(BaseModel):
     action_threshold: float = Field(
         0.1,
         description="Minimum action value to trigger a trade, used to avoid noise in continuous actions",
+    )
+    maintain_history: bool = Field(
+        True, description="Whether to maintain a history of past actions and states"
     )
 
 
