@@ -13,7 +13,9 @@ from trading.src.alg.environments.reward_functions.basic_profit_max import (
 )
 
 
-def factory_method(cfg: RewardConfig, initial_state: np.ndarray) -> RewardFunction:
+def reward_factory_method(
+    cfg: RewardConfig, initial_state: np.ndarray
+) -> RewardFunction:
     """
     Factory method to create a reward function instance based on the configuration.
     """

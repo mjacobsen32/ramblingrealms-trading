@@ -11,7 +11,7 @@ from stable_baselines3.common.vec_env import VecNormalize
 
 from trading.cli.alg.config import StockEnv, TradeMode
 from trading.src.alg.environments.reward_functions.reward_function_factory import (
-    factory_method,
+    reward_factory_method,
 )
 from trading.src.alg.portfolio.portfolio import Portfolio
 from trading.src.features import utils as feature_utils
@@ -39,7 +39,7 @@ class TradingEnv(gym.Env):
             symbols=data.index.get_level_values("symbol").unique(),
             time_step=time_step,
         )
-        self.reward_function = factory_method(cfg.reward_config, self.pf.state())
+        self.reward_function = reward_factory_method(cfg.reward_config, self.pf.state())
         self.observation_index = self.cfg.lookback_window
 
         # Define action space: continuous [-1,1] per stock (sell, hold, buy)
