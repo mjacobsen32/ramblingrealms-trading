@@ -64,7 +64,6 @@ def data_loader(data_config, feature_config):
     from trading.src.alg.data_process.data_loader import DataLoader
 
     data = DataLoader(data_config=data_config, feature_config=feature_config)
-    data.df["price"] = data.df["close"]
     data.df["timestamp"] = data.df.index.get_level_values("timestamp")
     data.df["size"] = 0.0
     data.df["profit"] = 0.0
@@ -112,16 +111,15 @@ def portfolio_config():
     """
     Fixture to create a simple portfolio configuration.
     """
-    from trading.cli.alg.config import PortfolioConfig, SellMode, TradeMode
+    from trading.cli.alg.config import PortfolioConfig, TradeMode
 
     return PortfolioConfig(
         initial_cash=1_000_000,
         hmax=10_000,
         buy_cost_pct=0.001,
         sell_cost_pct=0.001,
-        max_positions=1,
+        max_positions=None,
         trade_mode=TradeMode.CONTINUOUS,
-        sell_mode=SellMode.CONTINUOUS,
         trade_limit_percent=0.1,
     )
 

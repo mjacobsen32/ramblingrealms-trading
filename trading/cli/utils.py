@@ -36,8 +36,8 @@ def init_logger(log_level: str, log_file_level: str):
 
     console_level = getattr(logging, log_level, logging.NOTSET)
     file_level = getattr(logging, log_file_level, logging.NOTSET)
-    logger.setLevel(max(console_level, file_level))
 
+    logger.setLevel(min(console_level, file_level))
     console_handler = RichHandler(markup=True)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(logging.Formatter(FORMAT))
@@ -46,4 +46,7 @@ def init_logger(log_level: str, log_file_level: str):
     # Prevent propagation to avoid default handler
     logger.propagate = False
 
+    logging.info(
+        "Root logger initialized with level: %s", logging.getLevelName(logger.level)
+    )
     logging.info("Console logger initialized with level: %s", log_level)

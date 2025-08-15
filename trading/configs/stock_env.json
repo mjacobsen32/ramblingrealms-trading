@@ -1,19 +1,23 @@
 {
+    "lookback_window": 30,
     "reward_config":{
-        "type": "basic_profit_max",
-        "reward_scaling": 1e4
+        "type": "sharpe_ratio",
+        "reward_scaling": 1e6,
+        "kwargs": {
+            "risk_free_rate": 0.02
+        }
     },
     "portfolio_config":{
-        "initial_cash": 1000000,
+        "initial_cash": 1e6,
         "buy_cost_pct": 0.001,
         "sell_cost_pct": 0.001,
         "turbulence_threshold": null,
-        "max_positions": 1,
-        "hmax": 250000,
-        "trade_mode": "discrete",
-        "sell_mode": "discrete",
+        "max_positions": null,
+        "hmax": 1e6,
+        "trade_mode": "cont",
         "action_threshold": 0.1,
         "trade_limit_percent": 1.0,
-        "short_selling": false
+        "short_selling": false,
+        "maintain_history": true
     }
 }

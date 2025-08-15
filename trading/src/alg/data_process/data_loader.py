@@ -175,7 +175,7 @@ class DataLoader:
         """
         Returns a string representation of the dataframe.
         """
-        return f"start_date: {df.index.get_level_values('timestamp').min()}, end_date: {df.index.get_level_values('timestamp').max()}, rows: {len(df)}, features: {len(df.columns)}"
+        return f"start_date: {df.index.get_level_values('timestamp').min()}, end_date: {df.index.get_level_values('timestamp').max()}, shape: {df.shape}"
 
     def get_train_test(self):
         """
@@ -190,3 +190,10 @@ class DataLoader:
         )
 
         return train, test
+
+    def to_csv(self, path: str):
+        """
+        Saves the DataFrame to a CSV file.
+        """
+        self.df.to_csv(path, index=True)
+        logging.info("Data saved to %s", path)

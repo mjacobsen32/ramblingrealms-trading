@@ -7,6 +7,7 @@ import vectorbt as vbt
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, model_validator
 from scipy.spatial.distance import mahalanobis
+from scipy.special import expit
 
 
 class FeatureType(str, Enum):
@@ -189,6 +190,35 @@ class Feature(BaseModel):
             sub.fill_strategy = fill_strategy
         return sub
 
+    # ---------------------- Normalization Utilities ---------------------- #
+    @staticmethod
+    def _zscore(s: pd.Series) -> pd.Series:
+        mu = s.mean()
+        std = s.std(ddof=0)
+        if std == 0 or np.isnan(std):
+            return pd.Series(0.0, index=s.index)
+        return (s - mu) / (std + 1e-12)
+
+    @staticmethod
+    def _robust_zscore(s: pd.Series) -> pd.Series:
+        med = s.median()
+        mad = (s - med).abs().median()
+        if mad == 0 or np.isnan(mad):
+            return pd.Series(0.0, index=s.index)
+        return (s - med) / (1.4826 * mad + 1e-12)
+
+    @staticmethod
+    def _minmax(s: pd.Series) -> pd.Series:
+        mn = s.min()
+        mx = s.max()
+        if mx - mn == 0 or np.isnan(mx - mn):
+            return pd.Series(0.5, index=s.index)
+        return (s - mn) / (mx - mn)
+
+    @staticmethod
+    def _sigmoid_pct_change(s: pd.Series) -> pd.Series:
+        return expit(s.pct_change().fillna(0.0))
+
 
 class Candle(Feature):
     """
@@ -196,22 +226,58 @@ class Candle(Feature):
     """
 
     def get_feature_names(self) -> List[str]:
+        return [
+            "open_norm",
+            "high_norm",
+            "low_norm",
+            "close_norm",
+            "volume_norm",
+            "trade_count_norm",
+            "vwap_norm",
+        ]
+
+    def get_raw_feature_names(self) -> List[str]:
         return ["open", "high", "low", "close", "volume", "trade_count", "vwap"]
 
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
+        # percent change from previous day
+        # for now we are not piping to z-score, but we may later on, ideally we preserve large swings in raw data
+        df["open_norm"] = df["open"].pct_change().fillna(0.0)
+        df["high_norm"] = df["high"].pct_change().fillna(0.0)
+        df["low_norm"] = df["low"].pct_change().fillna(0.0)
+        df["close_norm"] = df["close"].pct_change().fillna(0.0)
+        df["vwap_norm"] = df["vwap"].pct_change().fillna(0.0)
+        df["price"] = df["close"]
+
+        # large swings, so we log the percent change, and pipe to z-score
+        df["trade_count_norm"] = (
+            df["trade_count"]
+            .pct_change()
+            .fillna(0.0)
+            .transform(np.log1p)
+            .pipe(Feature._robust_zscore)
+        )
+        df["volume_norm"] = (
+            df["volume"]
+            .pct_change()
+            .fillna(0.0)
+            .transform(np.log1p)
+            .pipe(Feature._robust_zscore)
+        )
+
+        return df
+
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        return self.clean_columns(self.get_feature_names(), data)
+        cleaned = self.clean_columns(self.get_raw_feature_names(), data)
+        if "symbol" in (df.index.names or []):
+            normalized = cleaned.groupby(level="symbol", group_keys=False).apply(
+                self.normalize
+            )
+        else:
+            normalized = self.normalize(cleaned)
+        return normalized
 
     TYPE: ClassVar[FeatureType] = FeatureType.CANDLE
-    open: float = Field(default=0.0, description="Open price of the candle")
-    high: float = Field(default=0.0, description="High price of the candle")
-    low: float = Field(default=0.0, description="Low price of the candle")
-    close: float = Field(default=0.0, description="Close price of the candle")
-    volume: float = Field(default=0.0, description="Volume of the candle")
-    period: str = Field(
-        TimeFrameUnit.Day, description="Time period of the candle (e.g., '1d', '1h')"
-    )
-    trade_count: int = Field(0, description="Number of trades during the candle period")
-    vwap: float = Field(0.0, description="Volume Weighted Average Price for the candle")
 
 
 class MovingWindow(Feature):
@@ -247,6 +313,12 @@ class ATR(Feature):
     field_low: str = Field("low", description="Field for low prices")
     field_close: str = Field("close", description="Field for close prices")
 
+    def get_feature_names(self) -> List[str]:
+        return [self.name + "_norm"]
+
+    def get_raw_feature_names(self) -> List[str]:
+        return [self.name]
+
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         df[self.name] = vbt.ATR.run(
             high=df[self.field_high],
@@ -254,7 +326,9 @@ class ATR(Feature):
             close=df[self.field_close],
             window=self.period,
         ).atr
-        return self.clean_columns(self.get_feature_names(), df)
+        df[self.name + "_norm"] = df[self.name] / df["close"]
+        cleaned = self.clean_columns([self.name, self.name + "_norm"], df)
+        return cleaned
 
 
 class RSI(Feature):
@@ -295,7 +369,20 @@ class MACD(Feature):
     )
 
     def get_feature_names(self) -> List[str]:
+        return [
+            f"{self.name}_norm",
+            f"{self.name}_norm_signal",
+            f"{self.name}_norm_hist",
+        ]
+
+    def get_raw_feature_names(self) -> List[str]:
         return [f"{self.name}", f"{self.name}_signal", f"{self.name}_hist"]
+
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
+        df[f"{self.name}_norm"] = self._zscore(df[f"{self.name}"])
+        df[f"{self.name}_norm_signal"] = self._zscore(df[f"{self.name}_signal"])
+        df[f"{self.name}_norm_hist"] = self._zscore(df[f"{self.name}_hist"])
+        return df
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         macd = vbt.MACD.run(
@@ -309,7 +396,13 @@ class MACD(Feature):
         df[f"{self.name}"] = macd.macd
         df[f"{self.name}_signal"] = macd.signal
         df[f"{self.name}_hist"] = macd.macd - macd.signal
-        return self.clean_columns(self.get_feature_names(), df)
+        if "symbol" in (df.index.names or []):
+            df = df.groupby(level="symbol", group_keys=False).apply(self.normalize)
+        else:
+            df = self.normalize(df)
+        return self.clean_columns(
+            self.get_feature_names() + self.get_raw_feature_names(), df
+        )
 
 
 class BollingerBands(Feature):
@@ -326,7 +419,20 @@ class BollingerBands(Feature):
     )
 
     def get_feature_names(self) -> List[str]:
+        return [
+            f"{self.name}_norm_upper",
+            f"{self.name}_norm_lower",
+            f"{self.name}_norm_mid",
+        ]
+
+    def get_raw_feature_names(self) -> List[str]:
         return [f"{self.name}_upper", f"{self.name}_lower", f"{self.name}_mid"]
+
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
+        df[f"{self.name}_norm_upper"] = self._zscore(df[f"{self.name}_upper"])
+        df[f"{self.name}_norm_lower"] = self._zscore(df[f"{self.name}_lower"])
+        df[f"{self.name}_norm_mid"] = self._zscore(df[f"{self.name}_mid"])
+        return df
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         bbands = vbt.BBANDS.run(
@@ -338,7 +444,13 @@ class BollingerBands(Feature):
         df[f"{self.name}_upper"] = bbands.upper
         df[f"{self.name}_lower"] = bbands.lower
         df[f"{self.name}_mid"] = bbands.middle
-        return self.clean_columns(self.get_feature_names(), df)
+        if "symbol" in (df.index.names or []):
+            df = df.groupby(level="symbol", group_keys=False).apply(self.normalize)
+        else:
+            df = self.normalize(df)
+        return self.clean_columns(
+            self.get_feature_names() + self.get_raw_feature_names(), df
+        )
 
 
 class MSTD(Feature):
@@ -375,11 +487,25 @@ class OBV(Feature):
     field_close: str = Field("close", description="Field for close prices")
     field_volume: str = Field("volume", description="Field for volume")
 
+    def get_feature_names(self) -> List[str]:
+        return [f"{self.name}_norm"]
+
+    def get_raw_feature_names(self) -> List[str]:
+        return [f"{self.name}"]
+
+    def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
+        df[f"{self.name}_norm"] = self._zscore(df[f"{self.name}"])
+        return df
+
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
         df[self.name] = vbt.OBV.run(
             close=df[self.field_close],
             volume=df[self.field_volume],
         ).obv
+        if "symbol" in (df.index.names or []):
+            df = df.groupby(level="symbol", group_keys=False).apply(self.normalize)
+        else:
+            df = self.normalize(df)
         return self.clean_columns(self.get_feature_names(), df)
 
 

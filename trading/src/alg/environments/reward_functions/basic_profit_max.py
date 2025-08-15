@@ -1,6 +1,8 @@
 import logging
 
 import numpy as np
+import pandas as pd
+import quantstats as qs
 
 from trading.cli.alg.config import RewardConfig
 from trading.src.alg.environments.reward_functions.base_reward_function import (
@@ -10,27 +12,98 @@ from trading.src.alg.portfolio.portfolio import Portfolio
 
 
 class BasicProfitMax(RewardFunction):
-    def __init__(self, cfg: RewardConfig):
-        self.previous_profit = 0.0
-        super().__init__(cfg)
+    def __init__(self, cfg: RewardConfig, initial_state: np.ndarray):
+        super().__init__(cfg, initial_state=initial_state)
+        self.initial_net = initial_state[0]
+        self.previous_net = self.initial_net
 
     def __repr__(self) -> str:
-        return f"BasicProfitMax(profit_memory={self.previous_profit})"
+        return f"BasicProfitMax(profit_memory={self.previous_net})"
 
     def reset(self):
-        self.previous_profit = 0.0
+        self.previous_net = self.initial_net
         return super().reset()
 
-    def compute_reward(self, pf: Portfolio) -> float:
-        # todo just pass in profit
-        profit = (pf.net_value() - pf.initial_cash) / pf.initial_cash
-        normalized_profit = np.tanh(profit)
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        current_net = pf.net_value()
+        delta_net = current_net - self.previous_net
+        self.previous_net = current_net
+
+        normalized_delta = np.tanh(delta_net / self.cfg.reward_scaling)
+        if (
+            np.isnan(normalized_delta)
+            or normalized_delta <= -1.0
+            or normalized_delta >= 1.0
+        ):
+            logging.warning("Normalized dt net value is %s", normalized_delta)
+        return normalized_delta
+
+
+class BasicRealizedProfitMax(RewardFunction):
+    def __init__(self, cfg: RewardConfig, initial_state: np.ndarray):
+        super().__init__(cfg, initial_state=initial_state)
+
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        normalized_profit = np.tanh(realized_profit / self.cfg.reward_scaling)
         if (
             np.isnan(normalized_profit)
             or normalized_profit <= -1.0
             or normalized_profit >= 1.0
         ):
             logging.warning("Normalized profit is %s", normalized_profit)
-        ret = normalized_profit - self.previous_profit
-        self.previous_profit = normalized_profit
-        return ret
+        return normalized_profit
+
+
+class SharpeRatio(RewardFunction):
+    def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
+        super().__init__(cfg, initial_state=initial_state)
+        self.initial_state = initial_state
+        self.risk_free_rate = cfg.kwargs.get("risk_free_rate", 0.2)
+
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        pd.set_option("future.no_silent_downcasting", True)
+        sharpe = qs.stats.sharpe(df["returns"], rf=self.risk_free_rate)
+        if np.isnan(sharpe) or np.isinf(sharpe):
+            logging.debug("Raw Sharpe Ratio is NaN or Inf")
+            return 0.0
+        return sharpe
+
+
+class SortinoRatio(RewardFunction):
+    def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
+        super().__init__(cfg, initial_state=initial_state)
+        self.initial_state = initial_state
+        self.risk_free_rate = cfg.kwargs.get("risk_free_rate", 0.2)
+
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        pd.set_option("future.no_silent_downcasting", True)
+        sortino = qs.stats.sortino(df["returns"], rf=self.risk_free_rate)
+        if np.isnan(sortino) or np.isinf(sortino):
+            logging.debug("Raw Sortino Ratio is NaN or Inf")
+            return 0.0
+        return sortino
+
+
+class CalmarRatio(RewardFunction):
+    def __init__(self, cfg: RewardConfig, initial_state: pd.DataFrame):
+        super().__init__(cfg, initial_state=initial_state)
+        self.initial_state = initial_state
+        self.risk_free_rate = cfg.kwargs.get("risk_free_rate", 0.2)
+
+    def compute_reward(
+        self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
+    ) -> float:
+        pd.set_option("future.no_silent_downcasting", True)
+        calmar = qs.stats.calmar(df["returns"])
+        if np.isnan(calmar) or np.isinf(calmar):
+            logging.debug("Raw Calmar Ratio is NaN or Inf")
+            return 0.0
+        return calmar

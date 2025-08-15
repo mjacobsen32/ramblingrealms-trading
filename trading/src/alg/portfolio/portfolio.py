@@ -9,7 +9,7 @@ from alpaca.data.timeframe import TimeFrameUnit
 from plotly import io as pio
 from vectorbt import _typing as tp
 
-from trading.cli.alg.config import PortfolioConfig, ProjectPath, SellMode, TradeMode
+from trading.cli.alg.config import PortfolioConfig, ProjectPath, TradeMode
 from trading.src.alg.portfolio.position import Position, PositionManager
 from trading.src.utility.utils import time_frame_unit_to_pd_timedelta
 
@@ -36,7 +36,13 @@ class Portfolio:
         self.nav: float = 0.0
         self.vbt_pf: vbt.Portfolio | None = None
         self.symbols = symbols
-        self._positions = PositionManager(symbols=symbols, max_lots=cfg.max_positions)
+        self._positions = PositionManager(
+            symbols=symbols,
+            max_lots=(
+                None if cfg.trade_mode == TradeMode.CONTINUOUS else cfg.max_positions
+            ),
+        )
+
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
         self.df: pd.DataFrame | None = None
 
@@ -53,7 +59,7 @@ class Portfolio:
 
         self.df.reset_index(level="symbol", inplace=True)
         self.df.set_index(["timestamp"], inplace=True)
-        price = self.df.pivot(columns="symbol", values="close")
+        price = self.df.pivot(columns="symbol", values="price")
         close = self.df.pivot(columns="symbol", values="close")
         size = self.df.pivot(columns="symbol", values="size")
 
@@ -87,14 +93,13 @@ class Portfolio:
         self,
         df: pd.DataFrame,
         prices: np.ndarray,
-        sell_mode: SellMode = SellMode.CONTINUOUS,
+        trade_mode: TradeMode = TradeMode.CONTINUOUS,
     ) -> np.ndarray:
         """
         Enforce trade rules on the actions.
         From trade sizes to actual trade sizes based on configuration and current portfolio state.
         @TODO clean up and make more efficient
         """
-        logging.debug("Raw Action: %s", df["size"])
 
         buy_mask = df["size"] > 0
         sell_mask = df["size"] < 0
@@ -103,12 +108,12 @@ class Portfolio:
         """
 
         positions = self._positions["holdings"]
-        if sell_mode == SellMode.CONTINUOUS:
+        if trade_mode == TradeMode.CONTINUOUS:
             # Sell proportionally based on signal strength
             df.loc[sell_mask, "size"] = np.clip(
                 df.loc[sell_mask, "size"], -positions[sell_mask], 0
             )
-        elif sell_mode == SellMode.DISCRETE:
+        elif trade_mode == TradeMode.DISCRETE:
             # Sell entire position if sell action is triggered
             df.loc[sell_mask, "size"] = -positions[sell_mask]
 
@@ -138,7 +143,7 @@ class Portfolio:
         # Clip the size to not exceed the minimum of both limits
         df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
-        logging.debug("Scaled Actions: %s", df["size"])
+        logging.debug("Scaled Sizes: %s", df["size"])
 
         return df["size"].values
 
@@ -153,6 +158,7 @@ class Portfolio:
         From signal strength to a desired trade size
         @TODO clean up and make more efficient
         """
+        logging.debug("Raw Action: %s", df["action"])
         # Find actions above threshold
         above_thresh = df["action"].abs() > self.cfg.action_threshold
 
@@ -187,8 +193,8 @@ class Portfolio:
         # Reduce df to a single datetime index (symbols only)
         df, step_profit = self._positions.step(df)
 
-        self.cash = self.cash - (df["size"] * df["close"]).sum()
-        self.nav = self._positions.nav(df["close"])
+        self.cash = self.cash - (df["size"] * df["price"]).sum()
+        self.nav = self._positions.nav(df["price"])
         self.total_value = self.cash + self.nav
 
         logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
@@ -209,7 +215,7 @@ class Portfolio:
             )
 
         df.loc[:, "size"] = self.enforce_trade_rules(
-            df, df["price"].values, self.cfg.sell_mode
+            df, df["price"].values, self.cfg.trade_mode
         )
         step_profit = self.update_position_batch(df=df)
         return {

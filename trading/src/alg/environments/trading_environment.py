@@ -9,9 +9,9 @@ from alpaca.data.timeframe import TimeFrameUnit
 from gymnasium import spaces
 from stable_baselines3.common.vec_env import VecNormalize
 
-from trading.cli.alg.config import SellMode, StockEnv, TradeMode
+from trading.cli.alg.config import StockEnv, TradeMode
 from trading.src.alg.environments.reward_functions.reward_function_factory import (
-    factory_method,
+    reward_factory_method,
 )
 from trading.src.alg.portfolio.portfolio import Portfolio
 from trading.src.features import utils as feature_utils
@@ -34,13 +34,13 @@ class TradingEnv(gym.Env):
         self.feature_cols = feature_utils.get_feature_cols(features=features)
         self.init_data(data)
         self.cfg = cfg
-        self.reward_function = factory_method(cfg.reward_config)
         self.pf: Portfolio = Portfolio(
             cfg=cfg.portfolio_config,
             symbols=data.index.get_level_values("symbol").unique(),
             time_step=time_step,
         )
-        self.observation_index = 0
+        self.reward_function = reward_factory_method(cfg.reward_config, self.pf.state())
+        self.observation_index = self.cfg.lookback_window
 
         # Define action space: continuous [-1,1] per stock (sell, hold, buy)
         self.action_space = spaces.Box(
@@ -59,16 +59,18 @@ class TradingEnv(gym.Env):
             1  # cash balance
             + 2 * self.stock_dimension  # stock prices and shares held
             + (
-                len(self.feature_cols) * self.stock_dimension
+                (len(self.feature_cols) * self.stock_dimension)
+                * (self.cfg.lookback_window + 1)
             )  # technical indicators for each stock
         )
         logging.info(
-            "State space: %s, Features (%s): %s, Stock Dimension: %s, action space: %s",
+            "State space: %s, Features (%s): %s, Stock Dimension: %s, action space: %s, lookback window: %i",
             state_space,
             len(self.feature_cols),
             self.feature_cols,
             self.stock_dimension,
             self.action_space.shape,
+            self.cfg.lookback_window,
         )
         # State space (cash + owned shares + prices + indicators)
         self.observation_space = spaces.Box(
@@ -85,15 +87,20 @@ class TradingEnv(gym.Env):
         """
         self.data = data.copy()
         self.data["size"] = 0.0
-        self.data["price"] = self.data["close"]
-        self.data["profit"] = 0.0  # Initialize profit column
-        self.data["timestamp"] = self.data.index.get_level_values("timestamp")
+        self.data["profit"] = 0.0
         self.data["action"] = 0.0  # Initialize action column
+        self.data["timestamp"] = self.data.index.get_level_values("timestamp")
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
         self.max_steps = len(self.timestamps) - 1
+        self.stats = pd.DataFrame(
+            0.0,
+            index=self.timestamps,
+            columns=["cum_returns", "returns", "net_value"],
+            dtype=np.float32,
+        )
 
     def _reset_internal_states(self):
-        self.observation_index = 0
+        self.observation_index = self.cfg.lookback_window
         self.terminal = False
         self.pf.reset()
         self.observation_timestamp = self.data.index.get_level_values(
@@ -118,11 +125,15 @@ class TradingEnv(gym.Env):
         if i == -1:
             i = self.observation_index
         indicators = (
-            self.data.loc[[self.observation_timestamp[i]]][self.feature_cols]
+            self.data.loc[
+                self.observation_timestamp[
+                    i - self.cfg.lookback_window
+                ] : self.observation_timestamp[i]
+            ][self.feature_cols]
             .to_numpy()
             .flatten()
         )
-        prices = self.data.loc[[self.observation_timestamp[i]]]["close"].to_numpy()
+        prices = self.data.loc[[self.observation_timestamp[i]]]["price"].to_numpy()
         portfolio_state = np.asarray(self.pf.state())
         logging.debug(
             "Portfolio state: %s\nPrices: %s\nIndicators: %s",
@@ -143,15 +154,15 @@ class TradingEnv(gym.Env):
         return c
 
     def render(self):
-        return (
-            f"Day: {self.observation_timestamp[self.observation_index]}\n"
-            f"Slice: {self.data.loc[self.observation_timestamp[self.observation_index]]}\n"
-            f"Tickers: {self.data.index.get_level_values('symbol').unique().tolist()}, "
-            f"Observation Space: {self.observation_space.shape}, "
-            f"Action Space: {self.action_space.shape}, "
-            f"Features: {self.feature_cols}, "
-            f"Reward Function: {self.reward_function}, "
-            f"{self.pf}"
+        return "Day: {}\nSlice: {}\nTickers: {}, Observation Space: {}, Action Space: {}, Features: {}, Reward Function: {}, {}".format(
+            self.observation_timestamp[self.observation_index],
+            self.data.loc[self.observation_timestamp[self.observation_index]],
+            self.data.index.get_level_values("symbol").unique().tolist(),
+            self.observation_space.shape,
+            self.action_space.shape,
+            self.feature_cols,
+            self.reward_function,
+            self.pf,
         )
 
     def step(self, action):
@@ -180,20 +191,42 @@ class TradingEnv(gym.Env):
 
         date_slice.loc[:, "action"] = action
         logging.debug("action: %s, date_slice: %s", action, date_slice)
-        profit = self.pf.step(df=date_slice, normalized_actions=True)  # heaviest
 
-        ret_info = {"net_value": self.pf.net_value(), "profit_change": profit}
+        d = self.pf.step(df=date_slice, normalized_actions=True)
 
-        (
-            logging.debug("Env State: %s", self.render())
-            if logging.getLogger().isEnabledFor(logging.DEBUG)
-            else None
+        self.stats.loc[
+            self.observation_timestamp[self.observation_index], "net_value"
+        ] = self.pf.net_value()
+        previous_net_value = (
+            self.stats.loc[
+                self.observation_timestamp[self.observation_index - 1], "net_value"
+            ]
+            if self.observation_index > 0
+            else self.pf.initial_cash
         )
-        logging.debug("Portfolio State: %s", self.pf)
+        self.stats.loc[
+            self.observation_timestamp[self.observation_index], "returns"
+        ] = (self.pf.net_value() - previous_net_value) / previous_net_value
 
+        self.stats.loc[
+            self.observation_timestamp[self.observation_index], "cum_returns"
+        ] = (self.pf.total_value - self.pf.initial_cash) / self.pf.initial_cash
+
+        ret_info = {
+            "net_value": self.pf.net_value(),
+            "profit_change": d["profit"],
+        }
+
+        logging.debug("Env State: %s", self)
+        logging.debug("Portfolio State: %s", self.pf)
+        logging.debug("Step Profit: %s", d["profit"])
+
+        stats_slice = self.stats.iloc[0 : self.observation_index + 1]
         ret = (
             self._get_observation(),
-            self.reward_function.compute_reward(self.pf),
+            self.reward_function.compute_reward(
+                pf=self.pf, df=stats_slice, realized_profit=d["profit"]
+            ),
             self.terminal,
             False,
             ret_info,

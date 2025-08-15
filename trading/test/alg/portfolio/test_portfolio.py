@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from trading.cli.alg.config import SellMode, TradeMode
+from trading.cli.alg.config import TradeMode
 from trading.src.alg.portfolio.portfolio import Portfolio
 from trading.test.alg.test_fixtures import *
 
@@ -181,7 +181,7 @@ def constraints_portfolio_config():
     """
     Fixture to create a simple portfolio configuration.
     """
-    from trading.cli.alg.config import PortfolioConfig, SellMode, TradeMode
+    from trading.cli.alg.config import PortfolioConfig, TradeMode
 
     return PortfolioConfig(
         initial_cash=1_000,
@@ -190,7 +190,6 @@ def constraints_portfolio_config():
         sell_cost_pct=0.0,
         max_positions=1,
         trade_mode=TradeMode.CONTINUOUS,
-        sell_mode=SellMode.CONTINUOUS,
         trade_limit_percent=0.1,
         action_threshold=0.0,
     )
@@ -280,7 +279,6 @@ def test_portfolio_positions(
     multi_tic_data, dates, portfolio_config, expected_positions
 ):
     portfolio_config.initial_cash = 1000
-    portfolio_config.max_positions = 5
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
     for i, date in enumerate(dates):
         pf.update_position_batch(multi_tic_data.loc[date])
@@ -292,7 +290,6 @@ def test_portfolio_positions(
 def test_discrete_mode(normalized_multi_tic_data, dates, portfolio_config):
     portfolio_config.initial_cash = 1000
     portfolio_config.trade_mode = TradeMode.DISCRETE
-    portfolio_config.sell_mode = SellMode.DISCRETE
     portfolio_config.max_positions = 1
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
 
