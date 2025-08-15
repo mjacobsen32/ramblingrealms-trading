@@ -40,7 +40,7 @@ class TradingEnv(gym.Env):
             time_step=time_step,
         )
         self.reward_function = factory_method(cfg.reward_config, self.pf.state())
-        self.observation_index = 0
+        self.observation_index = self.cfg.lookback_window
 
         # Define action space: continuous [-1,1] per stock (sell, hold, buy)
         self.action_space = spaces.Box(
@@ -59,7 +59,8 @@ class TradingEnv(gym.Env):
             1  # cash balance
             + 2 * self.stock_dimension  # stock prices and shares held
             + (
-                len(self.feature_cols) * self.stock_dimension
+                (len(self.feature_cols) * self.stock_dimension)
+                * (self.cfg.lookback_window + 1)
             )  # technical indicators for each stock
         )
         logging.info(
@@ -91,11 +92,14 @@ class TradingEnv(gym.Env):
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
         self.max_steps = len(self.timestamps) - 1
         self.stats = pd.DataFrame(
-            0.0, index=self.timestamps, columns=["returns"], dtype=np.float32
+            0.0,
+            index=self.timestamps,
+            columns=["cum_returns", "returns", "net_value"],
+            dtype=np.float32,
         )
 
     def _reset_internal_states(self):
-        self.observation_index = 0
+        self.observation_index = self.cfg.lookback_window
         self.terminal = False
         self.pf.reset()
         self.observation_timestamp = self.data.index.get_level_values(
@@ -120,7 +124,11 @@ class TradingEnv(gym.Env):
         if i == -1:
             i = self.observation_index
         indicators = (
-            self.data.loc[[self.observation_timestamp[i]]][self.feature_cols]
+            self.data.loc[
+                self.observation_timestamp[
+                    i - self.cfg.lookback_window
+                ] : self.observation_timestamp[i]
+            ][self.feature_cols]
             .to_numpy()
             .flatten()
         )
@@ -185,6 +193,9 @@ class TradingEnv(gym.Env):
 
         d = self.pf.step(df=date_slice, normalized_actions=True)
 
+        self.stats.loc[
+            self.observation_timestamp[self.observation_index], "net_value"
+        ] = self.pf.net_value()
         previous_net_value = (
             self.stats.loc[
                 self.observation_timestamp[self.observation_index - 1], "net_value"
@@ -195,6 +206,10 @@ class TradingEnv(gym.Env):
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "returns"
         ] = (self.pf.net_value() - previous_net_value) / previous_net_value
+
+        self.stats.loc[
+            self.observation_timestamp[self.observation_index], "cum_returns"
+        ] = (self.pf.total_value - self.pf.initial_cash) / self.pf.initial_cash
 
         ret_info = {
             "net_value": self.pf.net_value(),

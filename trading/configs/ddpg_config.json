@@ -1,0 +1,26 @@
+{
+    "algo": "ddpg",
+    "total_timesteps": 1e4,
+    "save_path": "{PROJECT_ROOT}/models/ppo_multi_ticker",
+        "kwargs": {
+            "policy": "MlpPolicy",
+            "learning_rate": {
+                "type": "linear",
+                "initial_value": 0.001
+            },
+            "n_steps": 1024,
+            "buffer_size": 1024,
+            "batch_size": 256,
+            "gamma": 0.99,
+            "tau": 0.005,
+            "train_freq": 1024,
+            "gradient_steps": -1,
+            "action_noise": null,
+            "device": "cuda",
+            "replay_buffer_class": null,
+            "replay_buffer_kwargs": {},
+            "policy_kwargs": {},
+            "verbose": 2,
+            "seed": 42
+    }
+}

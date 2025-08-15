@@ -1,4 +1,5 @@
 {
+    "lookback_window": 30,
     "reward_config":{
         "type": "sharpe_ratio",
         "reward_scaling": 1e6,
@@ -13,8 +14,8 @@
         "turbulence_threshold": null,
         "max_positions": 1,
         "hmax": 1e6,
-        "trade_mode": "discrete",
-        "sell_mode": "discrete",
+        "trade_mode": "cont",
+        "sell_mode": "cont",
         "action_threshold": 0.1,
         "trade_limit_percent": 1.0,
         "short_selling": false

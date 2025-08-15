@@ -222,6 +222,9 @@ class StockEnv(BaseModel):
     portfolio_config: PortfolioConfig = Field(
         default_factory=PortfolioConfig, description="Portfolio configuration"
     )
+    lookback_window: int = Field(
+        10, description="Number of past timesteps to consider for state representation"
+    )
 
 
 class AgentConfig(BaseModel):
