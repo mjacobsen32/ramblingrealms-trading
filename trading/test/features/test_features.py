@@ -218,16 +218,6 @@ def macd():
 
 def test_feature_macd(sin_wave_time_series, macd):
     res = macd.to_df(sin_wave_time_series, None)
-    res[
-        [
-            "macd",
-            "macd_signal",
-            "macd_hist",
-            "macd_norm",
-            "macd_norm_signal",
-            "macd_norm_hist",
-        ]
-    ].to_csv("/home/matthew-jacobsen/dev/ramblingrealms-trading/data/macd_test.csv")
     assert len(res) == 100
     assert "macd" in res.columns
     assert "macd_signal" in res.columns
