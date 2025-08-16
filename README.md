@@ -3,13 +3,3 @@
 
 ## Documentation
 Read the full documentation on [Read the Docs](https://ramblingrealms-trading.readthedocs.io/en/latest/)
-
-## Profiling
-`py-spy record -o ./profile.svg <command>`
-
-#### With Speedscope:
-`py-spy record -f speedscope -o profile.svg -- <command>`
-eg. `py-spy record -f speedscope -o profile.svg -- rr_trading alg train -c ./trading/configs/multi_ticker_ppo.json`
-
-## Tensorboard
-tensorboard --logdir <path/to/out/dir>
