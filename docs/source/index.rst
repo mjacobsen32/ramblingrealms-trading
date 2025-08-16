@@ -12,3 +12,6 @@ Rambling Realms Trading Platform documentation
 
    overview
    getting_started
+   usage
+   config
+   profiling
