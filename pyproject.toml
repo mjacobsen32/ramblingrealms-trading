@@ -70,6 +70,7 @@ pytest-cov = "^6.2.1"
 genbadge = "^1.1.2"
 defusedxml = "^0.7.1"
 py-spy = "^0.4.1"
+autodoc-pydantic = "^2.2.0"
 
 
 [tool.poetry.group.docs.dependencies]
@@ -77,6 +78,7 @@ sphinx = "^8.2.3"
 furo = "^2024.8.6"
 myst-parser = "^4.0.1"
 sphinx-rtd-theme = "^3.0.2"
+autodoc-pydantic = "^2.2.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
