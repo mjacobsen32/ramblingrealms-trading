@@ -13,9 +13,9 @@ from trading.cli.alg.config import StockEnv, TradeMode
 from trading.src.alg.environments.reward_functions.reward_function_factory import (
     reward_factory_method,
 )
-from trading.src.alg.portfolio.portfolio import Portfolio
 from trading.src.features import utils as feature_utils
 from trading.src.features.generic_features import Feature
+from trading.src.portfolio.portfolio import Portfolio
 
 
 class TradingEnv(gym.Env):

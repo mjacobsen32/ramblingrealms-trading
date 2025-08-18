@@ -2,7 +2,7 @@ import pandas as pd
 import vectorbt as vbt
 
 from trading.cli.alg.config import RewardConfig
-from trading.src.alg.portfolio.portfolio import Portfolio
+from trading.src.portfolio.portfolio import Portfolio
 
 
 class RewardFunction:

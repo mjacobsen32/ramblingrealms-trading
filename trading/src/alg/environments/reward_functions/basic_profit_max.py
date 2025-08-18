@@ -8,7 +8,7 @@ from trading.cli.alg.config import RewardConfig
 from trading.src.alg.environments.reward_functions.base_reward_function import (
     RewardFunction,
 )
-from trading.src.alg.portfolio.portfolio import Portfolio
+from trading.src.portfolio.portfolio import Portfolio
 
 
 class BasicProfitMax(RewardFunction):

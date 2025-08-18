@@ -12,7 +12,7 @@ from trading.src.alg.environments.reward_functions.basic_profit_max import (
 from trading.src.alg.environments.reward_functions.reward_function_factory import (
     reward_factory_method,
 )
-from trading.src.alg.portfolio.portfolio import Portfolio
+from trading.src.portfolio.portfolio import Portfolio
 from trading.test.alg.test_fixtures import *
 
 

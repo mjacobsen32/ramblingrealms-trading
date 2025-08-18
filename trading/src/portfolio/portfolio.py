@@ -10,7 +10,7 @@ from plotly import io as pio
 from vectorbt import _typing as tp
 
 from trading.cli.alg.config import PortfolioConfig, ProjectPath, TradeMode
-from trading.src.alg.portfolio.position import Position, PositionManager
+from trading.src.portfolio.position import Position, PositionManager
 from trading.src.utility.utils import time_frame_unit_to_pd_timedelta
 
 

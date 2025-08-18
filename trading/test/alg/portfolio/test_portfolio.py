@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from trading.cli.alg.config import TradeMode
-from trading.src.alg.portfolio.portfolio import Portfolio
+from trading.src.portfolio.portfolio import Portfolio
 from trading.test.alg.test_fixtures import *
 
 
