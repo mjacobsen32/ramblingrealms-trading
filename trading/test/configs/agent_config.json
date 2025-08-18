@@ -1,6 +1,6 @@
 {
     "algo": "ppo",
-    "save_path": "{PROJECT_ROOT}/trading/test/models/ppo",
+    "save_path": "{PROJECT_ROOT}/trading/test/models/ppo.zip",
     "total_timesteps": 1000,
     "kwargs": {
         "policy": "MlpPolicy",

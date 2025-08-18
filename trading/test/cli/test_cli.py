@@ -11,11 +11,24 @@ from trading.src.alg.backtest.backtesting import BackTesting
 
 CONFIG_DIR = Path(__file__).parent.parent / "configs"
 
+import os
 import re
 import shutil
+import tempfile
 from unittest.mock import patch
 
 runner = CliRunner()
+
+
+def setup_module(module):
+    temp_cache = tempfile.NamedTemporaryFile(delete=True, delete_on_close=True)
+    os.environ["RR_TRADING_USER_CACHE_PATH"] = temp_cache.name
+
+
+def teardown_module(module):
+    temp_cache_path = os.environ.get("RR_TRADING_USER_CACHE_PATH")
+    if temp_cache_path and os.path.exists(temp_cache_path):
+        os.remove(temp_cache_path)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -57,7 +70,7 @@ def test_setup(fake_keys):
         app,
         ["setup"],
         color=False,
-        input=f"y\n{key_path}\n{secret_path}\nn\ny\n{key_path}\n{secret_path}\nn\ny\n{key_path}\ny\n{key_path}\n{secret_path}\n",
+        input=f"y\n{key_path}\n{secret_path}\nn\ny\n{key_path}\n{secret_path}\nn\ny\n{key_path}\ny\n{key_path}\n{secret_path}\ny\n{key_path}\n{secret_path}\n",
     )
     assert result.exit_code == 0
 

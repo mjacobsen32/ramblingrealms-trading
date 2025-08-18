@@ -17,6 +17,7 @@ class ProjectPath(BaseModel):
     PROJECT_ROOT: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
     OUT_DIR: ClassVar[Path | None] = None
     BACKTEST_DIR: ClassVar[Path | None] = None
+    VERSION: ClassVar[str] = str()
     path: str = Field(str(), description="Path to the project root")
 
     @classmethod
@@ -47,6 +48,8 @@ class ProjectPath(BaseModel):
             value = value.replace("{OUT_DIR}", str(cls.OUT_DIR))
         elif "{BACKTEST_DIR}" in value:
             value = value.replace("{BACKTEST_DIR}", str(cls.BACKTEST_DIR))
+        if "{VERSION}" in value:
+            value = value.replace("{VERSION}", str(cls.VERSION))
         return {"path": value}
 
     def __str__(self) -> str:
@@ -294,7 +297,7 @@ class RRConfig(BaseModel):
 
     name: str = Field(..., description="Name of the algorithm")
     description: str = Field("", description="Description of the algorithm")
-    version: str = Field("1.0.0", description="Version of the algorithm")
+    version: str = Field(str(), description="Version of the algorithm")
     out_dir: ProjectPath = Field(default_factory=ProjectPath)
     agent_config: AgentConfig | ProjectPath = Field(
         default_factory=AgentConfig, description="Agent configuration"
@@ -311,6 +314,15 @@ class RRConfig(BaseModel):
     backtest_config: BackTestConfig | ProjectPath = Field(
         default_factory=BackTestConfig, description="Backtesting configuration"
     )
+
+    @field_validator(
+        "version",
+        mode="before",
+    )
+    @classmethod
+    def validate_version(cls, value: str) -> str:
+        ProjectPath.VERSION = value
+        return value
 
     @field_validator(
         "out_dir",

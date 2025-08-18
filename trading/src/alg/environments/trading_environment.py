@@ -30,6 +30,7 @@ class TradingEnv(gym.Env):
         features: List[Feature],
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
     ):
+        self.symbols = data.index.get_level_values("symbol").unique().tolist()
         self.stock_dimension = len(data.index.get_level_values("symbol").unique())
         self.feature_cols = feature_utils.get_feature_cols(features=features)
         self.init_data(data)

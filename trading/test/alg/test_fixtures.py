@@ -100,9 +100,10 @@ def agent_config():
 
     return AgentConfig(
         algo="ppo",
-        save_path="{PROJECT_ROOT}/trading/test/models/test_agent",
+        save_path="{PROJECT_ROOT}/trading/test/models/ppo.zip",
         deterministic=True,
         kwargs={"policy": "MlpPolicy", "n_steps": 2048},
+        total_timesteps=1000,
     )
 
 
@@ -121,6 +122,8 @@ def portfolio_config():
         max_positions=None,
         trade_mode=TradeMode.CONTINUOUS,
         trade_limit_percent=0.1,
+        action_threshold=0.01,
+        maintain_history=True,
     )
 
 

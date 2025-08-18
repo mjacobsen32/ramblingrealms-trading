@@ -36,14 +36,6 @@ Alpaca (required)
 The alpaca api is used for collecting market data and executing trades with a paper trading and live trading account.
 
 
-^^^^^^^^^^^^^^^^^
-Etrade (optional)
-^^^^^^^^^^^^^^^^^
-`Create an Etrade API token and save to local host <https://www.etrade.com/>`_
-
-The etrade api is outdated and likely to be deprecated in the future. Until long term support picks up, Alpaca is the recommended option for live/paper trading.
-
-
 ^^^^^^^^^^^^^^^^^^
 Polygon (optional)
 ^^^^^^^^^^^^^^^^^^
