@@ -21,4 +21,4 @@ repos:
     rev: 1.9.0
     hooks:
       - id: poetry-export
-        args: ["--only", "docs", "-f", "requirements.txt", "-o", "docs/requirements.txt"]
+        args: ["--with", "docs", "-f", "requirements.txt", "-o", "docs/requirements.txt"]

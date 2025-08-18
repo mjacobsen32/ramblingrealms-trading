@@ -7,7 +7,11 @@ Rambling Realms Trading Platform documentation
 ==============================================
 
 .. toctree::
-   usage
    :maxdepth: 2
    :caption: Contents:
 
+   overview
+   getting_started
+   usage
+   config
+   profiling

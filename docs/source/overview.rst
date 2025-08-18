@@ -1,0 +1,4 @@
+Overview
+========
+
+This app is made to streamline the training, testing, and deploying of machine learning based trading applications. The end-goal of the application is to provide a hyper generic pipeline for interchanging models, features, training configurations, and strategies all from the command line. The goal of this project is not to outpace existing high frequency trading platforms in existence which leverage high data volumes data and speed of execution, but instead identify long term trends utilizing OHLC data, sentiment data, gov data, value investment scores, and additional features. You can think of this project more as a full time financial advisor than a trading bot. 
