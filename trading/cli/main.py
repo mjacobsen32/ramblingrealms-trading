@@ -111,7 +111,6 @@ def paper_trade(
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
     trade = Trade.from_config(rr_trade_config, live=False)
-    trade.initialize()
     trade.run_model()
 
 
@@ -140,7 +139,6 @@ def live_trade(
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
     trade = Trade.from_config(rr_trade_config, live=True)
-    trade.initialize()
     trade.run_model()
 
 

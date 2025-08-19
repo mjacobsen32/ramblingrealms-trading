@@ -229,13 +229,13 @@ class Portfolio:
         Load backtesting results from a JSON file.
         """
         pf = vbt.Portfolio.load(str(file_path))
-        logging.info("Loaded backtest results from %s", file_path)
+        logging.info("Loaded VectorBT results from %s", file_path)
         ret = cls(cfg=cfg, symbols=[])
         ret.vbt_pf = pf
         return ret
 
     def save(self, file_path: str, df: pd.DataFrame | None = None):
-        logging.info("Saving backtest results to %s", file_path)
+        logging.info("Saving VectorBT results to %s", file_path)
         self.as_vbt_pf(df=df).save(file_path)
 
     def save_plots(self, backtest_dir: Path):

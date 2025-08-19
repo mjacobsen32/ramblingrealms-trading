@@ -39,7 +39,8 @@ class Agent:
                 "type": config.algo,
                 "version": ProjectPath.VERSION,
                 "symbols": self.env.symbols,
-                "features": self.env.feature_cols,
+                "features": [f.model_dump(mode="json") for f in self.env.features],
+                "env_config": self.env.cfg.model_dump(mode="json"),
             }
 
     @classmethod

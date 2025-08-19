@@ -202,6 +202,9 @@ class PortfolioConfig(BaseModel):
     maintain_history: bool = Field(
         True, description="Whether to maintain a history of past actions and states"
     )
+    max_exposure: float = Field(
+        1.0, description="Maximum exposure across the entire portfolio"
+    )
 
 
 class StockEnv(BaseModel):

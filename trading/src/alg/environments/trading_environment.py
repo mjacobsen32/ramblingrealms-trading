@@ -32,7 +32,8 @@ class TradingEnv(gym.Env):
     ):
         self.symbols = data.index.get_level_values("symbol").unique().tolist()
         self.stock_dimension = len(data.index.get_level_values("symbol").unique())
-        self.feature_cols = feature_utils.get_feature_cols(features=features)
+        self.features = features
+        self.feature_cols = feature_utils.get_feature_cols(features=self.features)
         self.init_data(data)
         self.cfg = cfg
         self.pf: Portfolio = Portfolio(
@@ -117,6 +118,22 @@ class TradingEnv(gym.Env):
         self._reset_internal_states()
         return self._get_observation(), {}
 
+    @classmethod
+    def observation(
+        cls, df: pd.DataFrame, pf: Portfolio, feature_cols: list, prices: np.ndarray
+    ) -> np.ndarray:
+        indicators = df[feature_cols].to_numpy().flatten()
+        portfolio_state = np.asarray(pf.state())
+        logging.debug(
+            "Portfolio state: %s\nPrices: %s\nIndicators: %s",
+            portfolio_state.shape,
+            prices.shape,
+            indicators.shape,
+        )
+        c = np.concatenate([portfolio_state, prices, indicators], axis=0)
+        logging.debug("Observation: %s", c)
+        return c
+
     def _get_observation(self, i: int = -1) -> np.ndarray:
         """Get the current observation from the environment.
 
@@ -125,34 +142,14 @@ class TradingEnv(gym.Env):
         """
         if i == -1:
             i = self.observation_index
-        indicators = (
-            self.data.loc[
-                self.observation_timestamp[
-                    i - self.cfg.lookback_window
-                ] : self.observation_timestamp[i]
-            ][self.feature_cols]
-            .to_numpy()
-            .flatten()
-        )
+        df = self.data.loc[
+            self.observation_timestamp[
+                i - self.cfg.lookback_window
+            ] : self.observation_timestamp[i]
+        ]
         prices = self.data.loc[[self.observation_timestamp[i]]]["price"].to_numpy()
-        portfolio_state = np.asarray(self.pf.state())
-        logging.debug(
-            "Portfolio state: %s\nPrices: %s\nIndicators: %s",
-            portfolio_state.shape,
-            prices.shape,
-            indicators.shape,
-        )
-        c = np.concatenate(
-            [
-                portfolio_state,
-                prices,
-                indicators,
-            ]
-        )
 
-        logging.debug("Observation: %s", c)
-
-        return c
+        return self.observation(df, self.pf, self.feature_cols, prices)
 
     def render(self):
         return "Day: {}\nSlice: {}\nTickers: {}, Observation Space: {}, Action Space: {}, Features: {}, Reward Function: {}, {}".format(
