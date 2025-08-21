@@ -18,6 +18,7 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinxcontrib.autodoc_pydantic",
+    "autoapi.extension",
 ]
 
 intersphinx_mapping = {
@@ -49,3 +50,10 @@ from pathlib import Path
 # Ensure project root is importable for autodoc (e.g., trading.*)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
+
+# AutoAPI config
+autoapi_type = "python"
+autoapi_dirs = ["../../trading"]  # path to your source
+autoapi_ignore = ["**/test/**"]
+autoapi_keep_files = True
+autoapi_add_toctree_entry = True

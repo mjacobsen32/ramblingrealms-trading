@@ -13,5 +13,13 @@ Rambling Realms Trading Platform documentation
    overview
    getting_started
    usage
-   config
+   configuration
    profiling
+
+Developer Reference
+===================
+.. toctree::
+   :maxdepth: 2
+   :caption: Developer Reference:
+   
+   autoapi/trading

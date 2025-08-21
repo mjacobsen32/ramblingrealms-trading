@@ -1,4 +1,4 @@
-Config Module
+Configuration
 =============
 
 .. automodule:: trading.cli.alg.config

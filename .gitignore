@@ -20,6 +20,7 @@ out
 # docs
 docs/_build
 docs/build
+docs/source/autoapi
 
 # trained models
 models
