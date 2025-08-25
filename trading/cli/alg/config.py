@@ -14,6 +14,11 @@ from trading.src.user_cache.user_cache import UserCache as user_cache
 
 
 class ProjectPath(BaseModel):
+    """
+    Path-like object for using variable based absolute paths
+
+    """
+
     PROJECT_ROOT: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
     OUT_DIR: ClassVar[Path | None] = None
     BACKTEST_DIR: ClassVar[Path | None] = None
@@ -60,6 +65,10 @@ class ProjectPath(BaseModel):
 
 
 class DataSourceType(str, Enum):
+    """
+    Enum for data source types.
+    """
+
     ALPACA = "alpaca"
 
 

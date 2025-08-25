@@ -19,6 +19,10 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinxcontrib.autodoc_pydantic",
     "autoapi.extension",
+    "sphinxcontrib.programoutput",
+    "sphinx_click",
+    "sphinxcontrib.typer",
+    "sphinx-jsonschema",
 ]
 
 intersphinx_mapping = {
@@ -56,4 +60,31 @@ autoapi_type = "python"
 autoapi_dirs = ["../../trading"]  # path to your source
 autoapi_ignore = ["**/test/**"]
 autoapi_keep_files = True
+autoapi_member_order = "bysource"
 autoapi_add_toctree_entry = True
+
+# Global defaults for sphinx-autodoc-pydantic
+# See: https://autodoc-pydantic.readthedocs.io/en/stable/users/configuration.html
+# Model docs defaults
+autodoc_pydantic_model_show_json = False
+autodoc_pydantic_model_show_config_summary = False
+autodoc_pydantic_model_show_validator_members = False
+autodoc_pydantic_model_show_validator_summary = False
+autodoc_pydantic_model_show_field_summary = False
+
+# Field docs defaults (apply to both models and settings)
+autodoc_pydantic_field_list_validators = False
+
+# BaseSettings docs defaults (in case you document any Settings classes)
+autodoc_pydantic_settings_show_json = False
+autodoc_pydantic_settings_show_config_summary = False
+autodoc_pydantic_settings_show_validator_members = False
+autodoc_pydantic_settings_show_validator_summary = False
+autodoc_pydantic_settings_show_field_summary = False
+# Render type hints in the description for better readability
+autodoc_typehints = "description"
+
+# autodoc-pydantic: show Pydantic model members (fields/validators/config) by default
+autodoc_pydantic_model_members = True
+# Keep member order aligned with source
+autodoc_pydantic_model_member_order = "bysource"

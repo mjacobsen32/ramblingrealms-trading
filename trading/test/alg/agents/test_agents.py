@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from trading.src.alg.agents.agents import Agent
 from trading.test.alg.test_fixtures import *

@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 
 from trading.cli.alg.alg import backtest, train
 from trading.cli.alg.config import ProjectPath
-from trading.cli.main import app
+from trading.cli.rr_trading import app
 from trading.src.alg.backtest.backtesting import BackTesting
 
 CONFIG_DIR = Path(__file__).parent.parent / "configs"

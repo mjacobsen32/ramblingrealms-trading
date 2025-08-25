@@ -54,7 +54,7 @@ dependencies = [
 repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
 
 [project.scripts]
-rr_trading = "trading.cli.main:app"
+rr_trading = "trading.cli.rr_trading:app"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
@@ -80,6 +80,10 @@ sphinx-rtd-theme = "^3.0.2"
 autodoc-pydantic = "^2.2.0"
 sphinx-autoapi = "^3.6.0"
 sphinx-autodoc-typehints = "^3.2.0"
+sphinxcontrib-programoutput = "^0.18"
+sphinx-click = "^6.0.0"
+sphinxcontrib-typer = "^0.5.1"
+sphinx-jsonschema = "^1.19.1"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

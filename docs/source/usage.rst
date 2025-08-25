@@ -1,61 +1,49 @@
-=====
-Usage
-=====
+===========
+Usage (CLI)
+===========
 
 --------
 Training
 --------
 
-.. code-block:: console
-
-    rr_trading alg train -c <path_to_config>
-
-.. code-block:: console
-
-    rr_trading alg train --help                                                                                                                       
-    Usage: rr_trading alg train [OPTIONS]                                                                                                                                          
-                                                                                                                                                                                    
-    ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-    │ *  --config      -c      TEXT  Path to the configuration file. [default: None] [required]                                                                                    │
-    │    --dry-run     -d            Run the training in dry run mode without saving results.                                                                                      │
-    │    --no-test     -t            Run the backtesting suite via the new model                                                                                                   │
-    │    --fetch-data  -f            Fetch the latest data before training. Do not use Cache.                                                                                      │
-    │    --help                      Show this message and exit.                                                                                                                   │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+.. typer:: trading.cli.rr_trading:app.alg.train
+   :prog: alg train
+   :width: 80
+   :show-nested:
+   :make-sections:
+   :theme: dimmed_monokai
 
 
-^^^^^^^^^^^
-Tensorboard
-^^^^^^^^^^^
+.. note::
 
-Tensorboard output will be saved to `out_dir`
+    tensorboard output will be saved to `<out_dir>/tensorboard` if configured.
+
+
 
 -----------
 Backtesting
 -----------
 
-.. code-block:: console
-
-    rr_trading alg backtest -c <path_to_config>
-    Usage: rr_trading alg backtest [OPTIONS]                                                                                                                                       
-                                                                                                                                                                                
-    Run backtesting on the trained model.                                                                                                                                          
-                                                                                                                                                                                    
-    ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-    │ *  --config    -c      TEXT  Path to the configuration file. [default: None] [required]                                                                                      │
-    │    --on-train                Run backtesting on the training data instead of test data.                                                                                      │
-    │    --help                    Show this message and exit.                                                                                                                     │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-
-.. code-block:: console
-
-    rr_trading alg backtest --help      
+.. typer:: trading.cli.rr_trading:app.alg.backtest
+   :prog: alg backtest
+   :width: 80
+   :show-nested:
+   :make-sections:
+   :theme: dimmed_monokai
 
 ^^^^^^^^
 Analysis
 ^^^^^^^^
 
-*Plots will be saved to `<out_dir>/backtest` and or rendered in browser if configured*
+.. typer:: trading.cli.rr_trading:app.alg.analysis
+   :prog: alg analysis
+   :width: 80
+   :show-nested:
+   :make-sections:
+   :theme: dimmed_monokai
+
+.. note::
+    plots will be saved to `<out_dir>/backtest` and/or rendered in browser if configured
 
 **Sample Backtest Results Rendering**
 
@@ -95,23 +83,6 @@ Analysis
         Calmar Ratio                                    0.623497                                                                                           
         Omega Ratio                                     1.161858                                                                                           
         Sortino Ratio                                   1.006545 
-
-.. code-block:: console
-
-    rr_trading alg analysis -c <path_to_config> -o <previous_run_output_dir>
-
-.. code-block:: console
-
-    rr_trading alg analysis --help      
-    Usage: rr_trading alg analysis [OPTIONS]                                                                                                                                       
-                                                                                                                                                                                    
-    Run analysis on the backtest results.                                                                                                                                          
-                                                                                                                                                                                    
-    ╭─ Options ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-    │ *  --config   -c      TEXT  Path to the configuration file. [default: None] [required]                                                                                       │
-    │ *  --out_dir  -o      TEXT  Path to the root output directory. [default: None] [required]                                                                                    │
-    │    --help                   Show this message and exit.                                                                                                                      │
-    ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 
 -------------
 Trading

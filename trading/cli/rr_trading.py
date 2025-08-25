@@ -29,7 +29,7 @@ FORMAT = "%(message)s"
 
 
 @app.callback()
-def main(
+def rr_trading(
     ctx: typer.Context,
     log_level_console: str = typer.Option(
         "INFO",

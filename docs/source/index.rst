@@ -14,7 +14,6 @@ Rambling Realms Trading Platform documentation
    getting_started
    usage
    configuration
-   profiling
 
 Developer Reference
 ===================
@@ -22,4 +21,4 @@ Developer Reference
    :maxdepth: 2
    :caption: Developer Reference:
    
-   autoapi/trading
+   profiling
