@@ -46,6 +46,10 @@ Not integrated yet.
 ^^^^^^^^^^^^
 Setup wizard
 ^^^^^^^^^^^^
-.. code-block:: console
-    
-    rr-trading setup
+
+.. typer:: trading.cli.rr_trading:app.setup
+   :prog: rr_trading setup
+   :width: 80
+   :show-nested:
+   :make-sections:
+   :theme: dimmed_monokai
