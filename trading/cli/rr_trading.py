@@ -4,14 +4,13 @@ from typing import Annotated
 
 import typer
 from pydantic import SecretStr
-from rich import print
 from rich.prompt import Prompt
 
 from trading.cli.alg import alg
 from trading.cli.data import data
 from trading.cli.trading.trade_config import RRTradeConfig
 from trading.cli.utils import init_logger
-from trading.src.trade.trade_base import Trade
+from trading.src.trade.trade_clients import Trade
 from trading.src.user_cache.user_cache import UserCache as User
 from trading.src.utility.utils import read_key
 

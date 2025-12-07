@@ -1,9 +1,11 @@
 import logging
-from collections import defaultdict, deque
+from collections import deque
 from enum import Enum
 
 import numpy as np
 import pandas as pd
+
+from trading.src.trade.trade_clients import TradingClient
 
 
 class PositionType(str, Enum):
@@ -144,15 +146,52 @@ class Position(np.ndarray):
         )
 
 
+class LivePositionManager:
+    def __init__(
+        self,
+        symbols: list[str],
+        max_lots: int | None = None,
+        trading_client: TradingClient | None = None,
+    ):
+        self.symbols = symbols
+        self.max_lots = max_lots
+        self.trading_client = trading_client
+        # self.df positions = trade_client.state(symbols=symbols)
+        # self.
+
+    def __getitem__(self, key):
+        """
+        Allow access to the internal DataFrame using the [] accessor.
+        """
+        return self.df[key]
+
+    def nav(self, prices: pd.Series) -> float:
+        """
+        Calculate the net asset value (NAV) of the portfolio.
+        """
+        return (self.df["holdings"] * prices).sum()
+
+    def net_value(self) -> float:
+        """
+        Calculate the net value of the portfolio.
+        """
+        return 0.0
+        # return self.cash + self.nav(prices=self.df["current_price"])
+
+
 class PositionManager:
     def __init__(
         self,
         symbols: list[str],
         max_lots: int | None = None,
         maintain_history: bool = True,
+        initial_cash: float = 0.0,
     ):
         self.symbols = symbols
         self.max_lots: int | None = max_lots
+        self.initial_cash = initial_cash
+        self.total_value: float = initial_cash
+        self.cash = initial_cash
         self.df = pd.DataFrame(
             {
                 "holdings": np.zeros(len(symbols), dtype=np.float32),
@@ -193,7 +232,7 @@ class PositionManager:
         self.history = []
         self.positions = {symbol: deque() for symbol in self.symbols}
 
-    def append(self, df: pd.DataFrame):
+    def _append(self, df: pd.DataFrame):
         for sym, row in df.iterrows():
             self.positions[sym].append(
                 Position(
@@ -204,7 +243,7 @@ class PositionManager:
                 )
             )
 
-    def exit_positions(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _exit_positions(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Exit positions based on the provided DataFrame.
         """
@@ -247,10 +286,10 @@ class PositionManager:
         buy_mask = (df["size"] > 0) & (
             (self.max_lots is None) or (self.df["position_counts"] < self.max_lots)
         )
-        self.append(df[buy_mask])
+        self._append(df[buy_mask])
 
         sell_mask = (df["size"] < 0) & (self.df["holdings"] > 0)
-        exit_view = self.exit_positions(df[sell_mask])
+        exit_view = self._exit_positions(df[sell_mask])
 
         self.df.loc[buy_mask, "holdings"] += df.loc[buy_mask, "size"]
         self.df.loc[buy_mask, "position_counts"] += np.sign(df.loc[buy_mask, "size"])
@@ -269,3 +308,9 @@ class PositionManager:
         Calculate the net asset value (NAV) of the portfolio.
         """
         return (self.df["holdings"] * prices).sum()
+
+    def net_value(self) -> float:
+        """
+        Calculate the net value of the portfolio.
+        """
+        return 0.0

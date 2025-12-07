@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from trading.cli.alg.config import PortfolioConfig, ProjectPath, TradeMode
+from trading.cli.alg.config import PortfolioConfig, ProjectPath
 
 
 class BrokerType(str, Enum):
@@ -11,6 +11,7 @@ class BrokerType(str, Enum):
     """
 
     ALPACA = "alpaca"
+    LOCAL = "local"
 
 
 class RRTradeConfig(BaseModel):
@@ -25,7 +26,7 @@ class RRTradeConfig(BaseModel):
         default_factory=ProjectPath, description="Path to the trained model."
     )
     broker: BrokerType = Field(
-        BrokerType.ALPACA, description="Broker to use for trading."
+        BrokerType.LOCAL, description="Broker to use for trading."
     )
     broker_kwargs: dict = Field(
         default_factory=dict, description="Additional broker-specific arguments."

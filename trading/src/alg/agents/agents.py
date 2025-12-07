@@ -118,7 +118,6 @@ class Agent:
         return self.model.predict(obs, self.config.deterministic)
 
     def save(self, path: Optional[str] = None):
-
         # Determine save path
         save_zip_path = Path(path if path else str(self.config.save_path))
         save_dir = save_zip_path.with_suffix("")

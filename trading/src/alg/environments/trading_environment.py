@@ -1,13 +1,11 @@
 import logging
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import gymnasium as gym
 import numpy as np
 import pandas as pd
-import vectorbt as vbt
 from alpaca.data.timeframe import TimeFrameUnit
 from gymnasium import spaces
-from stable_baselines3.common.vec_env import VecNormalize
 
 from trading.cli.alg.config import StockEnv, TradeMode
 from trading.src.alg.environments.reward_functions.reward_function_factory import (
@@ -120,10 +118,13 @@ class TradingEnv(gym.Env):
 
     @classmethod
     def observation(
-        cls, df: pd.DataFrame, pf: Portfolio, feature_cols: list, prices: np.ndarray
+        cls,
+        df: pd.DataFrame,
+        portfolio_state: np.ndarray,
+        feature_cols: list,
+        prices: np.ndarray,
     ) -> np.ndarray:
         indicators = df[feature_cols].to_numpy().flatten()
-        portfolio_state = np.asarray(pf.state())
         logging.debug(
             "Portfolio state: %s\nPrices: %s\nIndicators: %s",
             portfolio_state.shape,
@@ -149,7 +150,9 @@ class TradingEnv(gym.Env):
         ]
         prices = self.data.loc[[self.observation_timestamp[i]]]["price"].to_numpy()
 
-        return self.observation(df, self.pf, self.feature_cols, prices)
+        return self.observation(
+            df, np.asarray(self.pf.state()), self.feature_cols, prices
+        )
 
     def render(self):
         return "Day: {}\nSlice: {}\nTickers: {}, Observation Space: {}, Action Space: {}, Features: {}, Reward Function: {}, {}".format(

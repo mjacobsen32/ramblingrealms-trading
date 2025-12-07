@@ -1,9 +1,7 @@
-import json
 import logging
 from pathlib import Path
 
 import typer
-from rich import print as rprint
 from typing_extensions import Annotated
 
 from trading.cli.alg.config import ProjectPath, RRConfig
