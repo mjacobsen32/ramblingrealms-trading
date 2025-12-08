@@ -7,3 +7,7 @@
 ## Documentation
 
 Read the full documentation on [Read the Docs](https://ramblingrealms-trading.readthedocs.io/en/latest/)
+
+## Circular import
+
+- agents -> trading env -> rewards -> portfolio -> trade_api -> agents

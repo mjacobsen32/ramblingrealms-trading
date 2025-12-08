@@ -1,5 +1,5 @@
 {
-    "lookback_window": 30,
+    "lookback_window": 10,
     "reward_config":{
         "type": "sharpe_ratio",
         "reward_scaling": 1e6,

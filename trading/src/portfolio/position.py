@@ -146,39 +146,6 @@ class Position(np.ndarray):
         )
 
 
-class LivePositionManager:
-    def __init__(
-        self,
-        symbols: list[str],
-        max_lots: int | None = None,
-        trading_client: TradingClient | None = None,
-    ):
-        self.symbols = symbols
-        self.max_lots = max_lots
-        self.trading_client = trading_client
-        # self.df positions = trade_client.state(symbols=symbols)
-        # self.
-
-    def __getitem__(self, key):
-        """
-        Allow access to the internal DataFrame using the [] accessor.
-        """
-        return self.df[key]
-
-    def nav(self, prices: pd.Series) -> float:
-        """
-        Calculate the net asset value (NAV) of the portfolio.
-        """
-        return (self.df["holdings"] * prices).sum()
-
-    def net_value(self) -> float:
-        """
-        Calculate the net value of the portfolio.
-        """
-        return 0.0
-        # return self.cash + self.nav(prices=self.df["current_price"])
-
-
 class PositionManager:
     def __init__(
         self,
@@ -311,6 +278,37 @@ class PositionManager:
 
     def net_value(self) -> float:
         """
+        ! TODO implement this func I reckon
         Calculate the net value of the portfolio.
         """
         return 0.0
+
+
+class LivePositionManager(PositionManager):
+    """
+    Position Manager derived class for implementing wrapper functionality to the underlying logic of the PositionManager.
+    Additional logic to convert actual live portfolio positions into the PositionManager format, and thus perform that logic
+    on the live data. Additionally Position Manager can be derived to perform other wrapper functionality on the underlying
+    actions taken by the Position Manager logic.
+    """
+
+    def __init__(
+        self,
+        trading_client: TradingClient,
+        symbols: list[str],
+        max_lots: int | None = None,
+        maintain_history: bool = True,
+        initial_cash: float = 0,
+    ):
+        super().__init__(symbols, max_lots, maintain_history, initial_cash)
+        self.trading_client = trading_client
+
+    def reset(self):
+        raise NotImplementedError(
+            "LivePositionManager reset not implemented yet. And it will not be!"
+        )
+
+    def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+        df, profit = super().step(df)
+        df, profit = self.trading_client.execute_trades(df)
+        return df, profit

@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import tempfile
@@ -7,7 +8,7 @@ from typing import Optional
 
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC
 
-from trading.cli.alg.config import AgentConfig, ProjectPath
+from trading.cli.alg.config import AgentConfig, DataConfig, ProjectPath
 from trading.src.alg.agents.lr_schedule import BaseLRSchedule
 from trading.src.alg.environments.trading_environment import TradingEnv
 
@@ -20,7 +21,13 @@ class Agent:
     This class provides a common interface and basic functionality for all agents.
     """
 
-    def __init__(self, config: AgentConfig, env: TradingEnv, load: bool = False):
+    def __init__(
+        self,
+        config: AgentConfig,
+        env: TradingEnv,
+        data_config: DataConfig,
+        load: bool = False,
+    ):
         """
         Initializes the agent with the given configuration and environment.
         Args:
@@ -32,15 +39,17 @@ class Agent:
         self.meta_data: dict = {}
         self.env = env
         if load:
-            self.model, self.meta_data = Agent.load_agent(config, env)
+            self.model, self.meta_data = Agent.load_agent(config, self.env)
         else:
-            self.model = Agent.make_agent(config, env)
+            self.model = Agent.make_agent(config, self.env)
             self.meta_data = {
                 "type": config.algo,
                 "version": ProjectPath.VERSION,
                 "symbols": self.env.symbols,
                 "features": [f.model_dump(mode="json") for f in self.env.features],
                 "env_config": self.env.cfg.model_dump(mode="json"),
+                "data_config": data_config.model_dump(mode="json"),
+                "created_at": str(datetime.datetime.now()),
             }
 
     @classmethod

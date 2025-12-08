@@ -10,7 +10,7 @@ from trading.cli.alg import alg
 from trading.cli.data import data
 from trading.cli.trading.trade_config import RRTradeConfig
 from trading.cli.utils import init_logger
-from trading.src.trade.trade_clients import Trade
+from trading.src.trade.trade_api import Trade
 from trading.src.user_cache.user_cache import UserCache as User
 from trading.src.utility.utils import read_key
 
@@ -109,8 +109,15 @@ def paper_trade(
     with Path.open(Path(config)) as f:
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
-    trade = Trade.from_config(rr_trade_config, live=False)
-    trade.run_model()
+    trade_client = Trade(rr_trade_config, live=False)
+    trade_client.run_model()
+    # model, meta_data = alg.Agent.load_agent(
+    #     config=rr_trade_config.model_path.as_path(), env=None
+    # )
+    # logging.info(meta_data)
+    # observation: np.ndarray = np.ndarray([716])  # Dummy observation for example
+    # logging.info(model.predict(observation=observation))
+    # trade.run_model()
 
 
 @app.command(help="Run model on live trading Alpaca Account")
@@ -137,8 +144,8 @@ def live_trade(
     with Path.open(Path(config)) as f:
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
-    trade = Trade.from_config(rr_trade_config, live=True)
-    trade.run_model()
+    trade_client = Trade.from_config(rr_trade_config, live=True)
+    # trade.run_model()
 
 
 if __name__ == "__main__":

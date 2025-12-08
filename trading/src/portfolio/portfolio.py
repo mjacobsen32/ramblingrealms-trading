@@ -9,8 +9,7 @@ from plotly import io as pio
 from vectorbt import _typing as tp
 
 from trading.cli.alg.config import PortfolioConfig, ProjectPath, TradeMode
-from trading.src.portfolio.position import LivePositionManager, PositionManager
-from trading.src.trade.trade_clients import TradingClient
+from trading.src.portfolio.position import PositionManager
 from trading.src.utility.utils import time_frame_unit_to_pd_timedelta
 
 
@@ -23,40 +22,21 @@ class Portfolio:
     def __init__(
         self,
         cfg: PortfolioConfig,
+        position_manager: PositionManager,
         symbols: list[str],
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
-        trading_client: TradingClient | None = None,
     ):
         """
         Initialize the Portfolio
         """
         self.cfg = cfg
         self.vbt_pf: vbt.Portfolio | None = None
+        self.position_manager = position_manager
         self.symbols = symbols
-        if trading_client is None:
-            self._positions = PositionManager(
-                symbols=symbols,
-                max_lots=(
-                    None
-                    if cfg.trade_mode == TradeMode.CONTINUOUS
-                    else cfg.max_positions
-                ),
-                maintain_history=cfg.maintain_history,
-                initial_cash=cfg.initial_cash,
-            )
-        else:
-            self._positions = LivePositionManager(
-                symbols=symbols,
-                max_lots=(
-                    None
-                    if cfg.trade_mode == TradeMode.CONTINUOUS
-                    else cfg.max_positions
-                ),
-                trading_client=trading_client,
-            )
-
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
         self.persistent_df: pd.DataFrame | None = None
+        self.cash = cfg.initial_cash
+        self.initial_cash = cfg.initial_cash
 
     def as_vbt_pf(self, df: pd.DataFrame | None = None) -> vbt.Portfolio:
         """
@@ -93,13 +73,13 @@ class Portfolio:
         Returns:
             pd.Series: [internal_cash, positions].
         """
-        return np.concatenate([[self.cash], self._positions["holdings"]])
+        return np.concatenate([[self.cash], self.position_manager["holdings"]])
 
     def net_value(self) -> float:
         """
         Calculate the net value of the portfolio.
         """
-        return self._positions.net_value
+        return self.position_manager.net_value()
 
     def enforce_trade_rules(
         self,
@@ -119,7 +99,7 @@ class Portfolio:
             No short selling / no negative positions allowed (yet)
         """
 
-        positions = self._positions["holdings"]
+        positions = self.position_manager["holdings"]
         if trade_mode == TradeMode.CONTINUOUS:
             # Sell proportionally based on signal strength
             df.loc[sell_mask, "size"] = np.clip(
@@ -133,7 +113,7 @@ class Portfolio:
             Scale the actions to the portfolio value
         """
 
-        buy_limit = self.cfg.trade_limit_percent * self.net_value
+        buy_limit = self.cfg.trade_limit_percent * self._net_value
 
         buy_values = df.loc[buy_mask, "size"] * prices[buy_mask]
 
@@ -176,7 +156,7 @@ class Portfolio:
 
         # Calculate max shares allowed by hmax and trade_limit
         max_trade_value = min(
-            self.cfg.hmax, self.cfg.trade_limit_percent * self.net_value
+            self.cfg.hmax, self.cfg.trade_limit_percent * self._net_value
         )
         max_shares = max_trade_value // prices
 
@@ -203,10 +183,10 @@ class Portfolio:
         @TODO clean up and make more efficient
         """
         # Reduce df to a single datetime index (symbols only)
-        df, step_profit = self._positions.step(df)
+        df, step_profit = self.position_manager.step(df)
 
         self.cash = self.cash - (df["size"] * df["price"]).sum()
-        self.net_value = self.cash + self._positions.nav(df["price"])
+        self._net_value = self.cash + self.position_manager.nav(df["price"])
 
         logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
 
@@ -268,10 +248,10 @@ class Portfolio:
         Reset the portfolio to an empty state.
         """
         self.initial_cash = self.initial_cash
-        self.net_value = self.initial_cash
+        self._net_value = self.initial_cash
         self.cash = self.initial_cash
         self.vbt_pf = None
-        self._positions.reset()
+        self.position_manager.reset()
         logging.debug("Portfolio has been reset.\n%s", self)
 
     def set_vbt(self, pf: vbt.Portfolio):
@@ -383,13 +363,13 @@ class Portfolio:
         """
         String representation of the Portfolio.
         """
-        return f"Portfolio(initial_cash={self.initial_cash}, total_value={self.net_value}, cash={self.cash}, nav={self._positions.nav()})"
+        return f"Portfolio(initial_cash={self.initial_cash}, total_value={self._net_value}, cash={self.cash})"
 
     def get_positions(self) -> PositionManager:
         """
         Return the current positions in the portfolio.
         """
-        return self._positions
+        return self.position_manager
 
     def analysis(self, analysis_config, df: pd.DataFrame | None = None):
         logging.info(f"\nStats:\n{self.stats()}")

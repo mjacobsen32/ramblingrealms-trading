@@ -1,9 +1,8 @@
 import logging
-import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Self, Union
+from typing import Any, ClassVar, Dict, List, Union
 
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
@@ -182,12 +181,18 @@ class TradeMode(str, Enum):
 
 class PortfolioConfig(BaseModel):
     initial_cash: int = Field(100_000, description="Starting funds in state space")
+    maintain_history: bool = Field(
+        True, description="Whether to maintain a history of past actions and states"
+    )
     buy_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
     sell_cost_pct: Union[float, List[float]] = Field(
-        0.00, description="Corresponding cost for all assets or array per symbol"
+        default=0.00,
+        description="Corresponding cost for all assets or array per symbol",
     )
+
+    # ! THESE ARE PSUEDO-MODEL-HYPERPARAMETERS, THEY MUST BE MAINTAINED ACCROSS TRAINING, TESTING, AND PRODUCTION ENVIRONMENTS
     max_positions: int | None = Field(
         None,
         description="Maximum number of open positions per asset at any time. If None, no limit is applied. Does not apply to Continuous action space",
@@ -208,12 +213,10 @@ class PortfolioConfig(BaseModel):
         0.1,
         description="Minimum action value to trigger a trade, used to avoid noise in continuous actions",
     )
-    maintain_history: bool = Field(
-        True, description="Whether to maintain a history of past actions and states"
-    )
     max_exposure: float = Field(
         1.0, description="Maximum exposure across the entire portfolio"
     )
+    # ! THESE ARE PSUEDO-MODEL-HYPERPARAMETERS, THEY MUST BE MAINTAINED ACCROSS TRAINING, TESTING, AND PRODUCTION ENVIRONMENTS
 
 
 class StockEnv(BaseModel):
@@ -373,7 +376,7 @@ class RRConfig(BaseModel):
                 return string_map[str(info.field_name)].model_validate_json(
                     value.as_path().read_text()
                 )
-        except ValidationError as e_one:
+        except ValidationError:
             if isinstance(value, BaseModel):
                 try:
                     return string_map[str(info.field_name)].model_validate(value)

@@ -13,7 +13,7 @@ from trading.src.alg.environments.reward_functions.reward_function_factory impor
 )
 from trading.src.features import utils as feature_utils
 from trading.src.features.generic_features import Feature
-from trading.src.portfolio.portfolio import Portfolio
+from trading.src.portfolio.portfolio import Portfolio, PositionManager
 
 
 class TradingEnv(gym.Env):
@@ -33,11 +33,22 @@ class TradingEnv(gym.Env):
         self.features = features
         self.feature_cols = feature_utils.get_feature_cols(features=self.features)
         self.init_data(data)
-        self.cfg = cfg
+        self.cfg: StockEnv = cfg
+        position_manager = PositionManager(
+            symbols=self.symbols,
+            max_lots=(
+                None
+                if cfg.portfolio_config.trade_mode == TradeMode.CONTINUOUS
+                else cfg.portfolio_config.max_positions
+            ),
+            maintain_history=cfg.portfolio_config.maintain_history,
+            initial_cash=cfg.portfolio_config.initial_cash,
+        )
         self.pf: Portfolio = Portfolio(
             cfg=cfg.portfolio_config,
             symbols=data.index.get_level_values("symbol").unique(),
             time_step=time_step,
+            position_manager=position_manager,
         )
         self.reward_function = reward_factory_method(cfg.reward_config, self.pf.state())
         self.observation_index = self.cfg.lookback_window
@@ -211,7 +222,7 @@ class TradingEnv(gym.Env):
 
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "cum_returns"
-        ] = (self.pf.total_value - self.pf.initial_cash) / self.pf.initial_cash
+        ] = (self.pf.net_value() - self.pf.initial_cash) / self.pf.initial_cash
 
         ret_info = {
             "net_value": self.pf.net_value(),

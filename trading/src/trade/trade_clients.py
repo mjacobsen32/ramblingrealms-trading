@@ -13,6 +13,8 @@ class TradingClient:
     def from_config(cls, config: RRTradeConfig, live: bool = False) -> "TradingClient":
         if config.broker == BrokerType.ALPACA:
             return AlpacaClient(live)
+        elif config.broker == BrokerType.LOCAL:
+            return LocalTradingClient()
         else:
             raise ValueError(f"Unsupported broker type: {config.broker}")
 
@@ -22,11 +24,26 @@ class TradingClient:
     def get_account(self):
         raise NotImplementedError("This method should be implemented in a subclass.")
 
-    def execute_trades(self, actions: pd.DataFrame):
+    def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
         raise NotImplementedError("This method should be implemented in a subclass.")
 
     def state(self, symbols: list[str]) -> np.ndarray:
         raise NotImplementedError("This method should be implemented in a subclass.")
+
+
+class LocalTradingClient(TradingClient):
+    def __init__(self):
+        super().__init__(live=False)
+        logging.info("Initialized Local Trading Client")
+
+    def get_account(self):
+        return {"balance": 1_000_000.0}
+
+    def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+        return actions, 0.0
+
+    def state(self, symbols: list[str]) -> np.ndarray:
+        return np.zeros(len(symbols))
 
 
 class AlpacaClient(TradingClient):
@@ -35,13 +52,11 @@ class AlpacaClient(TradingClient):
         if live:
             self.alpaca_api_key = user_cache.alpaca_api_secret_live
             self.alpaca_api_secret = user_cache.alpaca_api_key_live
-            self.BASE_URL = "https://api.alpaca.markets/v2"
         elif not live:
             self.alpaca_api_key = user_cache.alpaca_api_key
             self.alpaca_api_secret = user_cache.alpaca_api_secret
-            self.BASE_URL = "https://paper-api.alpaca.markets/v2"
 
-        self.client = AlpacaTradingClient(
+        self.client: AlpacaTradingClient = AlpacaTradingClient(
             self.alpaca_api_key.get_secret_value(),
             self.alpaca_api_secret.get_secret_value(),
             paper=not live,
@@ -55,11 +70,11 @@ class AlpacaClient(TradingClient):
     def get_account(self):
         return self.account_details
 
-    def execute_trades(self, actions: pd.DataFrame):
-        pass
+    def get_clock(self):
+        return self.client.get_clock()
 
-    def state(self, symbols: list[str]) -> np.ndarray:
-        positions_dict = {
-            p.symbol: float(p.qty) for p in self.client.get_all_positions()
-        }
-        return np.array([positions_dict.get(symbol, 0.0) for symbol in symbols])
+    def get_calendar(self):
+        return self.client.get_calendar()
+
+    def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+        logging.info("Executing trades via Alpaca")

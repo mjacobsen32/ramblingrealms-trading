@@ -10,8 +10,8 @@ class BrokerType(str, Enum):
     Enum for broker types.
     """
 
-    ALPACA = "alpaca"
-    LOCAL = "local"
+    ALPACA = "ALPACA"
+    LOCAL = "LOCAL"
 
 
 class RRTradeConfig(BaseModel):

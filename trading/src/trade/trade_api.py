@@ -1,20 +1,22 @@
 import logging
 
+import numpy as np
+from alpaca.data.historical.stock import StockHistoricalDataClient
+from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrameUnit
 
-from trading.cli.trading.trade_config import BrokerType, PortfolioConfig, RRTradeConfig
+from trading.cli.alg.config import DataConfig, DataRequests, FeatureConfig
+from trading.cli.trading.trade_config import PortfolioConfig, RRTradeConfig
 from trading.src.alg.agents.agents import Agent
-from trading.src.alg.data_process.data_loader import (
-    DataLoader,
-    StockHistoricalDataClient,
-)
+from trading.src.alg.data_process.data_loader import DataLoader, DataSourceType
 from trading.src.alg.environments.trading_environment import TradingEnv
-from trading.src.features.utils import get_feature_cols
+from trading.src.features.utils import get_feature_cols, min_window_size
 from trading.src.portfolio.portfolio import (
     Portfolio,
-    ProjectPath,
-    TradingClient,
+    TradeMode,
 )
+from trading.src.portfolio.position import LivePositionManager
+from trading.src.trade.trade_clients import TradingClient
 from trading.src.user_cache.user_cache import UserCache
 
 
@@ -24,26 +26,17 @@ class Trade:
 
         self.model, self.meta_data = Agent.load_agent(config.model_path.as_path(), None)
         self.active_symbols = self.meta_data.get("symbols", [])
-        self.active_features = self.meta_data.get("features", [])
-
-        portfolio_config = (
-            PortfolioConfig(**self.meta_data["env_config"]["portfolio_config"])
-            if config.portfolio_config is None
-            else config.portfolio_config
+        logging.info("meta_data: %s", self.meta_data)
+        self.active_features = FeatureConfig.parse_features(self.meta_data).get(
+            "features", []
+        )
+        self.env_config = self.meta_data.get("env_config", {})
+        logging.info("Active features: %s", self.active_features)
+        self.portfolio_config = PortfolioConfig(
+            **self.env_config.get("portfolio_config", {})
         )
 
-        # TODO infer time_step
-        self.pf = Portfolio(
-            portfolio_config, self.active_symbols, (TimeFrameUnit.Day, 1)
-        )
-
-        logging.info(
-            "Loaded model type: '%s' version: '%s'\nSymbols: %s\nFeatures: %s",
-            self.meta_data.get("type", "Unknown"),
-            self.meta_data.get("version", "Unknown"),
-            self.active_symbols,
-            self.active_features,
-        )
+        self.data_config = DataConfig.model_validate(self.meta_data["data_config"])
 
         self.live = live
         self.trading_client = TradingClient.from_config(config, live)
@@ -52,35 +45,53 @@ class Trade:
         alpaca_api_key = user_cache.alpaca_api_key
         alpaca_api_secret = user_cache.alpaca_api_secret
 
-        # Required for market calendar data
-        self.trading_client = TradingClient.from_config(config, live)
-
         self.market_data_client = StockHistoricalDataClient(
             alpaca_api_key.get_secret_value(), alpaca_api_secret.get_secret_value()
         )
 
-    @classmethod
-    def from_config(cls, config: RRTradeConfig, live: bool = False) -> "Trade":
-        if config.broker == BrokerType.ALPACA:
-            return AlpacaTrade(config, live)
-        elif config.broker == BrokerType.LOCAL:
-            return LocalTrade(config, live)
-        else:
-            raise ValueError(f"Unsupported broker type: {config.broker}")
+        position_manager = LivePositionManager(
+            trading_client=self.trading_client,
+            symbols=self.active_symbols,
+            max_lots=(
+                None
+                if self.portfolio_config.trade_mode == TradeMode.CONTINUOUS
+                else self.portfolio_config.max_positions
+            ),
+            maintain_history=False,
+        )
+        # TODO infer time_step
+        self.pf = Portfolio(
+            self.portfolio_config,
+            position_manager,
+            self.active_symbols,
+            (TimeFrameUnit.Day, 1),
+        )
+
+        logging.info(
+            "Loaded model type: '%s' version: '%s'\nPortfolio Config: %s\nEnv Config: %s\nSymbols: %s\nFeatures: %s",
+            self.meta_data.get("type", "Unknown"),
+            self.meta_data.get("version", "Unknown"),
+            self.portfolio_config,
+            self.env_config,
+            self.active_symbols,
+            self.active_features,
+        )
 
     def _load_data(self):
-        clock = self.market_data_client.get_clock()
-        calendar = self.market_data_client.get_calendar()
+        clock = self.trading_client.get_clock()
+        calendar = self.trading_client.get_calendar()
+        min_window = min_window_size(self.active_features) + 1
+        logging.info("Determined min window size from features: %d", min_window)
         window = [entry for entry in calendar if entry.date < clock.next_open.date()][
-            -self.meta_data["env_config"]["lookback_window"] :
+            -(min_window):
         ]
         start, end = window[0], window[-1]
-        logging.info("Loading data for model trade: [%s, %s]", start, end)
+        logging.info("Loading data for model trade: [%s, %s]", start.date, end.date)
 
         requests = [
             DataRequests(
                 dataset_name="live",
-                source=DataRequests.Source.Alpaca,
+                source=DataSourceType.ALPACA,
                 endpoint="StockBarsRequest",
                 kwargs={
                     "symbol_or_symbols": self.active_symbols,
@@ -90,47 +101,54 @@ class Trade:
         ]
 
         # TODO infer timeframe and period
-        data_config = DataConfig(
-            start_date=str(start),
-            end_date=str(end),
-            time_step_unit=TimeFrameUnit.Day,
-            time_step_period=1,
-            cache_path=ProjectPath(),
-            cache_enabled=False,
-            requests=requests,
-            validation_split=0.0,
-        )
+        data_config = self.data_config
+        data_config.start_date = str(start.date)
+        data_config.end_date = str(end.date)
+        data_config.requests = requests
+
+        logging.debug("Data Config: %s", data_config.model_dump_json(indent=4))
 
         feature_config = FeatureConfig(
             features=self.meta_data["features"], fill_strategy="interpolate"
         )
-
         return DataLoader(
             data_config=data_config, feature_config=feature_config, fetch_data=True
         )
 
     def get_prices(self) -> np.ndarray:
         req = StockLatestTradeRequest(symbol_or_symbols=self.active_symbols)
-        latest = self.alpaca_history_client.get_stock_latest_trade(req)
+        latest = self.market_data_client.get_stock_latest_trade(req)
         prices = [trade.price for trade in latest.values()]
         return np.array(prices)
 
     def run_model(self):
         self.data_loader = self._load_data()
         prices = self.get_prices()
+        logging.debug("Latest prices: %s", prices)
+        logging.debug("df head:\n%s", self.data_loader.df.tail())
+        logging.debug("portfolio_state:\n%s", self.pf.state())
+        logging.debug("feature columns: %s", get_feature_cols(self.active_features))
         obs = TradingEnv.observation(
-            self.data_loader.df,
-            self.trading_client.state(self.active_symbols),
+            self.data_loader.df[-(self.env_config.get("lookback_window") + 1) :],
+            self.pf.state(),
             get_feature_cols(self.active_features),
             prices,
         )
-        actions, _states = self.model.predict(obs)
 
-        data = self.data_loader.df.copy()
-        # TODO move to data_loader
-        data.loc[:, "action"] = actions
-        data.loc[:, "price"] = prices
-        data.loc[:, "size"] = 0.0
+        logging.debug("Observation: %s", obs)
+        logging.debug("Observation shape: %s", obs.shape)
+        actions, _states = self.model.predict(obs)
+        logging.info(actions)
+        # data = self.data_loader.df.copy()
+        # logging.debug("data: %s", data.tail())
+        exit(0)
+        # data["size"] = 0.0
+        # data["price"] = 0.0
+        # data["action"] = 0.0
+        # # TODO move to data_loader
+        # data.loc[:, "action"] = actions
+        # data.loc[:, "price"] = prices
+        # data.loc[:, "size"] = 0.0
 
         self.pf.step(data, True)
         self.trading_client.execute_trades(data.loc[:, ["size", "price"]])

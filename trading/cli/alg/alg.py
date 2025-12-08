@@ -63,7 +63,7 @@ def train(
 
     logging.info("Environment Initialized.")
 
-    model = Agent(alg_config.agent_config, trade_env)
+    model = Agent(alg_config.agent_config, trade_env, alg_config.data_config)
     model.learn()
 
     if not dry_run:
@@ -116,7 +116,7 @@ def backtest(
     trade_env.reset()
 
     logging.info("Environment Initialized.")
-    model = Agent(config=alg_config.agent_config, env=trade_env, load=True)
+    model = Agent(config=alg_config, load=True)
 
     bt = BackTesting(
         model=model,
