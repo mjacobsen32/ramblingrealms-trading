@@ -78,3 +78,4 @@ class AlpacaClient(TradingClient):
 
     def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
         logging.info("Executing trades via Alpaca")
+        return actions, 0.0

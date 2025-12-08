@@ -250,22 +250,42 @@ class PositionManager:
         Step through the position manager.
         Return a set indicating if a position was exited and the profit from that position.
         """
-        buy_mask = (df["size"] > 0) & (
-            (self.max_lots is None) or (self.df["position_counts"] < self.max_lots)
-        )
+        # Build a mask for buys that respects the max_lots limit and aligns indices to the incoming df
+        if self.max_lots is None:
+            lot_limit_mask = pd.Series(True, index=df.index)
+        else:
+            lot_limit_mask = (
+                self.df["position_counts"].reindex(df.index).fillna(0) < self.max_lots
+            )
+
+        buy_mask = (df["size"] > 0) & lot_limit_mask
         self._append(df[buy_mask])
 
-        sell_mask = (df["size"] < 0) & (self.df["holdings"] > 0)
+        # Build a mask for sells and align holdings to the incoming df's index
+        sell_mask = (df["size"] < 0) & (
+            self.df["holdings"].reindex(df.index).fillna(0) > 0
+        )
         exit_view = self._exit_positions(df[sell_mask])
 
-        self.df.loc[buy_mask, "holdings"] += df.loc[buy_mask, "size"]
-        self.df.loc[buy_mask, "position_counts"] += np.sign(df.loc[buy_mask, "size"])
+        # Use explicit symbol indexes for self.df updates to avoid misaligned boolean indexing
+        buy_symbols = df.index[buy_mask]
+        sell_symbols = df.index[sell_mask]
 
-        self.df.loc[sell_mask, "holdings"] += exit_view["size"]
-        self.df.loc[sell_mask, "position_counts"] += np.sign(exit_view["size"])
-        self.df.loc[sell_mask, "rolling_profit"] += exit_view["profit"]
+        self.df.loc[buy_symbols, "holdings"] += df.loc[buy_symbols, "size"]
+        self.df.loc[buy_symbols, "position_counts"] += np.sign(
+            df.loc[buy_symbols, "size"]
+        )
 
-        df.loc[sell_mask, "size"] = exit_view["size"]
+        self.df.loc[sell_symbols, "holdings"] += exit_view.loc[sell_symbols, "size"]
+        self.df.loc[sell_symbols, "position_counts"] += np.sign(
+            exit_view.loc[sell_symbols, "size"]
+        )
+        self.df.loc[sell_symbols, "rolling_profit"] += exit_view.loc[
+            sell_symbols, "profit"
+        ]
+
+        df.loc[sell_symbols, "size"] = exit_view.loc[sell_symbols, "size"]
+
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
 
         return df, exit_view["profit"].sum()
@@ -274,7 +294,10 @@ class PositionManager:
         """
         Calculate the net asset value (NAV) of the portfolio.
         """
-        return (self.df["holdings"] * prices).sum()
+        # Reindex the prices against the positions index to ensure alignment by values
+        # (avoid joining on index names which can raise "cannot join with no overlapping index names").
+        prices_aligned = prices.reindex(self.df.index).fillna(0.0)
+        return (self.df["holdings"] * prices_aligned).sum()
 
     def net_value(self) -> float:
         """

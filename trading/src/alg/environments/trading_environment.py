@@ -16,6 +16,7 @@ from trading.src.features.generic_features import Feature
 from trading.src.portfolio.portfolio import Portfolio, PositionManager
 
 
+# @TODO BASE ENVIRONMENT WHICH TRAINING AND TRADING ENVS INHERIT FROM
 class TradingEnv(gym.Env):
     """
     Trading environment for reinforcement learning agents.

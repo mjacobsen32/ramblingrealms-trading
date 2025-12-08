@@ -99,23 +99,33 @@ class Portfolio:
             No short selling / no negative positions allowed (yet)
         """
 
-        positions = self.position_manager["holdings"]
+        # Make sure we use numpy boolean arrays whenever we index numpy arrays
+        buy_mask_arr = buy_mask.to_numpy()
+        sell_mask_arr = sell_mask.to_numpy()
+
+        positions = np.asarray(self.position_manager["holdings"])
         if trade_mode == TradeMode.CONTINUOUS:
             # Sell proportionally based on signal strength
+            logging.info("sell_mask: %s", sell_mask)
+            logging.info("positions: %s", positions)
+            logging.info("df: %s", df)
+            logging.info("df before clip:\n%s", df.loc[sell_mask, "size"])
             df.loc[sell_mask, "size"] = np.clip(
-                df.loc[sell_mask, "size"], -positions[sell_mask], 0
+                df.loc[sell_mask, "size"].to_numpy(),
+                a_min=-positions[sell_mask_arr],
+                a_max=0,
             )
         elif trade_mode == TradeMode.DISCRETE:
             # Sell entire position if sell action is triggered
-            df.loc[sell_mask, "size"] = -positions[sell_mask]
+            df.loc[sell_mask, "size"] = -positions[sell_mask_arr]
 
         """
             Scale the actions to the portfolio value
         """
 
-        buy_limit = self.cfg.trade_limit_percent * self._net_value
+        buy_limit = self.cfg.trade_limit_percent * self.net_value()
 
-        buy_values = df.loc[buy_mask, "size"] * prices[buy_mask]
+        buy_values = df.loc[buy_mask, "size"].to_numpy() * prices[buy_mask_arr]
 
         # Cap each trade at buy_limit
         capped_values = np.minimum(buy_values, buy_limit)
@@ -123,17 +133,21 @@ class Portfolio:
         attempted_buy = capped_values.sum()
 
         if attempted_buy > self.cash:
-            buy_limit = min(buy_limit, self.cash // len(buy_mask))
+            # use the number of buys not the length of the series to avoid division by zero/miscount
+            num_buys = int(buy_mask.sum())
+            buy_limit = min(buy_limit, self.cash // max(num_buys, 1))
 
         logging.debug("Buy Limit dollar amount: %s", buy_limit)
 
         # Calculate the maximum shares allowed by hmax and buy_limit for each buy
-        max_shares_hmax = self.cfg.hmax // prices[buy_mask]
-        max_shares_buy_limit = buy_limit // prices[buy_mask]
+        max_shares_hmax = self.cfg.hmax // prices[buy_mask_arr]
+        max_shares_buy_limit = buy_limit // prices[buy_mask_arr]
         max_shares = np.minimum(max_shares_hmax, max_shares_buy_limit)
 
         # Clip the size to not exceed the minimum of both limits
-        df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
+        df.loc[buy_mask, "size"] = np.clip(
+            df.loc[buy_mask, "size"].to_numpy(), 0, max_shares
+        )
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
         logging.debug("Scaled Sizes: %s", df["size"])
 
@@ -156,7 +170,7 @@ class Portfolio:
 
         # Calculate max shares allowed by hmax and trade_limit
         max_trade_value = min(
-            self.cfg.hmax, self.cfg.trade_limit_percent * self._net_value
+            self.cfg.hmax, self.cfg.trade_limit_percent * self.net_value()
         )
         max_shares = max_trade_value // prices
 

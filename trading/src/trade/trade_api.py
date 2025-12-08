@@ -124,13 +124,14 @@ class Trade:
     def run_model(self):
         self.data_loader = self._load_data()
         self.data_loader.to_csv("live_data.csv")
+        df = self.data_loader.df
         prices = self.get_prices()
         logging.debug("Latest prices: %s", prices)
         logging.debug("df head:\n%s", self.data_loader.df.tail())
         logging.debug("portfolio_state:\n%s", self.pf.state())
         logging.debug("feature columns: %s", get_feature_cols(self.active_features))
         obs = TradingEnv.observation(
-            self.data_loader.df[-(self.env_config.get("lookback_window") + 1) :],
+            df[-(self.env_config.get("lookback_window") + 1) :],
             self.pf.state(),
             get_feature_cols(self.active_features),
             prices,
@@ -139,18 +140,15 @@ class Trade:
         logging.info("Observation: %s", obs)
         logging.debug("Observation shape: %s", obs.shape)
         actions, _states = self.model.predict(obs)
-        logging.info(actions)
-        logging.info(_states)
-        # data = self.data_loader.df.copy()
-        # logging.debug("data: %s", data.tail())
-        exit(0)
-        # data["size"] = 0.0
-        # data["price"] = 0.0
-        # data["action"] = 0.0
-        # # TODO move to data_loader
-        # data.loc[:, "action"] = actions
-        # data.loc[:, "price"] = prices
-        # data.loc[:, "size"] = 0.0
-
-        self.pf.step(data, True)
-        self.trading_client.execute_trades(data.loc[:, ["size", "price"]])
+        logging.info("Actions: %s", actions)
+        logging.info("States: %s", _states)
+        logging.debug("data: %s", df.tail())
+        df["size"] = 1.0
+        df["profit"] = 0.0
+        df["price"] = 1.0
+        df["action"] = 1.0
+        current_slice = df.iloc[[-1]]
+        current_slice.loc[:, "action"] = actions
+        ret = self.pf.step(current_slice, True)
+        logging.info("Scaled actions: %s", ret["scaled_actions"])
+        logging.info("Profit: %s", ret["profit"])
