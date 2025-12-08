@@ -24,8 +24,8 @@ class Portfolio:
     def __init__(
         self,
         cfg: PortfolioConfig,
-        position_manager: PositionManager,
         symbols: list[str],
+        position_manager: PositionManager | None = None,
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
     ):
         """
@@ -37,6 +37,16 @@ class Portfolio:
         self.cash = cfg.initial_cash
         self.nav: float = 0.0
         self.vbt_pf: vbt.Portfolio | None = None
+        if position_manager is None:
+            # Create a default PositionManager for caller provided symbols.
+            from trading.src.portfolio.position import PositionManager
+
+            position_manager = PositionManager(
+                symbols=symbols,
+                max_lots=cfg.max_positions,
+                maintain_history=cfg.maintain_history,
+                initial_cash=cfg.initial_cash,
+            )
         self.position_manager = position_manager
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
         self.persistent_df: pd.DataFrame | None = None
@@ -82,7 +92,26 @@ class Portfolio:
         """
         Calculate the net value of the portfolio.
         """
-        return self.position_manager.net_value()
+        # If we have a persistent df with prices, compute nav using the latest prices
+        try:
+            if self.persistent_df is not None and not self.persistent_df.empty:
+                # Last timestamp prices
+                latest = self.persistent_df.reset_index().drop_duplicates(
+                    "symbol", keep="last"
+                )
+                prices = latest.set_index("symbol")["price"]
+                nav = self.position_manager.nav(prices)
+            else:
+                nav = 0.0
+        except Exception:
+            # Fall back to zero nav if any issues
+            nav = 0.0
+        self._net_value = float(self.cash + nav)
+        return self._net_value
+
+    @property
+    def total_value(self) -> float:
+        return self._net_value
 
     def enforce_trade_rules(
         self,
@@ -167,11 +196,18 @@ class Portfolio:
         # Find actions above threshold
         above_thresh = df["action"].abs() > self.cfg.action_threshold
 
+        # Ensure prices is a numeric numpy array (convert from pd.Series if needed)
+        if isinstance(prices, pd.Series):
+            price_vals = prices.to_numpy().astype(np.float64)
+        else:
+            price_vals = np.asarray(prices).astype(np.float64)
+
         # Calculate max shares allowed by hmax and trade_limit
         max_trade_value = min(
             self.cfg.hmax, self.cfg.trade_limit_percent * self._net_value
         )
-        max_shares = max_trade_value // prices
+        # safe integer division to get maximum number of shares per symbol
+        max_shares = (max_trade_value // price_vals).astype(np.float64)
 
         # Vectorized, faster assignment using numpy
         size = np.zeros_like(df["action"].values, dtype=np.float64)

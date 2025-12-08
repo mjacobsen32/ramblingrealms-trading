@@ -32,7 +32,7 @@ class Agent:
         self,
         config: AgentConfig,
         env: TradingEnv,
-        data_config: DataConfig,
+        data_config: DataConfig | None = None,
         load: bool = False,
     ):
         """
@@ -46,6 +46,7 @@ class Agent:
         self.meta_data: dict = {}
         self.env: TradingEnv = env
         if load:
+            # When loading, we may not need a data_config; it's stored in meta_data
             self.model, self.meta_data = Agent.load_agent(config, self.env)
         else:
             self.model = Agent.make_agent(config=config, env=self.env)
@@ -55,7 +56,9 @@ class Agent:
                 "symbols": self.env.symbols,
                 "features": [f.model_dump(mode="json") for f in self.env.features],
                 "env_config": self.env.cfg.model_dump(mode="json"),
-                "data_config": data_config.model_dump(mode="json"),
+                "data_config": (
+                    data_config.model_dump(mode="json") if data_config else {}
+                ),
                 "created_at": str(datetime.datetime.now()),
             }
 

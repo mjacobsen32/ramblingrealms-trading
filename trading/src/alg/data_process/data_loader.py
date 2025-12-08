@@ -2,7 +2,6 @@ import logging
 import os
 from typing import ClassVar, Dict, Type
 
-import numpy as np
 import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
@@ -118,7 +117,7 @@ class AlpacaDataLoader(DataSource):
                 # Fallback: try to coerce the return to a DataFrame
                 try:
                     df = pd.concat([df, pd.DataFrame(bars)])
-                except Exception as e:
+                except Exception:
                     logging.error(
                         "Unknown bars return type from Alpaca client: %s", type(bars)
                     )
