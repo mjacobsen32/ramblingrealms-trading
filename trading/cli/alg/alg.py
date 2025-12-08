@@ -52,11 +52,9 @@ def train(
         data=data_loader.get_train_test()[0],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
-        time_step=tuple(
-            [
-                alg_config.data_config.time_step_unit,
-                alg_config.data_config.time_step_period,
-            ]
+        time_step=(
+            alg_config.data_config.time_step_unit,
+            alg_config.data_config.time_step_period,
         ),
     )
     trade_env.reset()
@@ -106,17 +104,20 @@ def backtest(
         data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
-        time_step=tuple(
-            [
-                alg_config.data_config.time_step_unit,
-                alg_config.data_config.time_step_period,
-            ]
+        time_step=(
+            alg_config.data_config.time_step_unit,
+            alg_config.data_config.time_step_period,
         ),
     )
     trade_env.reset()
 
     logging.info("Environment Initialized.")
-    model = Agent(config=alg_config.agent_config, env=trade_env, load=True)
+    model = Agent(
+        config=alg_config.agent_config,
+        env=trade_env,
+        data_config=alg_config.data_config,
+        load=True,
+    )
 
     bt = BackTesting(
         model=model,

@@ -108,7 +108,21 @@ class AlpacaDataLoader(DataSource):
                 end=pd.to_datetime(end_date),
                 **request.kwargs,
             )
-            df = pd.concat([df, client.get_stock_bars(request_params).df])
+            bars = client.get_stock_bars(request_params)
+            # `get_stock_bars` may return an object with a `.df` attribute or a dict
+            if hasattr(bars, "df"):
+                df = pd.concat([df, bars.df])
+            elif isinstance(bars, dict) and "df" in bars:
+                df = pd.concat([df, bars["df"]])
+            else:
+                # Fallback: try to coerce the return to a DataFrame
+                try:
+                    df = pd.concat([df, pd.DataFrame(bars)])
+                except Exception as e:
+                    logging.error(
+                        "Unknown bars return type from Alpaca client: %s", type(bars)
+                    )
+                    raise
             if cache_enabled:
                 df.to_parquet(cache_file)
         return df

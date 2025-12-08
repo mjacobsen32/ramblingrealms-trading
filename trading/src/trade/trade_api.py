@@ -27,9 +27,8 @@ class Trade:
         self.model, self.meta_data = Agent.load_agent(config.model_path.as_path(), None)
         self.active_symbols = self.meta_data.get("symbols", [])
         logging.info("meta_data: %s", self.meta_data)
-        self.active_features = FeatureConfig.parse_features(self.meta_data).get(
-            "features", []
-        )
+        feature_cfg = FeatureConfig.model_validate(self.meta_data)
+        self.active_features = getattr(feature_cfg, "features", [])
         logging.info("Active features: %s", self.active_features)
         self.env_config = self.meta_data.get("env_config", {})
         self.portfolio_config = PortfolioConfig(

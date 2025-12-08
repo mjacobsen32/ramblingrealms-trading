@@ -94,7 +94,7 @@ class FeatureConfig(BaseModel):
         return data
 
     features: List[Feature] = Field(
-        default_factory=List[Feature], description="List of feature names"
+        default_factory=list, description="List of feature names"
     )
     fill_strategy: str = Field(
         "mean",
@@ -113,7 +113,7 @@ class DataRequests(BaseModel):
     dataset_name: str = Field("Generic", description="Name of the dataset")
     source: DataSourceType = Field(..., description="DataSourceType Enum")
     endpoint: str = Field(..., description="Endpoint of API")
-    kwargs: Dict = Field(..., description="Kwargs to pass in to the endpoint")
+    kwargs: Dict[str, Any] = Field(..., description="Kwargs to pass in to the endpoint")
 
 
 class DataConfig(BaseModel):
@@ -125,12 +125,14 @@ class DataConfig(BaseModel):
         "2020-01-01", description="Start date for the data collection"
     )
     end_date: str = Field("2023-01-01", description="End date for the data collection")
-    time_step_unit: str = Field(TimeFrameUnit.Day, description="Time step of the data")
+    time_step_unit: TimeFrameUnit = Field(
+        TimeFrameUnit.Day, description="Time step of the data"
+    )
     time_step_period: int = Field(
         1, description="Period of the time step (e.g., 1 for daily, 5 for 5-minute)"
     )
     cache_path: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Path to cache the downloaded data",
     )
     cache_enabled: bool = Field(
@@ -143,7 +145,7 @@ class DataConfig(BaseModel):
 
     @field_validator("time_step_unit")
     @classmethod
-    def validate_time_step_unit(cls, value: str) -> TimeFrameUnit:
+    def validate_time_step_unit(cls, value: TimeFrameUnit | str) -> TimeFrameUnit:
         """
         Validate the time_step_unit field to ensure it is a valid TimeFrameUnit.
         """
@@ -225,10 +227,12 @@ class StockEnv(BaseModel):
         description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
     )
     reward_config: RewardConfig = Field(
-        default_factory=RewardConfig, description="Reward function configuration"
+        default_factory=lambda: RewardConfig.model_construct(),
+        description="Reward function configuration",
     )
     portfolio_config: PortfolioConfig = Field(
-        default_factory=PortfolioConfig, description="Portfolio configuration"
+        default_factory=lambda: PortfolioConfig.model_construct(),
+        description="Portfolio configuration",
     )
     lookback_window: int = Field(
         10, description="Number of past timesteps to consider for state representation"
@@ -244,7 +248,7 @@ class AgentConfig(BaseModel):
         "ppo", description="Algorithm to use (e.g., 'ppo', 'a2c', 'dqn', etc.)"
     )
     save_path: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Path to save the trained agent model",
     )
     deterministic: bool = Field(
@@ -279,11 +283,11 @@ class BackTestConfig(BaseModel):
         False, description="Whether to save the backtesting results"
     )
     backtest_dir: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Directory for storing backtest results",
     )
     analysis_config: AnalysisConfig = Field(
-        default_factory=AnalysisConfig,
+        default_factory=lambda: AnalysisConfig.model_construct(),
     )
 
     @field_validator(
@@ -300,7 +304,7 @@ class BackTestConfig(BaseModel):
         return ProjectPath.model_validate(p)
 
     results_path: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Path to save the backtesting results",
     )
 
@@ -313,21 +317,26 @@ class RRConfig(BaseModel):
     name: str = Field(..., description="Name of the algorithm")
     description: str = Field("", description="Description of the algorithm")
     version: str = Field(str(), description="Version of the algorithm")
-    out_dir: ProjectPath = Field(default_factory=ProjectPath)
-    agent_config: AgentConfig | ProjectPath = Field(
-        default_factory=AgentConfig, description="Agent configuration"
+    out_dir: ProjectPath = Field(default_factory=lambda: ProjectPath.model_construct())
+    agent_config: AgentConfig = Field(
+        default_factory=lambda: AgentConfig.model_construct(),
+        description="Agent configuration",
     )
-    data_config: DataConfig | ProjectPath = Field(
-        default_factory=DataConfig, description="Data configuration"
+    data_config: DataConfig = Field(
+        default_factory=lambda: DataConfig.model_construct(),
+        description="Data configuration",
     )
-    feature_config: FeatureConfig | ProjectPath = Field(
-        default_factory=FeatureConfig, description="Feature configuration"
+    feature_config: FeatureConfig = Field(
+        default_factory=lambda: FeatureConfig.model_construct(),
+        description="Feature configuration",
     )
-    stock_env: StockEnv | ProjectPath = Field(
-        default_factory=StockEnv, description="Stock Trading Environment Config"
+    stock_env: StockEnv = Field(
+        default_factory=lambda: StockEnv.model_construct(),
+        description="Stock Trading Environment Config",
     )
-    backtest_config: BackTestConfig | ProjectPath = Field(
-        default_factory=BackTestConfig, description="Backtesting configuration"
+    backtest_config: BackTestConfig = Field(
+        default_factory=lambda: BackTestConfig.model_construct(),
+        description="Backtesting configuration",
     )
 
     @field_validator(

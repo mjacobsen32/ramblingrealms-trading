@@ -1,5 +1,6 @@
 import logging
 from abc import ABC
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -65,6 +66,8 @@ class RemoteTradingClient(TradingClient):
 
 
 class AlpacaClient(TradingClient):
+    account_details: Any
+
     def __init__(self, live: bool = False):
         user_cache = UserCache().load()
         if live:
@@ -80,7 +83,7 @@ class AlpacaClient(TradingClient):
             paper=not live,
         )
 
-        self.account_details = self.client.get_account()
+        self.account_details: Any = self.client.get_account()
         logging.info(
             "Initialized Alpaca Client: %s", self.account_details.account_number
         )

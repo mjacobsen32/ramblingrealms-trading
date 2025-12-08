@@ -184,7 +184,7 @@ class Portfolio:
             ].astype(np.float64)
         elif trade_mode == TradeMode.CONTINUOUS:
             size[above_idx] = np.round(
-                actions[above_idx] * max_shares[above_thresh]
+                actions[above_idx] * max_shares[above_idx]
             ).astype(np.float64)
 
         df.loc[:, "size"] = size
@@ -234,7 +234,9 @@ class Portfolio:
         """
         pf = vbt.Portfolio.load(str(file_path))
         logging.info("Loaded VectorBT results from %s", file_path)
-        ret = cls(cfg=cfg, symbols=[])
+        from trading.src.portfolio.position import PositionManager
+
+        ret = cls(cfg=cfg, position_manager=PositionManager(symbols=[]), symbols=[])
         ret.vbt_pf = pf
         return ret
 
@@ -260,7 +262,7 @@ class Portfolio:
         """
         Reset the portfolio to an empty state.
         """
-        self.initial_cash = self.initial_cash
+        self.initial_cash = self.cfg.initial_cash
         self._net_value = self.initial_cash
         self.cash = self.initial_cash
         self.vbt_pf = None

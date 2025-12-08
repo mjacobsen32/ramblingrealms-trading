@@ -28,7 +28,8 @@ class RRTradeConfig(BaseModel):
     """
 
     model_path: ProjectPath = Field(
-        default_factory=ProjectPath, description="Path to the trained model."
+        default_factory=lambda: ProjectPath.model_construct(),
+        description="Path to the trained model.",
     )
     broker: BrokerType = Field(
         BrokerType.LOCAL, description="Broker to use for trading."
@@ -37,7 +38,8 @@ class RRTradeConfig(BaseModel):
         default_factory=dict, description="Additional broker-specific arguments."
     )
     out_dir: ProjectPath = Field(
-        default_factory=ProjectPath, description="Path to the output directory."
+        default_factory=lambda: ProjectPath.model_construct(),
+        description="Path to the output directory.",
     )
     portfolio_config: PortfolioConfig | None = Field(
         None,
