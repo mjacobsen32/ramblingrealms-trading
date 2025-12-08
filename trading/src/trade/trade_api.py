@@ -123,6 +123,7 @@ class Trade:
 
     def run_model(self):
         self.data_loader = self._load_data()
+        self.data_loader.to_csv("live_data.csv")
         prices = self.get_prices()
         logging.debug("Latest prices: %s", prices)
         logging.debug("df head:\n%s", self.data_loader.df.tail())
@@ -135,10 +136,11 @@ class Trade:
             prices,
         )
 
-        logging.debug("Observation: %s", obs)
+        logging.info("Observation: %s", obs)
         logging.debug("Observation shape: %s", obs.shape)
         actions, _states = self.model.predict(obs)
         logging.info(actions)
+        logging.info(_states)
         # data = self.data_loader.df.copy()
         # logging.debug("data: %s", data.tail())
         exit(0)

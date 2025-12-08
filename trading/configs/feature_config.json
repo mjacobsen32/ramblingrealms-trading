@@ -34,12 +34,6 @@
             "field": "close"
         },
         {
-            "type": "rsi",
-            "name": "rsi_60",
-            "period": 60,
-            "field": "close"
-        },
-        {
             "type": "bollinger_bands",
             "name": "bollinger_bands_20",
             "period": 20
@@ -57,11 +51,6 @@
             "type": "stochastic",
             "name": "stochastic_20",
             "period": 20
-        },
-        {
-            "type": "turbulence",
-            "name": "turbulence",
-            "lookback": 60
         }
     ]
 }
