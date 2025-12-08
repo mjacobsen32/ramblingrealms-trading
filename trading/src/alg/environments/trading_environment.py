@@ -17,6 +17,7 @@ from trading.src.portfolio.portfolio import Portfolio, PositionManager
 
 
 # @TODO BASE ENVIRONMENT WHICH TRAINING AND TRADING ENVS INHERIT FROM
+# that will handle common functionality, but remove the bloat from the training env in the trading env
 class TradingEnv(gym.Env):
     """
     Trading environment for reinforcement learning agents.

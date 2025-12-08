@@ -1,4 +1,3 @@
-import logging
 from enum import Enum
 from typing import Any, ClassVar, Dict, List, Type
 
@@ -546,6 +545,7 @@ class Turbulence(Feature):
     """
     Computes a market turbulence index using multiple return periods and proper covariance calculation.
     This measures how unusual current market conditions are compared to historical patterns.
+    ! TODO pretty sure turbulence is broken
     """
 
     TYPE: ClassVar[FeatureType] = FeatureType("turbulence")
@@ -556,65 +556,19 @@ class Turbulence(Feature):
     )
 
     def to_df(self, df: pd.DataFrame, data: Any = None) -> pd.DataFrame:
-        logger = logging.getLogger(__name__)
-        logger.info(
-            "Turbulence '%s': Starting to_df with lookback=%d, return_periods=%s, field=%s, len(df)=%d, fill_strategy=%s",
-            self.name,
-            self.lookback,
-            self.return_periods,
-            self.field,
-            len(df),
-            self.fill_strategy,
-        )
-
         # Calculate returns for multiple periods
         returns_matrix = []
         for period in self.return_periods:
-            r = df[self.field].pct_change(periods=period)
-            logger.info(
-                "Turbulence '%s': computed returns for period %sd (len=%d, nans=%d, infs=%d)",
-                self.name,
-                period,
-                r.shape[0],
-                r.isna().sum(),
-                np.isinf(r).sum(),
-            )
-            returns = r.dropna()
+            returns = df[self.field].pct_change(periods=period).dropna()
             returns_matrix.append(returns)
-
-        if not returns_matrix:
-            logger.info(
-                "Turbulence '%s': returns_matrix is empty, nothing to compute",
-                self.name,
-            )
-            df[self.name] = np.nan
-            cleaned = self.clean_columns(self.get_feature_names(), df)
-            logger.info(
-                "Turbulence '%s': finished to_df with cleaned NaNs=%d",
-                self.name,
-                cleaned[self.name].isna().sum(),
-            )
-            return cleaned
 
         # Align all return series to the same length
         min_length = min(len(r) for r in returns_matrix)
-        logger.info(
-            "Turbulence '%s': min aligned returns length=%d", self.name, min_length
-        )
         returns_df = pd.DataFrame(
             {
                 f"return_{period}d": r.iloc[-min_length:].values
                 for period, r in zip(self.return_periods, returns_matrix)
             }
-        )
-
-        # Log basic info about returns_df
-        logger.info(
-            "Turbulence '%s': returns_df shape=%s; nan_counts=%s; inf_counts=%s",
-            self.name,
-            returns_df.shape,
-            returns_df.isna().sum().to_dict(),
-            (np.isinf(returns_df.values)).sum(axis=0).tolist(),
         )
 
         turbulence_values = []
@@ -631,24 +585,7 @@ class Turbulence(Feature):
 
             # Skip if insufficient data
             if len(historical_returns) < 3:
-                logger.info(
-                    "Turbulence '%s': index %d skipped - insufficient historical_returns length=%d",
-                    self.name,
-                    i,
-                    len(historical_returns),
-                )
-                turbulence_values.append(0.0)
-                continue
-
-            # if current returns have NaN or Inf, log & add NaN
-            if np.isnan(current_returns).any() or np.isinf(current_returns).any():
-                logger.info(
-                    "Turbulence '%s': index %d current_returns contain NaN/Inf (%s)",
-                    self.name,
-                    i,
-                    current_returns,
-                )
-                turbulence_values.append(np.nan)
+                turbulence_values.append(0)
                 continue
 
             try:
@@ -656,66 +593,17 @@ class Turbulence(Feature):
                 mean_returns = historical_returns.mean().values
                 cov_matrix = historical_returns.cov().values
 
-                # Log cov matrix diagnostics
-                cov_nan_count = np.isnan(cov_matrix).sum()
-                cov_inf_count = np.isinf(cov_matrix).sum()
-                logger.info(
-                    "Turbulence '%s': index %d cov_matrix shape=%s, nan_count=%d, inf_count=%d",
-                    self.name,
-                    i,
-                    cov_matrix.shape,
-                    cov_nan_count,
-                    cov_inf_count,
-                )
-
                 # Add small regularization to avoid singular matrix
                 cov_matrix += np.eye(len(cov_matrix)) * 1e-8
-
-                # Condition number check
-                try:
-                    cond_num = np.linalg.cond(cov_matrix)
-                except Exception:
-                    cond_num = float("inf")
-                if cond_num > 1e12:
-                    logger.info(
-                        "Turbulence '%s': index %d covariance matrix is near-singular (cond=%g)",
-                        self.name,
-                        i,
-                        cond_num,
-                    )
 
                 # Calculate Mahalanobis distance (turbulence index)
                 diff = np.array(current_returns) - np.array(mean_returns)
                 inv_cov = np.linalg.pinv(cov_matrix)  # Use pseudo-inverse for stability
-
-                if np.isnan(inv_cov).any() or np.isinf(inv_cov).any():
-                    logger.info(
-                        "Turbulence '%s': index %d inv_cov contains NaN/Inf, falling back",
-                        self.name,
-                        i,
-                    )
-                    raise np.linalg.LinAlgError("Inv cov invalid")
-
                 turbulence = np.dot(np.dot(diff.T, inv_cov), diff)
-                if np.isnan(turbulence) or np.isinf(turbulence):
-                    logger.info(
-                        "Turbulence '%s': index %d computed turbulence is NaN/Inf (%s), falling back",
-                        self.name,
-                        i,
-                        turbulence,
-                    )
-                    raise ValueError("NaN/Inf turbulence")
-
                 turbulence_values.append(float(turbulence))
 
-            except (np.linalg.LinAlgError, ValueError) as e:
+            except (np.linalg.LinAlgError, ValueError):
                 # Fallback to simple standardized distance if matrix issues
-                logger.info(
-                    "Turbulence '%s': index %d covariance invert/mahalanobis failed with %s, using fallback standardized method",
-                    self.name,
-                    i,
-                    e,
-                )
                 mean_returns = np.array(historical_returns.mean().values)
                 std_returns = np.array(historical_returns.std().values)
                 std_returns = np.where(std_returns == 0, 1e-8, std_returns)
@@ -730,36 +618,4 @@ class Turbulence(Feature):
         ) + turbulence_values
         df[self.name] = result_values
 
-        # Log pre-clean stats
-        logger.info(
-            "Turbulence '%s': pre-clean NaNs=%d, infs=%d (in series length=%d)",
-            self.name,
-            df[self.name].isna().sum(),
-            np.isinf(df[self.name]).sum(),
-            len(df[self.name]),
-        )
-
-        cleaned = self.clean_columns(self.get_feature_names(), df)
-
-        # Log post-clean stats
-        logger.info(
-            "Turbulence '%s': post-clean NaNs=%d, infs=%d (len=%d). fill_strategy=%s",
-            self.name,
-            cleaned[self.name].isna().sum(),
-            np.isinf(cleaned[self.name]).sum(),
-            len(cleaned[self.name]),
-            self.fill_strategy,
-        )
-
-        # If there are still NaNs left after cleaning, log a few example indices
-        remaining_nans = cleaned[self.name].isna()
-        if remaining_nans.any():
-            nan_idxs = cleaned.index[remaining_nans].tolist()
-            # Show up to 5 examples
-            logger.info(
-                "Turbulence '%s': Remaining NaN indices (examples up to 5) = %s",
-                self.name,
-                nan_idxs[:5],
-            )
-
-        return cleaned
+        return self.clean_columns(self.get_feature_names(), df)

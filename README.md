@@ -2,12 +2,8 @@
 
 ![Black](https://img.shields.io/badge/code%20style-black-000000.svg):small_orange_diamond:![CI](https://github.com/mjacobsen32/ramblingrealms-trading/actions/workflows/ci.yml/badge.svg):small_orange_diamond:[![Documentation Status](https://readthedocs.org/projects/ramblingrealms-trading/badge/?version=latest)](https://ramblingrealms-trading.readthedocs.io/en/latest/?badge=latest):small_orange_diamond:![codecov](https://raw.githubusercontent.com/mjacobsen32/ramblingrealms-trading/main/assets/coverage.svg)
 
-## Model Performance ![Model Performance](https://ramblingrealms.com)
+## Model Performance Demo's ![Model Performance](https://ramblingrealms.com)
 
 ## Documentation
 
 Read the full documentation on [Read the Docs](https://ramblingrealms-trading.readthedocs.io/en/latest/)
-
-## Circular import
-
-- agents -> trading env -> rewards -> portfolio -> trade_api -> agents

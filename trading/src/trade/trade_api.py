@@ -30,8 +30,8 @@ class Trade:
         self.active_features = FeatureConfig.parse_features(self.meta_data).get(
             "features", []
         )
-        self.env_config = self.meta_data.get("env_config", {})
         logging.info("Active features: %s", self.active_features)
+        self.env_config = self.meta_data.get("env_config", {})
         self.portfolio_config = PortfolioConfig(
             **self.env_config.get("portfolio_config", {})
         )
@@ -59,7 +59,6 @@ class Trade:
             ),
             maintain_history=False,
         )
-        # TODO infer time_step
         self.pf = Portfolio(
             self.portfolio_config,
             position_manager,
@@ -82,12 +81,14 @@ class Trade:
         calendar = self.trading_client.get_calendar()
         min_window = min_window_size(self.active_features) + 1
         logging.info("Determined min window size from features: %d", min_window)
+        # TODO this does not allow for live trading in intraday sessions
         window = [entry for entry in calendar if entry.date < clock.next_open.date()][
             -(min_window):
         ]
         start, end = window[0], window[-1]
         logging.info("Loading data for model trade: [%s, %s]", start.date, end.date)
 
+        # TODO offload requests meta data construction
         requests = [
             DataRequests(
                 dataset_name="live",
@@ -100,7 +101,6 @@ class Trade:
             )
         ]
 
-        # TODO infer timeframe and period
         data_config = self.data_config
         data_config.start_date = str(start.date)
         data_config.end_date = str(end.date)
@@ -123,13 +123,14 @@ class Trade:
 
     def run_model(self):
         self.data_loader = self._load_data()
-        self.data_loader.to_csv("live_data.csv")
         df = self.data_loader.df
         prices = self.get_prices()
+
         logging.debug("Latest prices: %s", prices)
         logging.debug("df head:\n%s", self.data_loader.df.tail())
         logging.debug("portfolio_state:\n%s", self.pf.state())
         logging.debug("feature columns: %s", get_feature_cols(self.active_features))
+
         obs = TradingEnv.observation(
             df[-(self.env_config.get("lookback_window") + 1) :],
             self.pf.state(),
@@ -137,18 +138,25 @@ class Trade:
             prices,
         )
 
-        logging.info("Observation: %s", obs)
+        logging.debug("Observation: %s", obs)
         logging.debug("Observation shape: %s", obs.shape)
+
         actions, _states = self.model.predict(obs)
-        logging.info("Actions: %s", actions)
-        logging.info("States: %s", _states)
+
+        logging.info("Model Actions: %s", actions)
         logging.debug("data: %s", df.tail())
+
         df["size"] = 1.0
         df["profit"] = 0.0
         df["price"] = 1.0
         df["action"] = 1.0
+
         current_slice = df.iloc[[-1]]
         current_slice.loc[:, "action"] = actions
+
         ret = self.pf.step(current_slice, True)
+
         logging.info("Scaled actions: %s", ret["scaled_actions"])
         logging.info("Profit: %s", ret["profit"])
+
+        return ret

@@ -21,6 +21,7 @@ class Agent:
     This class provides a common interface and basic functionality for all agents.
     """
 
+    # @TODO ideally we have better scopes on our dependency injection, data config is ingested for saving meta data
     def __init__(
         self,
         config: AgentConfig,
@@ -35,13 +36,15 @@ class Agent:
             env (TradingEnv): The trading environment in which the agent will operate.
             load (bool): Whether to load an existing agent or create a new one.
         """
-        self.config = config
+        self.config: AgentConfig = config
         self.meta_data: dict = {}
-        self.env = env
+        self.env: TradingEnv = env
         if load:
             self.model, self.meta_data = Agent.load_agent(config, self.env)
-        else:
-            self.model = Agent.make_agent(config, self.env)
+        elif self.model:
+            self.model: A2C | DDPG | DQN | PPO | SAC = Agent.make_agent(
+                config=config, env=self.env
+            )
             self.meta_data = {
                 "type": config.algo,
                 "version": ProjectPath.VERSION,
@@ -53,7 +56,9 @@ class Agent:
             }
 
     @classmethod
-    def make_agent(cls, config: AgentConfig, env: TradingEnv):
+    def make_agent(
+        cls, config: AgentConfig, env: TradingEnv
+    ) -> A2C | DDPG | DQN | PPO | SAC:
         """
         Creates an agent based on the provided configuration and environment.
         """

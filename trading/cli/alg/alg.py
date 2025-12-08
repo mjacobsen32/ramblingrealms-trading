@@ -116,7 +116,7 @@ def backtest(
     trade_env.reset()
 
     logging.info("Environment Initialized.")
-    model = Agent(config=alg_config, load=True)
+    model = Agent(config=alg_config.agent_config, env=trade_env, load=True)
 
     bt = BackTesting(
         model=model,

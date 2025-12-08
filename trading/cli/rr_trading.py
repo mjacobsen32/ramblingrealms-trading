@@ -111,13 +111,6 @@ def paper_trade(
         logging.info(f"Loaded configuration from {config}")
     trade_client = Trade(rr_trade_config, live=False)
     trade_client.run_model()
-    # model, meta_data = alg.Agent.load_agent(
-    #     config=rr_trade_config.model_path.as_path(), env=None
-    # )
-    # logging.info(meta_data)
-    # observation: np.ndarray = np.ndarray([716])  # Dummy observation for example
-    # logging.info(model.predict(observation=observation))
-    # trade.run_model()
 
 
 @app.command(help="Run model on live trading Alpaca Account")
@@ -141,11 +134,12 @@ def live_trade(
     if not confirmation and confirmation_str.lower() != "y":
         logging.info("Live trading execution cancelled.")
         return
+    logging.info("Running model on Alpaca live trading account...")
     with Path.open(Path(config)) as f:
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
-    trade_client = Trade.from_config(rr_trade_config, live=True)
-    # trade.run_model()
+    trade_client = Trade(rr_trade_config, live=True)
+    trade_client.run_model()
 
 
 if __name__ == "__main__":

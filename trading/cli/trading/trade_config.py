@@ -10,8 +10,13 @@ class BrokerType(str, Enum):
     Enum for broker types.
     """
 
+    # ALPACA will connect to the ALPACA broker to executre trades and manage positions
     ALPACA = "ALPACA"
+    # LOCAL will use a local simulated broken for paper trading
     LOCAL = "LOCAL"
+    # REMOTE will use a remote simulated broker for paper trading, this mode is used to push
+    # positions and trade activity to the S3 bucket consumed by the front-end dashboard
+    REMOTE = "REMOTE"
 
 
 class RRTradeConfig(BaseModel):

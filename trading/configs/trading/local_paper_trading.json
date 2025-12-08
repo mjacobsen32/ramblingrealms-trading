@@ -1,0 +1,5 @@
+{
+    "model_path": "{PROJECT_ROOT}/models/ddpg.1.0.zip",
+    "out_dir": "{PROJECT_ROOT}/out/trading",
+    "broker": "LOCAL"
+}

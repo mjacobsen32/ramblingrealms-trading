@@ -156,9 +156,6 @@ class PositionManager:
     ):
         self.symbols = symbols
         self.max_lots: int | None = max_lots
-        self.initial_cash = initial_cash
-        self.total_value: float = initial_cash
-        self.cash = initial_cash
         self.df = pd.DataFrame(
             {
                 "holdings": np.zeros(len(symbols), dtype=np.float32),

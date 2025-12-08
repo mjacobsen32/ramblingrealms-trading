@@ -1,4 +1,5 @@
 import logging
+from abc import ABC
 
 import numpy as np
 import pandas as pd
@@ -8,13 +9,15 @@ from trading.cli.trading.trade_config import BrokerType, RRTradeConfig
 from trading.src.user_cache.user_cache import UserCache
 
 
-class TradingClient:
+class TradingClient(ABC):
     @classmethod
     def from_config(cls, config: RRTradeConfig, live: bool = False) -> "TradingClient":
         if config.broker == BrokerType.ALPACA:
             return AlpacaClient(live)
         elif config.broker == BrokerType.LOCAL:
             return LocalTradingClient()
+        elif config.broker == BrokerType.REMOTE:
+            return RemoteTradingClient()
         else:
             raise ValueError(f"Unsupported broker type: {config.broker}")
 
@@ -35,6 +38,21 @@ class LocalTradingClient(TradingClient):
     def __init__(self):
         super().__init__(live=False)
         logging.info("Initialized Local Trading Client")
+
+    def get_account(self):
+        return {"balance": 1_000_000.0}
+
+    def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+        return actions, 0.0
+
+    def state(self, symbols: list[str]) -> np.ndarray:
+        return np.zeros(len(symbols))
+
+
+class RemoteTradingClient(TradingClient):
+    def __init__(self):
+        super().__init__(live=True)
+        logging.info("Initialized Remote Trading Client")
 
     def get_account(self):
         return {"balance": 1_000_000.0}

@@ -17,6 +17,8 @@ class Portfolio:
     """
     Portfolio class for managing trading positions and cash flow.
     Very much Stateful
+    TODO there is not a clean seperation between portfolio logic and the underlying broker api and state. It is good to have the portfolio state mirrored internally via the df, but self.cash, self.initial_cash, etc... are not reflections of the underlying broker api, (ALPACA, LOCAL, REMOTE).
+    ? position manager acts as the broker api here, interacting with the positions, trades, and orders, should we offload many of the portfolio attributes to the position manager? (and rename it)
     """
 
     def __init__(
@@ -30,13 +32,14 @@ class Portfolio:
         Initialize the Portfolio
         """
         self.cfg = cfg
+        self.initial_cash = cfg.initial_cash
+        self._net_value: float = cfg.initial_cash
+        self.cash = cfg.initial_cash
+        self.nav: float = 0.0
         self.vbt_pf: vbt.Portfolio | None = None
         self.position_manager = position_manager
-        self.symbols = symbols
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
         self.persistent_df: pd.DataFrame | None = None
-        self.cash = cfg.initial_cash
-        self.initial_cash = cfg.initial_cash
 
     def as_vbt_pf(self, df: pd.DataFrame | None = None) -> vbt.Portfolio:
         """
@@ -106,10 +109,6 @@ class Portfolio:
         positions = np.asarray(self.position_manager["holdings"])
         if trade_mode == TradeMode.CONTINUOUS:
             # Sell proportionally based on signal strength
-            logging.info("sell_mask: %s", sell_mask)
-            logging.info("positions: %s", positions)
-            logging.info("df: %s", df)
-            logging.info("df before clip:\n%s", df.loc[sell_mask, "size"])
             df.loc[sell_mask, "size"] = np.clip(
                 df.loc[sell_mask, "size"].to_numpy(),
                 a_min=-positions[sell_mask_arr],
@@ -123,7 +122,7 @@ class Portfolio:
             Scale the actions to the portfolio value
         """
 
-        buy_limit = self.cfg.trade_limit_percent * self.net_value()
+        buy_limit = self.cfg.trade_limit_percent * self._net_value
 
         buy_values = df.loc[buy_mask, "size"].to_numpy() * prices[buy_mask_arr]
 
@@ -170,7 +169,7 @@ class Portfolio:
 
         # Calculate max shares allowed by hmax and trade_limit
         max_trade_value = min(
-            self.cfg.hmax, self.cfg.trade_limit_percent * self.net_value()
+            self.cfg.hmax, self.cfg.trade_limit_percent * self._net_value
         )
         max_shares = max_trade_value // prices
 
@@ -201,7 +200,7 @@ class Portfolio:
 
         self.cash = self.cash - (df["size"] * df["price"]).sum()
         self._net_value = self.cash + self.position_manager.nav(df["price"])
-
+        self.nav = self.position_manager.nav(df["price"])
         logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
 
         return step_profit
