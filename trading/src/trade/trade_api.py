@@ -60,8 +60,8 @@ class Trade:
         )
         self.pf = Portfolio(
             self.portfolio_config,
-            position_manager,
             self.active_symbols,
+            position_manager,
             (TimeFrameUnit.Day, 1),
         )
 
