@@ -17,7 +17,7 @@ except Exception:  # pragma: no cover - optional dependency for remote client
     boto3 = None
 
 from trading.cli.trading.trade_config import BrokerType, RRTradeConfig
-from trading.src.portfolio.position import Position
+from trading.src.portfolio.position import Position, PositionDecoder, PositionEncoder
 from trading.src.user_cache.user_cache import UserCache
 
 
@@ -29,6 +29,8 @@ def _json_default(obj: object):  # -> str | Any:
         return obj.item()
     if isinstance(obj, deque):
         return list(obj)
+    if isinstance(obj, Position):
+        return PositionEncoder().default(obj)
     # Fallback to str
     return str(obj)
 
@@ -90,9 +92,6 @@ class TradingClient(ABC):
     ) -> tuple[pd.DataFrame, float]:
         raise NotImplementedError
 
-    def state(self, symbols: list[str]) -> np.ndarray:
-        raise NotImplementedError("This method should be implemented in a subclass.")
-
     def get_clock(self):
         return self.alpaca_account_client.get_clock()
 
@@ -113,10 +112,21 @@ class LocalTradingClient(TradingClient):
             return path_field.as_path()
         raise ValueError(f"No path configured for local trading {default_name} data")
 
-    def _load_positions(self) -> dict:
+    def _load_positions(self) -> dict[str, deque[Position]]:
+        ret = dict[str, deque[Position]]()
+        count = 0
         if not self.positions_path.exists():
-            return {"positions": []}
-        return json.loads(self.positions_path.read_text())
+            logging.info("No positions file found at %s", self.positions_path)
+            return ret
+        data = json.loads(self.positions_path.read_text())
+        for key, positions in data.items():
+            for pos in positions:
+                count += 1
+                ret.setdefault(key, deque()).append(
+                    json.loads(json.dumps(pos), object_hook=PositionDecoder)
+                )
+        logging.info("Loaded %d positions from %s", count, self.positions_path)
+        return ret
 
     def _save_positions(self, payload: dict) -> None:
         self.positions_path.parent.mkdir(parents=True, exist_ok=True)
@@ -139,27 +149,7 @@ class LocalTradingClient(TradingClient):
         return self._load_account()
 
     def get_positions(self) -> dict[str, deque[Position]]:
-        data = self._load_positions()
-        positions: dict[str, deque[Position]] = {}
-        for raw in data.get("positions", []):
-            sym = raw.get("symbol")
-            qty = float(raw.get("qty", 0))
-            entry = float(raw.get("avg_entry_price", 0))
-            enter_date = pd.to_datetime(raw.get("enter_date", pd.Timestamp.utcnow()))
-            exit_date = pd.to_datetime(raw.get("exit_date", None))
-            exit_size = float(raw.get("exit_size", 0))
-            position_type = raw.get("position_type", "long")
-            pos = Position(
-                symbol=sym,
-                lot_size=qty,
-                enter_price=entry,
-                enter_date=enter_date,
-                exit_date=exit_date,
-                exit_size=exit_size,
-                position_type=position_type,
-            )
-            positions.setdefault(sym, deque()).append(pos)
-        logging.info(f"Loaded positions: {len(positions)}")
+        positions = self._load_positions()
         return positions
 
     def execute_trades(
@@ -176,9 +166,6 @@ class LocalTradingClient(TradingClient):
         self._save_positions(positions)
 
         return actions, actions.get("profit", 0.0).sum()
-
-    def state(self, symbols: list[str]) -> np.ndarray:
-        return np.zeros(len(symbols))
 
 
 class RemoteTradingClient(TradingClient):
@@ -262,9 +249,6 @@ class RemoteTradingClient(TradingClient):
             )
         self._put_remote_json(self.positions_key, data)
         return actions, 0.0
-
-    def state(self, symbols: list[str]) -> np.ndarray:
-        return np.zeros(len(symbols))
 
 
 class AlpacaClient(TradingClient):

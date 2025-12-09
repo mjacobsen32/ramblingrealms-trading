@@ -1,3 +1,4 @@
+import json
 import logging
 from collections import deque
 from enum import Enum
@@ -13,6 +14,37 @@ if TYPE_CHECKING:
 class PositionType(str, Enum):
     LONG = "long"
     SHORT = "short"
+
+
+class PositionEncoder(json.JSONEncoder):
+    def default(self, obj):
+        return {
+            "symbol": obj.symbol,
+            "lot_size": obj.lot_size,
+            "enter_price": obj.enter_price,
+            "enter_date": obj.enter_date.isoformat(),
+            "exit_date": (
+                obj.exit_date.isoformat() if obj.exit_date is not None else None
+            ),
+            "exit_price": obj.exit_price,
+            "exit_size": obj.exit_size,
+            "position_type": obj.position_type,
+        }
+
+
+def PositionDecoder(dct):
+    return Position(
+        symbol=dct["symbol"],
+        lot_size=dct["lot_size"],
+        enter_price=dct["enter_price"],
+        enter_date=pd.Timestamp(dct["enter_date"]),
+        exit_date=(
+            pd.Timestamp(dct["exit_date"]) if dct.get("exit_date") is not None else None
+        ),
+        exit_price=dct.get("exit_price"),
+        exit_size=dct.get("exit_size"),
+        position_type=PositionType(dct["position_type"]),
+    )
 
 
 class Position(np.ndarray):

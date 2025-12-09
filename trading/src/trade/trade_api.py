@@ -160,8 +160,10 @@ class Trade:
         df["profit"] = 0.0
         df["price"] = 1.0
         df["action"] = 1.0
+        df["timestamp"] = df.index.get_level_values("timestamp")
 
         current_slice = df.iloc[[-1]]
+        current_slice = current_slice.droplevel(0)
         current_slice.loc[:, "action"] = actions
         current_slice.loc[:, "price"] = prices
 
