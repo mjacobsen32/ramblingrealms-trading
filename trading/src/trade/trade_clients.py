@@ -159,18 +159,20 @@ class LocalTradingClient(TradingClient):
                 position_type=position_type,
             )
             positions.setdefault(sym, deque()).append(pos)
-        logging.info("Loaded positions: %s", positions)
+        logging.info(f"Loaded positions: {len(positions)}")
         return positions
 
     def execute_trades(
         self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
     ) -> tuple[pd.DataFrame, float]:
-        logging.info(
-            "size: %s, at price: %s, with signal: %s",
-            actions["size"],
-            actions["price"],
-            actions["action"],
-        )
+        for sym, row in actions.iterrows():
+            logging.info(
+                "sym: %s, size: %s, at price: %s, with signal: %s",
+                sym,
+                row.get("size"),
+                row.get("price"),
+                row.get("action"),
+            )
         self._save_positions(positions)
 
         return actions, actions.get("profit", 0.0).sum()

@@ -174,11 +174,16 @@ class DataLoader:
         self.df.dropna()
 
         logging.info(
-            "Data Successfully loaded...\nCurrent columns: %s\nCurrent Features: %s",
+            "Data Successfully Loaded. Num Rows: %d, Num features: %d",
+            len(self.df),
+            len(self.features),
+        )
+        logging.debug(
+            "\nCurrent columns: %s\nCurrent Features: %s",
             [f for f in self.columns],
             self.feature_config.features,
         )
-        logging.info(
+        logging.debug(
             "Current tickers: %s",
             self.df.index.get_level_values("symbol").unique().tolist(),
         )

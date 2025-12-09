@@ -189,7 +189,7 @@ class PositionManager:
             self.positions = {symbol: deque(maxlen=self.max_lots) for symbol in symbols}
         self.history: list[Position] = []
         self.maintain_history = maintain_history
-        logging.info("Initializing PositionManager for symbols: %s", symbols)
+        logging.info("Initializing PositionManager with symbols: %s", symbols)
 
     def __getitem__(self, key):
         """

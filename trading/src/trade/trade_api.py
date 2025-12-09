@@ -27,10 +27,14 @@ class Trade:
 
         self.model, self.meta_data = Agent.load_agent(config.model_path.as_path(), None)
         self.active_symbols = self.meta_data.get("symbols", [])
-        logging.info("meta_data: %s", self.meta_data)
+        logging.info(
+            "Meta Data loaded for model: %s:%s",
+            self.meta_data["type"],
+            self.meta_data["version"],
+        )
         feature_cfg = FeatureConfig.model_validate(self.meta_data)
         self.active_features = getattr(feature_cfg, "features", [])
-        logging.info("Active features: %s", self.active_features)
+        logging.debug("Active features: %s", self.active_features)
         self.env_config = self.meta_data.get("env_config", {})
         self.portfolio_config = PortfolioConfig(
             **self.env_config.get("portfolio_config", {})
@@ -58,6 +62,7 @@ class Trade:
                 else self.portfolio_config.max_positions
             ),
             maintain_history=False,
+            initial_cash=self.portfolio_config.initial_cash,
             initial_prices=self.get_prices(),
         )
         self.pf = Portfolio(
@@ -67,7 +72,7 @@ class Trade:
             (TimeFrameUnit.Day, 1),
         )
 
-        logging.info(
+        logging.debug(
             "Loaded model type: '%s' version: '%s'\nPortfolio Config: %s\nEnv Config: %s\nSymbols: %s\nFeatures: %s",
             self.meta_data.get("type", "Unknown"),
             self.meta_data.get("version", "Unknown"),
