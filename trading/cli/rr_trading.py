@@ -1,3 +1,4 @@
+import datetime
 import logging
 from pathlib import Path
 from typing import Annotated
@@ -117,6 +118,14 @@ def paper_trade(
         str,
         typer.Option("--config", "-c", help="Path to the RRTrade configuration file."),
     ],
+    predict_time: Annotated[
+        str,
+        typer.Option(
+            "--timestamp",
+            "-t",
+            help="Timestamp for which to run the model (YYYY-MM-DD).",
+        ),
+    ] = "",
 ):
     """
     Run the model on the Alpaca paper trading account.
@@ -127,7 +136,11 @@ def paper_trade(
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
     trade_client = Trade(rr_trade_config, live=False)
-    trade_client.run_model()
+    trade_client.run_model(
+        predict_time=(
+            datetime.datetime.fromisoformat(predict_time) if predict_time else None
+        )
+    )
 
 
 @app.command(help="Run model on live trading Alpaca Account")

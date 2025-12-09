@@ -1,3 +1,4 @@
+import datetime
 import logging
 
 import numpy as np
@@ -76,13 +77,17 @@ class Trade:
             self.active_features,
         )
 
-    def _load_data(self) -> DataLoader:
-        clock = self.trading_client.alpaca_account_client.get_clock()
+    def _load_data(self, datetime_now: datetime.datetime | None = None) -> DataLoader:
         calendar = self.trading_client.alpaca_account_client.get_calendar()
         min_window = min_window_size(self.active_features) + 1
         logging.info("Determined min window size from features: %d", min_window)
         # TODO this does not allow for live trading in intraday sessions
-        window = [entry for entry in calendar if entry.date < clock.next_open.date()][
+        if datetime_now is None:
+            prediction_time = datetime.datetime.now().date()
+        else:
+            prediction_time = datetime_now.date()
+
+        window = [entry for entry in calendar if entry.date < prediction_time][
             -(min_window):
         ]
         start, end = window[0], window[-1]
@@ -121,8 +126,8 @@ class Trade:
         prices = [trade.price for trade in latest.values()]
         return np.array(prices)
 
-    def run_model(self):
-        self.data_loader = self._load_data()
+    def run_model(self, predict_time: datetime.datetime | None = None) -> dict:
+        self.data_loader = self._load_data(predict_time)
         df = self.data_loader.df
         prices = self.get_prices()
 
