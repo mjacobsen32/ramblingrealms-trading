@@ -45,6 +45,10 @@ class RRTradeConfig(BaseModel):
     broker_kwargs: dict = Field(
         default_factory=dict, description="Additional broker-specific arguments."
     )
+    bucket_name: str | None = Field(
+        default=None,
+        description="Name of the remote S3 bucket for REMOTE broker.",
+    )
     positions_path: ProjectPath | None = Field(
         default=None,
         description="Path to positions JSON for local/remote brokers.",
@@ -53,14 +57,6 @@ class RRTradeConfig(BaseModel):
         default=None,
         description="Path to account JSON for local/remote brokers.",
     )
-    remote_bucket: str | None = Field(
-        default=None,
-        description="Remote bucket (e.g., R2/S3) for storing trading state.",
-    )
-    remote_prefix: str | None = Field(
-        default=None,
-        description="Remote key prefix for trading state (positions/account).",
-    )
     out_dir: ProjectPath = Field(
         default_factory=lambda: ProjectPath.model_construct(),
         description="Path to the output directory.",
@@ -68,4 +64,8 @@ class RRTradeConfig(BaseModel):
     portfolio_config: PortfolioConfig | None = Field(
         default=None,
         description="Portfolio configuration. If None, the configuration saved with the model will be used",
+    )
+    defer_trade_execution: bool = Field(
+        default=False,
+        description="If True, trade executions will be deferred until program termination, utilizing batched writes.",
     )

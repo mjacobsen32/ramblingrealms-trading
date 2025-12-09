@@ -77,7 +77,11 @@ class Position(np.ndarray):
     def from_alpaca_position(cls, alpaca_position: AlpacaPosition) -> "Position":
         return cls(
             symbol=alpaca_position.symbol,
-            lot_size=float(alpaca_position.qty),
+            lot_size=float(
+                alpaca_position.qty_available
+                if alpaca_position.qty_available
+                else alpaca_position.qty
+            ),
             enter_price=float(alpaca_position.avg_entry_price),
             enter_date=None,
             exit_date=None,

@@ -1,10 +1,12 @@
 {
     "model_path": "{PROJECT_ROOT}/models/ddpg.1.0.zip",
     "out_dir": "{PROJECT_ROOT}/out/trading",
-    "position_path":"positions/remote_paper_trading_positions_test.json",
-    "portfolio_path":"accounts/remote_paper_trading_account_test.json",
+    "positions_path":"paper_trading/positions/ddpg.1.0.json",
+    "account_path":"paper_trading/accounts/ddpg.1.0.json",
     "broker": "REMOTE",
+    "bucket_name": "rr-storage",
     "broker_kwargs":{
-      "remote_bucket": "rr-trading"
-    }
+      "service_name": "s3"
+    },
+    "defer_trade_execution": true
 }
