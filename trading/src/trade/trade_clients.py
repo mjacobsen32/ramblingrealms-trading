@@ -3,14 +3,15 @@ import logging
 from abc import ABC, abstractmethod
 from collections import deque
 from pathlib import Path
-from typing import Any
+from uuid import UUID
 
 import numpy as np
 import pandas as pd
 from alpaca.trading.client import TradingClient as AlpacaTradingClient
-from alpaca.trading.enums import AccountStatus, OrderSide, OrderType, TimeInForce
+from alpaca.trading.enums import AccountStatus
+from alpaca.trading.models import Position as AlpacaPosition
 from alpaca.trading.models import TradeAccount
-from alpaca.trading.requests import OrderRequest
+from alpaca.trading.requests import MarketOrderRequest
 
 try:
     import boto3
@@ -49,10 +50,10 @@ class TradingClient(ABC):
             raise ValueError(f"Unsupported broker type: {config.broker}")
 
     def __init__(self, live: bool, config: RRTradeConfig):
+        user_cache = UserCache().load()
+
         self.live = live
         self.config = config
-        logging.info("Init Base Trading Client; cfg: %s", config)
-        user_cache = UserCache().load()
         self.alpaca_api_key = user_cache.alpaca_api_key
         self.alpaca_api_secret = user_cache.alpaca_api_secret
 
@@ -62,30 +63,29 @@ class TradingClient(ABC):
             paper=not live,
         )
 
-    def get_prices(self, symbols: list[str]) -> pd.Series:
-        prices = {}
-        for sym in symbols:
-            try:
-                barset = self.alpaca_account_client.get_bars(
-                    symbol=sym,
-                    timeframe="1Day",
-                    limit=1,
-                    adjustment="raw",
-                )
-                if barset and len(barset) > 0:
-                    bars = barset[sym]
-                    if bars and len(bars) > 0:
-                        prices[sym] = bars[-1].c  # closing price of the latest bar
-            except Exception as exc:  # pragma: no cover - network
-                logging.error("Failed to fetch price for %s: %s", sym, exc)
-        return pd.Series(prices)
+        self._account = self._load_account()
+        self._positions = self._load_positions()
+
+    def get_clock(self):
+        return self.alpaca_account_client.get_clock()
+
+    def get_calendar(self):
+        return self.alpaca_account_client.get_calendar()
+
+    @property
+    def account(self) -> TradeAccount:
+        return self._account
+
+    @property
+    def positions(self) -> dict[str, deque[Position]]:
+        return self._positions
 
     @abstractmethod
-    def get_account(self) -> TradeAccount:
+    def _load_positions(self) -> dict[str, deque[Position]]:
         raise NotImplementedError
 
     @abstractmethod
-    def get_positions(self) -> dict[str, deque[Position]]:
+    def _load_account(self) -> TradeAccount:
         raise NotImplementedError
 
     @abstractmethod
@@ -94,22 +94,17 @@ class TradingClient(ABC):
     ) -> tuple[pd.DataFrame, float]:
         raise NotImplementedError
 
-    def get_clock(self):
-        return self.alpaca_account_client.get_clock()
-
-    def get_calendar(self):
-        return self.alpaca_account_client.get_calendar()
-
 
 class LocalTradingClient(TradingClient):
     def __init__(self, config: RRTradeConfig):
-        super().__init__(live=False, config=config)
-        logging.info("Initialized Local Trading Client")
         self.positions_path = self._resolve_path(config.positions_path, "positions")
         self.account_path = self._resolve_path(config.account_path, "account")
+        super().__init__(live=False, config=config)
+        logging.info("Initialized Local Trading Client")
 
-    def __del__(self):
-        self._save_account()
+    def __del__(self) -> None:
+        self.account_path.parent.mkdir(parents=True, exist_ok=True)
+        self.account_path.write_text(self.account.model_dump_json(indent=2))
 
     @staticmethod
     def _resolve_path(path_field, default_name: str) -> Path:
@@ -133,13 +128,7 @@ class LocalTradingClient(TradingClient):
         logging.info("Loaded %d positions from %s", count, self.positions_path)
         return ret
 
-    def _save_positions(self, payload: dict) -> None:
-        self.positions_path.parent.mkdir(parents=True, exist_ok=True)
-        self.positions_path.write_text(
-            json.dumps(payload, indent=2, default=_json_default)
-        )
-
-    def _load_account(self) -> None:
+    def _load_account(self) -> TradeAccount:
         if self.config.portfolio_config is None:
             raise ValueError(
                 "Portfolio config is required for local account initialization"
@@ -147,33 +136,17 @@ class LocalTradingClient(TradingClient):
         else:
             init_cash = self.config.portfolio_config.initial_cash
         if not self.account_path.exists():
-            self.account = TradeAccount(
+            account = TradeAccount(
                 id=self.config.id,
                 account_number=self.config.account_number,
                 status=AccountStatus.ACTIVE,
                 cash=str(init_cash),
             )
         else:
-            self.account = TradeAccount.model_validate_json(
-                self.account_path.read_text()
-            )
-        logging.info(
-            "Loaded account with id: %s; active cash: %s",
-            self.account.id,
-            self.account.cash,
-        )
+            account = TradeAccount.model_validate_json(self.account_path.read_text())
 
-    def _save_account(self) -> None:
-        self.account_path.parent.mkdir(parents=True, exist_ok=True)
-        self.account_path.write_text(self.account.model_dump_json(indent=2))
-
-    def get_account(self) -> TradeAccount:
-        self._load_account()
-        return self.account
-
-    def get_positions(self) -> dict[str, deque[Position]]:
-        positions = self._load_positions()
-        return positions
+        logging.info("Loaded account id: %s; cash: %s", account.id, account.cash)
+        return account
 
     def execute_trades(
         self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
@@ -186,7 +159,8 @@ class LocalTradingClient(TradingClient):
                 row.get("price"),
                 row.get("action"),
             )
-        self._save_positions(positions)
+
+        self._positions = positions
 
         return actions, actions.get("profit", 0.0).sum()
 
@@ -218,68 +192,26 @@ class RemoteTradingClient(TradingClient):
             "remote_account_key", "account.json"
         )
 
-    def _fetch_remote_json(self, key: str) -> dict:
-        obj = self._s3.get_object(Bucket=self.bucket, Key=f"{self.prefix}{key}")
-        return json.loads(obj["Body"].read().decode())
+    def _load_positions(self) -> dict[str, deque[Position]]:
+        return {}
 
-    def _put_remote_json(self, key: str, data: dict) -> None:
-        self._s3.put_object(
-            Bucket=self.bucket,
-            Key=f"{self.prefix}{key}",
-            Body=json.dumps(data, indent=2, default=_json_default).encode(),
+    def _load_account(self) -> TradeAccount:
+        return TradeAccount(
+            id=UUID("00000000-0000-0000-0000-000000000000"),
+            account_number="remote",
+            status=AccountStatus.ACTIVE,
         )
-
-    def get_account(self):
-        try:
-            data = self._fetch_remote_json(self.account_key)
-        except Exception:
-            data = {}
-        return data
-
-    def get_positions(self) -> dict[str, deque[Position]]:
-        try:
-            data = self._fetch_remote_json(self.positions_key)
-        except Exception:
-            data = {"positions": []}
-        positions: dict[str, deque[Position]] = {}
-        for raw in data.get("positions", []):
-            sym = raw.get("symbol")
-            qty = float(raw.get("qty", 0))
-            entry = float(raw.get("avg_entry_price", 0))
-            enter_date = pd.to_datetime(raw.get("enter_date", pd.Timestamp.utcnow()))
-            pos = Position(
-                symbol=sym, lot_size=qty, enter_price=entry, enter_date=enter_date
-            )
-            positions.setdefault(sym, deque()).append(pos)
-        return positions
 
     def execute_trades(
         self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
     ) -> tuple[pd.DataFrame, float]:
-        try:
-            data = self._fetch_remote_json(self.positions_key)
-        except Exception:
-            data = {"positions": []}
-        positions_list = data.setdefault("positions", [])
-        for sym, row in actions.iterrows():
-            positions_list.append(
-                {
-                    "symbol": sym,
-                    "qty": row.get("size", 0),
-                    "avg_entry_price": row.get("price", 0),
-                    "enter_date": str(row.get("timestamp", pd.Timestamp.utcnow())),
-                }
-            )
-        self._put_remote_json(self.positions_key, data)
         return actions, 0.0
 
 
 class AlpacaClient(TradingClient):
-    account_details: Any
-
     def __init__(self, config: RRTradeConfig, live: bool = False):
-        super().__init__(live=live, config=config)
         user_cache = UserCache().load()
+
         if live:
             self.alpaca_api_key = user_cache.alpaca_api_key_live
             self.alpaca_api_secret = user_cache.alpaca_api_secret_live
@@ -293,47 +225,53 @@ class AlpacaClient(TradingClient):
             paper=not live,
         )
 
-        self.account_details: Any = self.client.get_account()
-        logging.info(
-            "Initialized Alpaca Client: %s", self.account_details.account_number
-        )
+        super().__init__(live=live, config=config)
 
-    def get_account(self) -> TradeAccount:
-        return self.account_details
-
-    def get_positions(self) -> dict[str, deque[Position]]:
+    def _load_positions(self) -> dict[str, deque[Position]]:
+        ret = dict[str, deque[Position]]()
         alpaca_positions = self.client.get_all_positions()
-        positions: dict[str, deque[Position]] = {}
-        for p in alpaca_positions:
-            qty = float(getattr(p, "qty", 0))
-            entry = float(getattr(p, "avg_entry_price", 0))
-            sym = getattr(p, "symbol", "")
-            enter_date = pd.Timestamp.utcnow()
-            pos = Position(
-                symbol=sym, lot_size=qty, enter_price=entry, enter_date=enter_date
+        for alpaca_pos in alpaca_positions:
+            if isinstance(alpaca_pos, AlpacaPosition):
+                pos = Position.from_alpaca_position(alpaca_pos)
+            else:
+                raise ValueError("Failed to load Alpaca position as Position")
+            ret.setdefault(pos.symbol, deque()).append(pos)
+        logging.info("Loaded %d positions from Alpaca", len(alpaca_positions))
+        return ret
+
+    def _load_account(self) -> TradeAccount:
+        account = self.client.get_account()
+        if isinstance(account, TradeAccount):
+            logging.info(
+                "Loaded Alpaca account id: %s; cash: %s", account.id, account.cash
             )
-            positions.setdefault(sym, deque()).append(pos)
-        return positions
+            return account
+        else:
+            raise ValueError("Failed to load Alpaca account as TradeAccount")
 
     def execute_trades(
         self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
     ) -> tuple[pd.DataFrame, float]:
-        logging.info("Executing trades via Alpaca")
+        logging.info("Executing trades via Alpaca client: %s", actions)
         for sym, row in actions.iterrows():
-            size = row.get("size", 0)
-            if size == 0:
-                continue
-            side = OrderSide.BUY if size > 0 else OrderSide.SELL
-            qty = abs(float(size))
-            order = OrderRequest(
-                symbol=sym,
-                qty=qty,
-                side=side,
-                type=OrderType.MARKET,
-                time_in_force=TimeInForce.GTC,
+            logging.info(
+                "sym: %s, size: %s, at price: %s, with signal: %s",
+                sym,
+                row.get("size"),
+                row.get("price"),
+                row.get("action"),
             )
-            try:
-                self.client.submit_order(order)
-            except Exception as exc:  # pragma: no cover - network
-                logging.error("Failed to submit order for %s: %s", sym, exc)
-        return actions, 0.0
+            # ! for now we are placing market orders only, limit orders should be used when running live
+            # ! and stop loss can easily be added as well
+            order = MarketOrderRequest(
+                symbol=sym,
+                qty=abs(row.get("size", 0)),
+                side="buy" if row.get("size", 0) > 0 else "sell",
+                type="market",
+                time_in_force="day",
+            )
+            self.client.submit_order(order)
+
+        self._positions = positions
+
+        return actions, actions.get("profit", 0.0).sum()

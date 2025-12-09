@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+from alpaca.trading.models import Position as AlpacaPosition
 
 if TYPE_CHECKING:
     from trading.src.trade.trade_clients import TradingClient
@@ -50,6 +51,7 @@ def PositionDecoder(dct):
 class Position(np.ndarray):
     """
     Represents a position in the portfolio, backed by a numpy array.
+    TODO swap out in favor of alpacas Position type, if possible, however speed of np.ndarray is preferred.
     """
 
     COLS = [
@@ -71,12 +73,29 @@ class Position(np.ndarray):
     IDX_EXIT_SIZE = 6
     IDX_POSITION_TYPE = 7
 
+    @classmethod
+    def from_alpaca_position(cls, alpaca_position: AlpacaPosition) -> "Position":
+        return cls(
+            symbol=alpaca_position.symbol,
+            lot_size=float(alpaca_position.qty),
+            enter_price=float(alpaca_position.avg_entry_price),
+            enter_date=None,
+            exit_date=None,
+            exit_price=None,
+            exit_size=None,
+            position_type=(
+                PositionType.LONG
+                if alpaca_position.side == "long"
+                else PositionType.SHORT
+            ),
+        )
+
     def __new__(
         cls,
         symbol: str,
         lot_size: float,
         enter_price: float,
-        enter_date: pd.Timestamp,
+        enter_date: pd.Timestamp | None = None,
         exit_date: pd.Timestamp | None = None,
         exit_price: float | None = None,
         exit_size: float | None = None,
@@ -112,7 +131,7 @@ class Position(np.ndarray):
         return self[self.IDX_EXIT_PRICE]
 
     @property
-    def enter_date(self) -> pd.Timestamp:
+    def enter_date(self) -> pd.Timestamp | None:
         return self[self.IDX_ENTER_DATE]
 
     @property
@@ -261,8 +280,8 @@ class PositionManager:
         logging.info("Loading positions from trading client.")
 
         manager = object.__new__(cls)
-        positions = trading_client.get_positions()
-        cash = trading_client.get_account().cash
+        positions = trading_client.positions
+        cash = trading_client.account.cash
         df = pd.DataFrame(
             {
                 "holdings": np.zeros(len(symbols), dtype=np.float32),
@@ -297,6 +316,11 @@ class PositionManager:
     ) -> None:
         """Populate this PositionManager from a mapping of positions (e.g. from a TradingClient)."""
         for sym, pos_list in client_positions.items():
+            if sym not in self.positions:
+                logging.warning(
+                    "Symbol %s not in PositionManager symbols; skipping", sym
+                )
+                continue
             total = 0.0
             for pos in pos_list:
                 self.positions[sym].append(pos)
