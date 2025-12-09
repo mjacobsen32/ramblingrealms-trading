@@ -6,8 +6,8 @@ from alpaca.data.historical.stock import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrameUnit
 
-from trading.cli.alg.config import DataConfig, DataRequests, FeatureConfig
-from trading.cli.trading.trade_config import PortfolioConfig, RRTradeConfig
+from trading.cli.alg.config import DataConfig, DataRequests, FeatureConfig, StockEnv
+from trading.cli.trading.trade_config import RRTradeConfig
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.data_process.data_loader import DataLoader, DataSourceType
 from trading.src.alg.environments.trading_environment import TradingEnv
@@ -32,18 +32,17 @@ class Trade:
             self.meta_data["type"],
             self.meta_data["version"],
         )
+        self.env_config = StockEnv.model_validate(self.meta_data["env_config"])
+        self.data_config = DataConfig.model_validate(self.meta_data["data_config"])
+        self.portfolio_config = self.env_config.portfolio_config
+        self.config.portfolio_config = self.portfolio_config
+
         feature_cfg = FeatureConfig.model_validate(self.meta_data)
         self.active_features = getattr(feature_cfg, "features", [])
         logging.debug("Active features: %s", self.active_features)
-        self.env_config = self.meta_data.get("env_config", {})
-        self.portfolio_config = PortfolioConfig(
-            **self.env_config.get("portfolio_config", {})
-        )
-
-        self.data_config = DataConfig.model_validate(self.meta_data["data_config"])
 
         self.live = live
-        self.trading_client = TradingClient.from_config(config, live)
+        self.trading_client = TradingClient.from_config(self.config, live)
 
         user_cache = UserCache().load()
         alpaca_api_key = user_cache.alpaca_api_key
@@ -142,7 +141,7 @@ class Trade:
         logging.debug("feature columns: %s", get_feature_cols(self.active_features))
 
         obs = TradingEnv.observation(
-            df[-(self.env_config.get("lookback_window") + 1) :],
+            df[-(self.env_config.lookback_window + 1) :],
             self.pf.state(),
             get_feature_cols(self.active_features),
             prices,

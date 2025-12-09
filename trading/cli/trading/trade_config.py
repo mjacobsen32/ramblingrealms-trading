@@ -1,4 +1,5 @@
 from enum import Enum
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -27,12 +28,19 @@ class RRTradeConfig(BaseModel):
         - require trade approval
     """
 
+    id: UUID = Field(
+        default=UUID("00000000-0000-0000-0000-000000000001"),
+        description="User ID for the trading account.",
+    )
+    account_number: str = Field(
+        default="000-000-000", description="Account number for the trading account."
+    )
     model_path: ProjectPath = Field(
         default_factory=lambda: ProjectPath.model_construct(),
         description="Path to the trained model.",
     )
     broker: BrokerType = Field(
-        BrokerType.LOCAL, description="Broker to use for trading."
+        default=BrokerType.LOCAL, description="Broker to use for trading."
     )
     broker_kwargs: dict = Field(
         default_factory=dict, description="Additional broker-specific arguments."
@@ -58,6 +66,6 @@ class RRTradeConfig(BaseModel):
         description="Path to the output directory.",
     )
     portfolio_config: PortfolioConfig | None = Field(
-        None,
+        default=None,
         description="Portfolio configuration. If None, the configuration saved with the model will be used",
     )

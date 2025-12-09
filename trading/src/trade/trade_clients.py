@@ -8,7 +8,8 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from alpaca.trading.client import TradingClient as AlpacaTradingClient
-from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
+from alpaca.trading.enums import AccountStatus, OrderSide, OrderType, TimeInForce
+from alpaca.trading.models import TradeAccount
 from alpaca.trading.requests import OrderRequest
 
 try:
@@ -47,9 +48,10 @@ class TradingClient(ABC):
         else:
             raise ValueError(f"Unsupported broker type: {config.broker}")
 
-    def __init__(self, live: bool = False, config: RRTradeConfig | None = None):
+    def __init__(self, live: bool, config: RRTradeConfig):
         self.live = live
         self.config = config
+        logging.info("Init Base Trading Client; cfg: %s", config)
         user_cache = UserCache().load()
         self.alpaca_api_key = user_cache.alpaca_api_key
         self.alpaca_api_secret = user_cache.alpaca_api_secret
@@ -79,7 +81,7 @@ class TradingClient(ABC):
         return pd.Series(prices)
 
     @abstractmethod
-    def get_account(self):
+    def get_account(self) -> TradeAccount:
         raise NotImplementedError
 
     @abstractmethod
@@ -105,6 +107,9 @@ class LocalTradingClient(TradingClient):
         logging.info("Initialized Local Trading Client")
         self.positions_path = self._resolve_path(config.positions_path, "positions")
         self.account_path = self._resolve_path(config.account_path, "account")
+
+    def __del__(self):
+        self._save_account()
 
     @staticmethod
     def _resolve_path(path_field, default_name: str) -> Path:
@@ -134,19 +139,37 @@ class LocalTradingClient(TradingClient):
             json.dumps(payload, indent=2, default=_json_default)
         )
 
-    def _load_account(self) -> dict:
+    def _load_account(self) -> None:
+        if self.config.portfolio_config is None:
+            raise ValueError(
+                "Portfolio config is required for local account initialization"
+            )
+        else:
+            init_cash = self.config.portfolio_config.initial_cash
         if not self.account_path.exists():
-            return {}
-        return json.loads(self.account_path.read_text())
-
-    def _save_account(self, payload: dict) -> None:
-        self.account_path.parent.mkdir(parents=True, exist_ok=True)
-        self.account_path.write_text(
-            json.dumps(payload, indent=2, default=_json_default)
+            self.account = TradeAccount(
+                id=self.config.id,
+                account_number=self.config.account_number,
+                status=AccountStatus.ACTIVE,
+                cash=str(init_cash),
+            )
+        else:
+            self.account = TradeAccount.model_validate_json(
+                self.account_path.read_text()
+            )
+        logging.info(
+            "Loaded account with id: %s; active cash: %s",
+            self.account.id,
+            self.account.cash,
         )
 
-    def get_account(self):
-        return self._load_account()
+    def _save_account(self) -> None:
+        self.account_path.parent.mkdir(parents=True, exist_ok=True)
+        self.account_path.write_text(self.account.model_dump_json(indent=2))
+
+    def get_account(self) -> TradeAccount:
+        self._load_account()
+        return self.account
 
     def get_positions(self) -> dict[str, deque[Position]]:
         positions = self._load_positions()
@@ -275,7 +298,7 @@ class AlpacaClient(TradingClient):
             "Initialized Alpaca Client: %s", self.account_details.account_number
         )
 
-    def get_account(self):
+    def get_account(self) -> TradeAccount:
         return self.account_details
 
     def get_positions(self) -> dict[str, deque[Position]]:

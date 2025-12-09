@@ -222,7 +222,7 @@ class PortfolioConfig(BaseModel):
 
 
 class StockEnv(BaseModel):
-    turbulence_threshold: Union[float, None] = Field(
+    turbulence_threshold: float | None = Field(
         None,
         description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
     )

@@ -262,7 +262,7 @@ class PositionManager:
 
         manager = object.__new__(cls)
         positions = trading_client.get_positions()
-        cash = trading_client.get_account().get("cash", initial_cash)
+        cash = trading_client.get_account().cash
         df = pd.DataFrame(
             {
                 "holdings": np.zeros(len(symbols), dtype=np.float32),
@@ -289,6 +289,7 @@ class PositionManager:
         )
         # Populate the instance's data structures using client positions
         manager.to_df(positions, df)
+        logging.info("PositionManager state: %s", manager.df)
         return manager
 
     def to_df(
