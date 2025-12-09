@@ -1,5 +1,10 @@
 {
     "model_path": "{PROJECT_ROOT}/models/ddpg.1.0.zip",
     "out_dir": "{PROJECT_ROOT}/out/trading",
-    "broker": "REMOTE"
+    "position_path":"positions/remote_paper_trading_positions_test.json",
+    "portfolio_path":"accounts/remote_paper_trading_account_test.json",
+    "broker": "REMOTE",
+    "broker_kwargs":{
+      "remote_bucket": "rr-trading"
+    }
 }

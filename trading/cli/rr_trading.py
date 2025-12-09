@@ -92,6 +92,23 @@ def setup():
         user.alpaca_api_secret_live = SecretStr(
             read_key(Prompt.ask("Enter your Alpaca API secret path for Live Trading"))
         )
+    remote_portfolio = Prompt.ask(
+        "Do you want to set up remote portfolio management with an S3 Client? (requires write access)",
+        default="n",
+    )
+    if remote_portfolio.lower() == "y":
+        # Remote portfolio setup
+        user.r2_access_key_id = SecretStr(
+            read_key(Prompt.ask("Enter your S3 Client Access Key ID (PUBLIC) key path"))
+        )
+        user.r2_secret_access_key = SecretStr(
+            read_key(
+                Prompt.ask(
+                    "Enter your S3 Client Secret Access Key ID (PRIVATE) key path"
+                )
+            )
+        )
+        user.r2_endpoint_url = Prompt.ask("Enter your S3 Client Endpoint URL")
 
 
 @app.command(help="Run model on paper trading Alpaca Account")

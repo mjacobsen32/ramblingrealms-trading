@@ -6,7 +6,6 @@ from typing import Optional
 
 from appdirs import user_config_dir
 from pydantic import BaseModel, Field, SecretStr, field_serializer
-from rich.console import Console
 
 
 class UserCache(BaseModel):
@@ -37,6 +36,17 @@ class UserCache(BaseModel):
         default=SecretStr(""),
         description="Alpaca API Secret for Paper Trading and Market Data",
     )
+    r2_access_key_id: SecretStr = Field(
+        default=SecretStr(""), description="R2/S3 access key for remote trading"
+    )
+    r2_secret_access_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="R2/S3 secret key for remote trading",
+    )
+    r2_endpoint_url: str = Field(
+        default="",
+        description="R2/S3 endpoint URL for remote trading client (optional).",
+    )
     out_dir: Path = Field(
         default=Path(""),
         description="Output directory for saving results",
@@ -55,7 +65,15 @@ class UserCache(BaseModel):
             )
         )
 
-    @field_serializer("alpaca_api_key", "alpaca_api_secret", when_used="json")
+    @field_serializer(
+        "alpaca_api_key",
+        "alpaca_api_secret",
+        "r2_secret_access_key",
+        "alpaca_api_key_live",
+        "alpaca_api_secret_live",
+        "r2_access_key_id",
+        when_used="json",
+    )
     def dump_secret(self, v):
         return v.get_secret_value()
 

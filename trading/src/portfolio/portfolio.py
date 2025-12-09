@@ -32,10 +32,6 @@ class Portfolio:
         Initialize the Portfolio
         """
         self.cfg = cfg
-        self.initial_cash = cfg.initial_cash
-        self._net_value: float = cfg.initial_cash
-        self.cash = cfg.initial_cash
-        self.nav: float = 0.0
         self.vbt_pf: vbt.Portfolio | None = None
         if position_manager is None:
             # Create a default PositionManager for caller provided symbols.
@@ -73,7 +69,7 @@ class Portfolio:
             price=price,
             size=size,
             size_type=0,  # amount
-            init_cash=self.initial_cash,
+            init_cash=self.position_manager.initial_cash(),
             log=True,
             cash_sharing=True,
             freq="d",
@@ -86,32 +82,12 @@ class Portfolio:
         Returns:
             pd.Series: [internal_cash, positions].
         """
-        return np.concatenate([[self.cash], self.position_manager["holdings"]])
-
-    def net_value(self) -> float:
-        """
-        Calculate the net value of the portfolio.
-        """
-        # If we have a persistent df with prices, compute nav using the latest prices
-        try:
-            if self.persistent_df is not None and not self.persistent_df.empty:
-                # Last timestamp prices
-                latest = self.persistent_df.reset_index().drop_duplicates(
-                    "symbol", keep="last"
-                )
-                prices = latest.set_index("symbol")["price"]
-                nav = self.position_manager.nav(prices)
-            else:
-                nav = 0.0
-        except Exception:
-            # Fall back to zero nav if any issues
-            nav = 0.0
-        self._net_value = float(self.cash + nav)
-        return self._net_value
-
-    @property
-    def total_value(self) -> float:
-        return self._net_value
+        return np.concatenate(
+            [
+                [self.position_manager.available_cash()],
+                self.position_manager["holdings"],
+            ]
+        )
 
     def enforce_trade_rules(
         self,
@@ -151,7 +127,7 @@ class Portfolio:
             Scale the actions to the portfolio value
         """
 
-        buy_limit = self.cfg.trade_limit_percent * self._net_value
+        buy_limit = self.cfg.trade_limit_percent * self.position_manager.net_value()
 
         buy_values = df.loc[buy_mask, "size"].to_numpy() * prices[buy_mask_arr]
 
@@ -160,10 +136,12 @@ class Portfolio:
 
         attempted_buy = capped_values.sum()
 
-        if attempted_buy > self.cash:
+        if attempted_buy > self.position_manager.available_cash():
             # use the number of buys not the length of the series to avoid division by zero/miscount
             num_buys = int(buy_mask.sum())
-            buy_limit = min(buy_limit, self.cash // max(num_buys, 1))
+            buy_limit = min(
+                buy_limit, self.position_manager.available_cash() // max(num_buys, 1)
+            )
 
         logging.debug("Buy Limit dollar amount: %s", buy_limit)
 
@@ -204,7 +182,8 @@ class Portfolio:
 
         # Calculate max shares allowed by hmax and trade_limit
         max_trade_value = min(
-            self.cfg.hmax, self.cfg.trade_limit_percent * self._net_value
+            self.cfg.hmax,
+            self.cfg.trade_limit_percent * self.position_manager.net_value(),
         )
         # safe integer division to get maximum number of shares per symbol
         max_shares = (max_trade_value // price_vals).astype(np.float64)
@@ -233,10 +212,6 @@ class Portfolio:
         """
         # Reduce df to a single datetime index (symbols only)
         df, step_profit = self.position_manager.step(df)
-
-        self.cash = self.cash - (df["size"] * df["price"]).sum()
-        self._net_value = self.cash + self.position_manager.nav(df["price"])
-        self.nav = self.position_manager.nav(df["price"])
         logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
 
         return step_profit
@@ -298,9 +273,6 @@ class Portfolio:
         """
         Reset the portfolio to an empty state.
         """
-        self.initial_cash = self.cfg.initial_cash
-        self._net_value = self.initial_cash
-        self.cash = self.initial_cash
         self.vbt_pf = None
         self.position_manager.reset()
         logging.debug("Portfolio has been reset.\n%s", self)
@@ -414,7 +386,7 @@ class Portfolio:
         """
         String representation of the Portfolio.
         """
-        return f"Portfolio(initial_cash={self.initial_cash}, total_value={self._net_value}, cash={self.cash})"
+        return f"Portfolio(initial_cash={self.position_manager.initial_cash()}, total_value={self.position_manager.net_value()}, cash={self.position_manager.available_cash()})"
 
     def get_positions(self) -> PositionManager:
         """

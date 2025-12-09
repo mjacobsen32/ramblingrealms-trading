@@ -1,11 +1,13 @@
 import logging
 from collections import deque
 from enum import Enum
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
-from trading.src.trade.trade_clients import TradingClient
+if TYPE_CHECKING:
+    from trading.src.trade.trade_clients import TradingClient
 
 
 class PositionType(str, Enum):
@@ -38,17 +40,25 @@ class Position(np.ndarray):
     IDX_POSITION_TYPE = 7
 
     def __new__(
-        cls, symbol: str, lot_size: float, enter_price: float, enter_date: pd.Timestamp
+        cls,
+        symbol: str,
+        lot_size: float,
+        enter_price: float,
+        enter_date: pd.Timestamp,
+        exit_date: pd.Timestamp | None = None,
+        exit_price: float | None = None,
+        exit_size: float | None = None,
+        position_type: PositionType = PositionType.LONG,
     ):
         data = [
             symbol,  # symbol
             lot_size,  # lot_size
             enter_date,  # enter_date
             enter_price,  # enter_price
-            None,  # exit_date (default)
-            None,  # exit_price (default)
-            0.0,  # exit_size (default)
-            PositionType.LONG,  # position_type (default to LONG)
+            exit_date,  # exit_date
+            exit_price,  # exit_price
+            exit_size,  # exit_size
+            position_type,  # position_type
         ]
         obj = np.asarray(data, dtype=object).view(cls)
         return obj
@@ -153,20 +163,30 @@ class PositionManager:
         max_lots: int | None = None,
         maintain_history: bool = True,
         initial_cash: float = 0.0,
+        df: pd.DataFrame | None = None,
+        positions: dict[str, deque[Position]] | None = None,
+        cash: float | None = None,
     ):
         self.symbols = symbols
         self.max_lots: int | None = max_lots
-        self.df = pd.DataFrame(
-            {
-                "holdings": np.zeros(len(symbols), dtype=np.float32),
-                "position_counts": np.zeros(len(symbols), dtype=np.int32),
-                "rolling_profit": np.zeros(len(symbols), dtype=np.float32),
-            },
-            index=symbols,
-        )
-        self.positions: dict[str, deque[Position]] = {
-            symbol: deque(maxlen=self.max_lots) for symbol in symbols
-        }
+        self._initial_cash = float(initial_cash)
+        self._cash = float(initial_cash if cash is None else cash)
+        if df is None:
+            self.df = pd.DataFrame(
+                {
+                    "holdings": np.zeros(len(symbols), dtype=np.float32),
+                    "position_counts": np.zeros(len(symbols), dtype=np.int32),
+                    "rolling_profit": np.zeros(len(symbols), dtype=np.float32),
+                    "price": np.zeros(len(symbols), dtype=np.float32),
+                },
+                index=symbols,
+            )
+        else:
+            self.df = df
+        if positions is not None:
+            self.positions = positions
+        else:
+            self.positions = {symbol: deque(maxlen=self.max_lots) for symbol in symbols}
         self.history: list[Position] = []
         self.maintain_history = maintain_history
         logging.info("Initializing PositionManager for symbols: %s", symbols)
@@ -195,6 +215,61 @@ class PositionManager:
         self.df["rolling_profit"] = 0.0
         self.history = []
         self.positions = {symbol: deque() for symbol in self.symbols}
+
+    @classmethod
+    def from_client(
+        cls,
+        trading_client: "TradingClient",
+        symbols: list[str],
+        max_lots: int | None = None,
+        maintain_history: bool = True,
+        initial_cash: float = 0.0,
+        initial_prices: pd.Series | None = None,
+    ) -> "PositionManager":
+        logging.info("Loading positions from trading client.")
+
+        manager = object.__new__(cls)
+        positions = trading_client.get_positions()
+        cash = trading_client.get_account().get("cash", initial_cash)
+        df = pd.DataFrame(
+            {
+                "holdings": np.zeros(len(symbols), dtype=np.float32),
+                "position_counts": np.zeros(len(symbols), dtype=np.int32),
+                "rolling_profit": np.zeros(len(symbols), dtype=np.float32),
+                "price": (
+                    initial_prices
+                    if initial_prices is not None
+                    else np.zeros(len(symbols), dtype=np.float32)
+                ),
+            },
+            index=symbols,
+        )
+        # Initialize core attributes first so methods that rely on them can run
+        PositionManager.__init__(
+            self=manager,
+            symbols=symbols,
+            max_lots=max_lots,
+            maintain_history=maintain_history,
+            initial_cash=initial_cash,
+            df=df,
+            positions=None,  # create fresh deques and then populate them with to_df
+            cash=cash,
+        )
+        # Populate the instance's data structures using client positions
+        manager.to_df(positions, df)
+        return manager
+
+    def to_df(
+        self, client_positions: dict[str, deque["Position"]], df: pd.DataFrame
+    ) -> None:
+        """Populate this PositionManager from a mapping of positions (e.g. from a TradingClient)."""
+        for sym, pos_list in client_positions.items():
+            total = 0.0
+            for pos in pos_list:
+                self.positions[sym].append(pos)
+                total += float(pos.lot_size)
+            df.loc[sym, "holdings"] = total
+            df.loc[sym, "position_counts"] = len(pos_list)
 
     def _append(self, df: pd.DataFrame):
         for sym, row in df.iterrows():
@@ -273,6 +348,8 @@ class PositionManager:
             df.loc[buy_symbols, "size"]
         )
 
+        self._cash -= (df.loc[buy_symbols, "size"] * df.loc[buy_symbols, "price"]).sum()
+
         self.df.loc[sell_symbols, "holdings"] += exit_view.loc[sell_symbols, "size"]
         self.df.loc[sell_symbols, "position_counts"] += np.sign(
             exit_view.loc[sell_symbols, "size"]
@@ -281,27 +358,38 @@ class PositionManager:
             sell_symbols, "profit"
         ]
 
+        self._cash += exit_view.loc[sell_symbols, "profit"].sum()
+
+        self.df["price"] = df["price"].reindex(self.df.index).fillna(0.0)
+
         df.loc[sell_symbols, "size"] = exit_view.loc[sell_symbols, "size"]
 
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
 
         return df, exit_view["profit"].sum()
 
-    def nav(self, prices: pd.Series) -> float:
+    def available_cash(self) -> float:
+        """
+        Return the available cash of the portfolio.
+        """
+        return self._cash
+
+    def initial_cash(self) -> float:
+        """
+        Return the initial cash of the portfolio.
+        """
+        return self._initial_cash
+
+    def nav(self, prices: pd.Series | None = None) -> float:
         """
         Calculate the net asset value (NAV) of the portfolio.
         """
-        # Reindex the prices against the positions index to ensure alignment by values
-        # (avoid joining on index names which can raise "cannot join with no overlapping index names").
-        prices_aligned = prices.reindex(self.df.index).fillna(0.0)
-        return (self.df["holdings"] * prices_aligned).sum()
+        if prices is not None:
+            self.df["price"] = prices
+        return (self.df["holdings"] * self.df["price"]).sum()
 
-    def net_value(self) -> float:
-        """
-        ! TODO implement this func I reckon
-        Calculate the net value of the portfolio.
-        """
-        return 0.0
+    def net_value(self, prices: pd.Series | None = None) -> float:
+        return self.available_cash() + self.nav(prices)
 
 
 class LivePositionManager(PositionManager):
@@ -314,13 +402,24 @@ class LivePositionManager(PositionManager):
 
     def __init__(
         self,
-        trading_client: TradingClient,
+        trading_client: "TradingClient",
         symbols: list[str],
         max_lots: int | None = None,
         maintain_history: bool = True,
         initial_cash: float = 0,
+        initial_prices: pd.Series | None = None,
     ):
-        super().__init__(symbols, max_lots, maintain_history, initial_cash)
+        # Create a fully initialized PositionManager and copy its state onto this instance
+        manager = PositionManager.from_client(
+            trading_client=trading_client,
+            symbols=symbols,
+            max_lots=max_lots,
+            maintain_history=maintain_history,
+            initial_cash=initial_cash,
+            initial_prices=initial_prices,
+        )
+        # copy manager attributes (including _cash) into this LivePositionManager instance
+        self.__dict__.update(manager.__dict__)
         self.trading_client = trading_client
 
     def reset(self):
@@ -330,5 +429,5 @@ class LivePositionManager(PositionManager):
 
     def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:
         df, profit = super().step(df)
-        df, profit = self.trading_client.execute_trades(df)
+        df, profit = self.trading_client.execute_trades(df, self.positions)
         return df, profit

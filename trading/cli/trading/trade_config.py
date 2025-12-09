@@ -37,6 +37,22 @@ class RRTradeConfig(BaseModel):
     broker_kwargs: dict = Field(
         default_factory=dict, description="Additional broker-specific arguments."
     )
+    positions_path: ProjectPath | None = Field(
+        default=None,
+        description="Path to positions JSON for local/remote brokers.",
+    )
+    account_path: ProjectPath | None = Field(
+        default=None,
+        description="Path to account JSON for local/remote brokers.",
+    )
+    remote_bucket: str | None = Field(
+        default=None,
+        description="Remote bucket (e.g., R2/S3) for storing trading state.",
+    )
+    remote_prefix: str | None = Field(
+        default=None,
+        description="Remote key prefix for trading state (positions/account).",
+    )
     out_dir: ProjectPath = Field(
         default_factory=lambda: ProjectPath.model_construct(),
         description="Path to the output directory.",

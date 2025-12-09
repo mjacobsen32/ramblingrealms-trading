@@ -57,6 +57,7 @@ class Trade:
                 else self.portfolio_config.max_positions
             ),
             maintain_history=False,
+            initial_prices=self.get_prices(),
         )
         self.pf = Portfolio(
             self.portfolio_config,
@@ -75,9 +76,9 @@ class Trade:
             self.active_features,
         )
 
-    def _load_data(self):
-        clock = self.trading_client.get_clock()
-        calendar = self.trading_client.get_calendar()
+    def _load_data(self) -> DataLoader:
+        clock = self.trading_client.alpaca_account_client.get_clock()
+        calendar = self.trading_client.alpaca_account_client.get_calendar()
         min_window = min_window_size(self.active_features) + 1
         logging.info("Determined min window size from features: %d", min_window)
         # TODO this does not allow for live trading in intraday sessions
@@ -152,6 +153,7 @@ class Trade:
 
         current_slice = df.iloc[[-1]]
         current_slice.loc[:, "action"] = actions
+        current_slice.loc[:, "price"] = prices
 
         ret = self.pf.step(current_slice, True)
 
