@@ -1,0 +1,8 @@
+{
+    "model_path": "{PROJECT_ROOT}/trading/test/models/ppo.zip",
+    "out_dir": "{PROJECT_ROOT}/trading/test/temp/out/",
+    "broker": "LOCAL",
+    "positions_path": "{PROJECT_ROOT}/trading/test/data/positions/local_paper_trading_positions.json",
+    "account_path": "{PROJECT_ROOT}/trading/test/data/accounts/local_paper_trading_account.json",
+    "defer_trade_execution": false
+}

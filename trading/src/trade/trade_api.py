@@ -1,8 +1,8 @@
 import datetime
 import logging
+from typing import Any
 
 import numpy as np
-from alpaca.data.historical.stock import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrameUnit
 
@@ -18,11 +18,16 @@ from trading.src.portfolio.portfolio import (
 )
 from trading.src.portfolio.position import LivePositionManager
 from trading.src.trade.trade_clients import TradingClient
-from trading.src.user_cache.user_cache import UserCache
 
 
 class Trade:
-    def __init__(self, config: RRTradeConfig, live: bool):
+    def __init__(
+        self,
+        config: RRTradeConfig,
+        market_data_client: Any,
+        alpaca_account_client: Any,
+        live: bool,
+    ):
         self.config = config
 
         self.model, self.meta_data = Agent.load_agent(config.model_path.as_path(), None)
@@ -36,20 +41,15 @@ class Trade:
         self.data_config = DataConfig.model_validate(self.meta_data["data_config"])
         self.portfolio_config = self.env_config.portfolio_config
         self.config.portfolio_config = self.portfolio_config
+        self.market_data_client = market_data_client
 
         feature_cfg = FeatureConfig.model_validate(self.meta_data)
         self.active_features = getattr(feature_cfg, "features", [])
         logging.debug("Active features: %s", self.active_features)
 
         self.live = live
-        self.trading_client = TradingClient.from_config(self.config, live)
-
-        user_cache = UserCache().load()
-        alpaca_api_key = user_cache.alpaca_api_key
-        alpaca_api_secret = user_cache.alpaca_api_secret
-
-        self.market_data_client = StockHistoricalDataClient(
-            alpaca_api_key.get_secret_value(), alpaca_api_secret.get_secret_value()
+        self.trading_client = TradingClient.from_config(
+            config=self.config, alpaca_account_client=alpaca_account_client, live=live
         )
 
         position_manager = LivePositionManager(
@@ -65,10 +65,10 @@ class Trade:
             initial_prices=self.get_prices(),
         )
         self.pf = Portfolio(
-            self.portfolio_config,
-            self.active_symbols,
-            position_manager,
-            (TimeFrameUnit.Day, 1),
+            cfg=self.portfolio_config,
+            symbols=self.active_symbols,
+            position_manager=position_manager,
+            time_step=(TimeFrameUnit.Day, 1),
         )
 
         logging.debug(
@@ -100,7 +100,7 @@ class Trade:
         # TODO offload requests meta data construction
         requests = [
             DataRequests(
-                dataset_name="live",
+                dataset_name="LIVE",
                 source=DataSourceType.ALPACA,
                 endpoint="StockBarsRequest",
                 kwargs={
@@ -110,19 +110,26 @@ class Trade:
             )
         ]
 
+        # TODO this is a bit hacky, refactor
         data_config = self.data_config
         data_config.start_date = str(start.date)
         data_config.end_date = str(end.date)
         data_config.requests = requests
+        data_config.validation_split = 0.0  # no validation for trading
+        data_config.cache_enabled = (
+            False if self.live else data_config.cache_enabled
+        )  # no caching for trading live
 
         logging.debug("Data Config: %s", data_config.model_dump_json(indent=4))
 
         feature_config = FeatureConfig(
             features=self.meta_data["features"], fill_strategy="interpolate"
         )
-        return DataLoader(
-            data_config=data_config, feature_config=feature_config, fetch_data=True
-        )
+
+        # TODO HACKY!
+        for f in feature_config.features:
+            f.source = "LIVE"
+        return DataLoader(data_config=data_config, feature_config=feature_config)
 
     def get_prices(self) -> np.ndarray:
         req = StockLatestTradeRequest(symbol_or_symbols=self.active_symbols)

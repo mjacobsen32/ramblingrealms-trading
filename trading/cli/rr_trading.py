@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from alpaca.data.historical.stock import StockHistoricalDataClient
+from alpaca.trading.client import TradingClient as AlpacaTradingClient
 from pydantic import SecretStr
 from rich.prompt import Prompt
 
@@ -135,7 +137,26 @@ def paper_trade(
     with Path.open(Path(config)) as f:
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
-    trade_client = Trade(rr_trade_config, live=False)
+
+    user_cache = User().load()
+    alpaca_api_key = user_cache.alpaca_api_key
+    alpaca_api_secret = user_cache.alpaca_api_secret
+
+    market_data_client = StockHistoricalDataClient(
+        alpaca_api_key.get_secret_value(), alpaca_api_secret.get_secret_value()
+    )
+
+    alpaca_account_client: AlpacaTradingClient = AlpacaTradingClient(
+        alpaca_api_key.get_secret_value(),
+        alpaca_api_secret.get_secret_value(),
+        paper=True,
+    )
+    trade_client = Trade(
+        config=rr_trade_config,
+        market_data_client=market_data_client,
+        alpaca_account_client=alpaca_account_client,
+        live=False,
+    )
     trade_client.run_model(
         predict_time=(
             datetime.datetime.fromisoformat(predict_time) if predict_time else None
@@ -165,10 +186,33 @@ def live_trade(
         logging.info("Live trading execution cancelled.")
         return
     logging.info("Running model on Alpaca live trading account...")
+
     with Path.open(Path(config)) as f:
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
-    trade_client = Trade(rr_trade_config, live=True)
+
+    user_cache = User().load()
+
+    alpaca_api_key = user_cache.alpaca_api_key_live
+    alpaca_api_secret = user_cache.alpaca_api_secret_live
+
+    market_data_client = StockHistoricalDataClient(
+        alpaca_api_key.get_secret_value(), alpaca_api_secret.get_secret_value()
+    )
+
+    alpaca_account_client: AlpacaTradingClient = AlpacaTradingClient(
+        alpaca_api_key.get_secret_value(),
+        alpaca_api_secret.get_secret_value(),
+        paper=True,
+    )
+
+    trade_client = Trade(
+        config=rr_trade_config,
+        market_data_client=market_data_client,
+        alpaca_account_client=alpaca_account_client,
+        live=True,
+    )
+
     trade_client.run_model()
 
 

@@ -123,7 +123,27 @@ class AlpacaDataLoader(DataSource):
                     )
                     raise
             if cache_enabled:
+                logging.info("Caching data to %s", cache_file)
                 df.to_parquet(cache_file)
+            else:
+                logging.info("Caching is disabled; not saving data to cache.")
+
+        logging.info("Length of fetched data: %d", len(df))
+
+        if df.index.get_level_values("symbol").nunique() != len(
+            request.kwargs["symbol_or_symbols"]
+        ):
+            logging.error(
+                "Requested %d symbols, but received data for %d symbols.",
+                len(request.kwargs["symbol_or_symbols"]),
+                df.index.get_level_values("symbol").nunique(),
+            )
+            raise ValueError("Mismatch in number of symbols fetched from Alpaca.")
+        logging.info(
+            "Start of fetched data: %s; End of fetched data: %s",
+            df.index.get_level_values("timestamp")[0],
+            df.index.get_level_values("timestamp")[-1],
+        )
         return df
 
 
@@ -160,12 +180,17 @@ class DataLoader:
                 data_config.cache_enabled,
                 data_config.time_step_period,
             )
-            for feature in [
-                f
-                for f in self.feature_config.features
-                if f.source == request.dataset_name or f.source is None
-            ]:
-                self.df = feature.to_df(self.df, data)
+            for feature in [f for f in self.feature_config.features]:
+                if feature.source == request.dataset_name or feature.source is None:
+                    self.df = feature.to_df(self.df, data)
+                else:
+                    logging.warning(
+                        "Skipping feature %s for source %s",
+                        feature.name,
+                        request.dataset_name,
+                    )
+
+        # ! if df is empty, raise error probably due to features having mis matched source names
 
         self.columns = self.df.columns
         self.features = get_feature_cols(features=self.feature_config.features)

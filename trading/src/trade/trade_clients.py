@@ -3,11 +3,11 @@ import logging
 from abc import ABC, abstractmethod
 from collections import deque
 from pathlib import Path
+from typing import Any
 
 import boto3
 import numpy as np
 import pandas as pd
-from alpaca.trading.client import TradingClient as AlpacaTradingClient
 from alpaca.trading.enums import AccountStatus
 from alpaca.trading.models import Position as AlpacaPosition
 from alpaca.trading.models import TradeAccount
@@ -34,29 +34,28 @@ def _json_default(obj: object):  # -> str | Any:
 
 class TradingClient(ABC):
     @classmethod
-    def from_config(cls, config: RRTradeConfig, live: bool = False) -> "TradingClient":
+    def from_config(
+        cls, config: RRTradeConfig, alpaca_account_client: Any, live: bool = False
+    ) -> "TradingClient":
         if config.broker == BrokerType.ALPACA:
-            return AlpacaClient(config=config, live=live)
+            return AlpacaClient(
+                config=config, alpaca_account_client=alpaca_account_client, live=live
+            )
         elif config.broker == BrokerType.LOCAL:
-            return LocalTradingClient(config=config)
+            return LocalTradingClient(
+                config=config, alpaca_account_client=alpaca_account_client, live=live
+            )
         elif config.broker == BrokerType.REMOTE:
-            return RemoteTradingClient(config=config)
+            return RemoteTradingClient(
+                config=config, alpaca_account_client=alpaca_account_client, live=live
+            )
         else:
             raise ValueError(f"Unsupported broker type: {config.broker}")
 
-    def __init__(self, live: bool, config: RRTradeConfig):
-        user_cache = UserCache().load()
-
+    def __init__(self, live: bool, config: RRTradeConfig, alpaca_account_client: Any):
         self.live = live
         self.config = config
-        self.alpaca_api_key = user_cache.alpaca_api_key
-        self.alpaca_api_secret = user_cache.alpaca_api_secret
-
-        self.alpaca_account_client: AlpacaTradingClient = AlpacaTradingClient(
-            self.alpaca_api_key.get_secret_value(),
-            self.alpaca_api_secret.get_secret_value(),
-            paper=not live,
-        )
+        self.alpaca_account_client = alpaca_account_client
 
         self._account = self._load_account()
         self._positions = self._load_positions()
@@ -91,10 +90,12 @@ class TradingClient(ABC):
 
 
 class LocalTradingClient(TradingClient):
-    def __init__(self, config: RRTradeConfig):
+    def __init__(self, config: RRTradeConfig, alpaca_account_client: Any, live: bool):
         self.positions_path = self._resolve_path(config.positions_path, "positions")
         self.account_path = self._resolve_path(config.account_path, "account")
-        super().__init__(live=False, config=config)
+        super().__init__(
+            live=live, config=config, alpaca_account_client=alpaca_account_client
+        )
         logging.info("Initialized Local Trading Client")
 
     def __del__(self) -> None:
@@ -157,11 +158,11 @@ class LocalTradingClient(TradingClient):
 
         self._positions = positions
 
-        return actions, actions.get("profit", 0.0).sum()
+        return actions, actions["profit"].sum()
 
 
 class RemoteTradingClient(TradingClient):
-    def __init__(self, config: RRTradeConfig):
+    def __init__(self, config: RRTradeConfig, alpaca_account_client: Any, live: bool):
         logging.info("Initialized Remote Trading Client")
         cache = UserCache().load()
         config.broker_kwargs.update(
@@ -176,7 +177,9 @@ class RemoteTradingClient(TradingClient):
         self.positions_key = str(config.positions_path)
         self.account_key = str(config.account_path)
 
-        super().__init__(live=True, config=config)
+        super().__init__(
+            live=True, config=config, alpaca_account_client=alpaca_account_client
+        )
 
         logging.info("RemoteTradingClient Initialized with S3 client")
 
@@ -280,32 +283,24 @@ class RemoteTradingClient(TradingClient):
             logging.info("Uploading trades to remote storage")
             self._write_account()
             self._write_positions()
-        return actions, 0.0
+        return actions, actions["profit"].sum()
 
 
 # TODO implement batched orders
 class AlpacaClient(TradingClient):
-    def __init__(self, config: RRTradeConfig, live: bool = False):
-        user_cache = UserCache().load()
-
-        if live:
-            self.alpaca_api_key = user_cache.alpaca_api_key_live
-            self.alpaca_api_secret = user_cache.alpaca_api_secret_live
-        else:
-            self.alpaca_api_key = user_cache.alpaca_api_key
-            self.alpaca_api_secret = user_cache.alpaca_api_secret
-
-        self.client: AlpacaTradingClient = AlpacaTradingClient(
-            self.alpaca_api_key.get_secret_value(),
-            self.alpaca_api_secret.get_secret_value(),
-            paper=not live,
+    def __init__(
+        self,
+        config: RRTradeConfig,
+        live: bool = False,
+        alpaca_account_client: Any = None,
+    ):
+        super().__init__(
+            live=live, config=config, alpaca_account_client=alpaca_account_client
         )
-
-        super().__init__(live=live, config=config)
 
     def _load_positions(self) -> dict[str, deque[Position]]:
         ret = dict[str, deque[Position]]()
-        alpaca_positions = self.client.get_all_positions()
+        alpaca_positions = self.alpaca_account_client.get_all_positions()
         for alpaca_pos in alpaca_positions:
             if isinstance(alpaca_pos, AlpacaPosition):
                 pos = Position.from_alpaca_position(alpaca_pos)
@@ -316,7 +311,7 @@ class AlpacaClient(TradingClient):
         return ret
 
     def _load_account(self) -> TradeAccount:
-        account = self.client.get_account()
+        account = self.alpaca_account_client.get_account()
         if isinstance(account, TradeAccount):
             logging.info(
                 "Loaded Alpaca account id: %s; cash: %s", account.id, account.cash
@@ -350,9 +345,9 @@ class AlpacaClient(TradingClient):
                 type="market",
                 time_in_force="day",
             )
-            self.client.submit_order(order)
+            self.alpaca_account_client.submit_order(order)
             logging.info("Submitting order: %s", order)
 
         self._positions = positions
 
-        return actions, actions.get("profit", 0.0).sum()
+        return actions, actions["profit"].sum()

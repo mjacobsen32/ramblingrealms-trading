@@ -279,7 +279,7 @@ class PositionManager:
         max_lots: int | None = None,
         maintain_history: bool = True,
         initial_cash: float = 0.0,
-        initial_prices: pd.Series | None = None,
+        initial_prices: np.ndarray | None = None,
     ) -> "PositionManager":
         logging.info("Loading positions from trading client.")
 
@@ -459,7 +459,7 @@ class LivePositionManager(PositionManager):
         max_lots: int | None = None,
         maintain_history: bool = True,
         initial_cash: float = 0,
-        initial_prices: pd.Series | None = None,
+        initial_prices: np.ndarray | None = None,
     ):
         # Create a fully initialized PositionManager and copy its state onto this instance
         manager = PositionManager.from_client(

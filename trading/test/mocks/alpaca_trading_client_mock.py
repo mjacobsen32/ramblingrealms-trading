@@ -1,0 +1,102 @@
+import datetime
+from typing import List, Optional
+from uuid import UUID
+
+from alpaca.broker import AccountStatus, AssetClass
+from alpaca.trading import AssetExchange, PositionSide
+from alpaca.trading.models import Calendar, Clock, Order, Position, TradeAccount
+from alpaca.trading.requests import GetCalendarRequest, OrderRequest
+
+
+class AlpacaTradingClientMock:
+    def get_clock(self) -> Clock:
+        return Clock(
+            timestamp=datetime.datetime.fromisoformat("2023-01-01T10:00:00+00:00"),
+            is_open=True,
+            next_open=datetime.datetime.fromisoformat("2023-01-01T10:08:00+00:00"),
+            next_close=datetime.datetime.fromisoformat("2023-01-01T10:16:00+00:00"),
+        )
+
+    def get_calendar(
+        self,
+        filters: Optional[GetCalendarRequest] = None,
+    ) -> List[Calendar]:
+        """Return a list of `Calendar` objects from 2012-01-01 up to
+        (today - 100 days).
+
+        This is a simple mock implementation that returns one Calendar per
+        calendar date. Each day's `open` is 09:30 UTC and `close` is 16:00 UTC.
+        If the end date is before the start date the function returns an
+        empty list.
+        """
+        end = datetime.date(2012, 1, 1)
+        start = end - datetime.timedelta(days=100)
+
+        calendars: List[Calendar] = []
+        current = start
+        while current <= end:
+            calendars.append(
+                Calendar(date=current.strftime("%Y-%m-%d"), open="09:30", close="16:00")
+            )
+            current += datetime.timedelta(days=1)
+
+        return calendars
+
+    def submit_order(self, order_data: OrderRequest) -> Order:
+        return Order(
+            id="order_123",
+            symbol=order_data.symbol,
+            qty=order_data.qty,
+            side=order_data.side,
+            type=order_data.type,
+            time_in_force=order_data.time_in_force,
+            status="filled",
+            filled_qty=order_data.qty,
+            filled_avg_price=100.0,
+            submitted_at=datetime.datetime.fromisoformat("2023-01-01T10:00:00+00:00"),
+            updated_at=datetime.datetime.fromisoformat("2023-01-01T10:05:00+00:00"),
+        )
+
+    def get_account(self) -> TradeAccount:
+        return TradeAccount(
+            id=UUID("account_123"),
+            account_number="account_number_123",
+            status=AccountStatus.ACTIVE,
+            cash="10000.0",
+            buying_power="20000.0",
+            portfolio_value="15000.0",
+        )
+
+    def get_all_positions(
+        self,
+    ) -> List[Position]:
+        return [
+            Position(
+                symbol="AAPL",
+                asset_id=UUID("asset_123"),
+                exchange=AssetExchange.NYSE,
+                asset_class=AssetClass.US_EQUITY,
+                side=PositionSide.LONG,
+                cost_basis="1500.0",
+                qty="10",
+                avg_entry_price="150.0",
+                current_price="155.0",
+                market_value="1550.0",
+                unrealized_pl="50.0",
+                unrealized_plpc="0.0323",
+            ),
+            Position(
+                symbol="TSLA",
+                asset_id=UUID("asset_124"),
+                exchange=AssetExchange.NYSE,
+                asset_class=AssetClass.US_EQUITY,
+                side=PositionSide.LONG,
+                cost_basis="3000.0",
+                qty="5",
+                avg_entry_price="600.0",
+                current_price="620.0",
+                market_value="3100.0",
+                unrealized_pl="100.0",
+                unrealized_plpc="0.0323",
+            ),
+        ]
