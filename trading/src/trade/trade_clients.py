@@ -159,6 +159,7 @@ class LocalTradingClient(TradingClient):
     def execute_trades(
         self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
     ) -> tuple[pd.DataFrame, float]:
+        self._positions = positions
         for sym, row in actions.iterrows():
             logging.info(
                 "sym: %s, size: %s, at price: %s, with signal: %s",
@@ -173,7 +174,6 @@ class LocalTradingClient(TradingClient):
             logging.info("Writing trades to disk")
             self._write_account()
             self._write_positions()
-        self._positions = positions
 
         return actions, actions["profit"].sum()
 

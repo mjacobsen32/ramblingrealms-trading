@@ -95,7 +95,7 @@ def test_local_client_read_write_positions(
     assert os.path.exists(str(local_trade_config.account_path))
     assert os.path.exists(str(local_trade_config.positions_path))
 
-    assert client._load_positions() == 1
+    assert len(client._load_positions()) == 1
 
 
 os.environ["MOTO_S3_CUSTOM_ENDPOINTS"] = (
