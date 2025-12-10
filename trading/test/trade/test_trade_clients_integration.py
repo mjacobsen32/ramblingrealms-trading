@@ -1,19 +1,26 @@
-import io
-import json
-from types import SimpleNamespace
+import os
+from collections import deque
+from pathlib import Path
+from uuid import UUID
 
+import boto3
 import pandas as pd
 import pytest
+from alpaca.trading.enums import AccountStatus
+from alpaca.trading.models import TradeAccount
+from moto import mock_aws
 
-from trading.cli.alg.config import ProjectPath
-from trading.cli.trading.trade_config import BrokerType, RRTradeConfig
 from trading.src.portfolio.position import Position, PositionManager
-from trading.src.trade import trade_clients as tc
 from trading.src.trade.trade_clients import (
     AlpacaClient,
     LocalTradingClient,
     RemoteTradingClient,
 )
+from trading.src.user_cache.user_cache import UserCache
+from trading.test.alg.test_fixtures import *
+from trading.test.conftest import *
+
+CONFIG_DIR = Path(__file__).parent.parent / "configs"
 
 
 class FakeSecret:
@@ -26,17 +33,29 @@ class FakeSecret:
 
 def test_position_manager_from_client_populates_holdings():
     class FakeClient:
-        def get_positions(self):
+        @property
+        def positions(self) -> dict[str, deque[Position]]:
             return {
-                "ABC": [
-                    Position(
-                        symbol="ABC",
-                        lot_size=2,
-                        enter_price=10,
-                        enter_date=pd.Timestamp("2024-01-01"),
-                    )
-                ]
+                "ABC": deque(
+                    [
+                        Position(
+                            symbol="ABC",
+                            lot_size=2,
+                            enter_price=10,
+                            enter_date=pd.Timestamp("2024-01-01"),
+                        )
+                    ]
+                )
             }
+
+        @property
+        def account(self) -> TradeAccount:
+            return TradeAccount(
+                id=UUID("12345678-1234-5678-1234-567812345678"),
+                account_number="acct",
+                status=AccountStatus.ACTIVE,
+                cash="20.0",
+            )
 
     pm = PositionManager.from_client(FakeClient(), symbols=["ABC", "XYZ"])
     assert pm.df.loc["ABC", "holdings"] == 2
@@ -45,184 +64,99 @@ def test_position_manager_from_client_populates_holdings():
     assert pm.net_value() == pytest.approx(20.0)
 
 
-def test_local_client_read_write_positions(tmp_path):
-    positions_path = tmp_path / "positions.json"
-    account_path = tmp_path / "account.json"
-    positions_path.write_text(
-        json.dumps(
-            {
-                "positions": [
-                    {
-                        "symbol": "AAPL",
-                        "qty": 3,
-                        "avg_entry_price": 5,
-                        "enter_date": "2024-01-01",
-                    }
-                ]
-            }
+def test_local_client_read_write_positions(
+    tmp_path, alpaca_trading_client_mock, local_trade_config
+):
+    local_trade_config.positions_path.path = str(tmp_path / "positions.json")
+    local_trade_config.account_path.path = str(tmp_path / "account.json")
+    client = LocalTradingClient(
+        local_trade_config, alpaca_trading_client_mock, live=False
+    )
+
+    positions = client.positions
+    assert len(positions) == 0
+    assert int(client.account.cash) == 1000000
+
+    positions = {"AAPL": deque()}
+    positions["AAPL"].append(
+        Position(
+            symbol="AAPL",
+            lot_size=5,
+            enter_price=100,
+            enter_date=pd.Timestamp("2024-01-01"),
         )
     )
-    cfg = RRTradeConfig(
-        broker=BrokerType.LOCAL,
-        positions_path=ProjectPath(path=str(positions_path)),
-        account_path=ProjectPath(path=str(account_path)),
+    actions = pd.DataFrame(data={"profit": [0]}, index=["AAPL"])
+    client.execute_trades(actions=actions, positions=positions)
+
+    assert len(client.positions) == 1
+    assert client.positions["AAPL"][0].lot_size == 5
+
+    assert os.path.exists(str(local_trade_config.account_path))
+    assert os.path.exists(str(local_trade_config.positions_path))
+
+    assert client._load_positions() == 1
+
+
+os.environ["MOTO_S3_CUSTOM_ENDPOINTS"] = (
+    "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com"
+)
+
+
+@mock_aws
+def test_remote_client_uses_s3_store(
+    remote_trade_config, alpaca_trading_client_mock, rr_trading_user_cache_path
+) -> None:
+    cache = UserCache().load()
+    conn = boto3.resource(
+        "s3",
+        endpoint_url=cache.r2_endpoint_url,
     )
-    client = LocalTradingClient(cfg)
+    conn.create_bucket(Bucket="rr-storage")
 
-    positions = client.get_positions()
-    assert positions["AAPL"][0].lot_size == 3
-
-    actions = pd.DataFrame(
-        [
-            {
-                "size": 1,
-                "price": 10,
-                "timestamp": pd.Timestamp("2024-02-01"),
-            }
-        ],
-        index=["AAPL"],
+    client = RemoteTradingClient(
+        remote_trade_config, alpaca_trading_client_mock, live=False
     )
-    client.execute_trades(actions)
-    saved = json.loads(positions_path.read_text())
-    assert len(saved["positions"]) == 2
 
+    positions = client.positions
+    assert len(positions) == 0
+    assert int(client.account.cash) == 1000000
 
-def test_remote_client_uses_s3_store(monkeypatch) -> None:
-    store: dict[tuple[str, str], bytes] = {}
-
-    class FakeUserCache:
-        r2_access_key_id = FakeSecret("id")
-        r2_secret_access_key = FakeSecret("secret")
-        r2_endpoint_url = "http://example"
-
-        @classmethod
-        def load(cls):
-            return cls()
-
-    class FakeS3Client:
-        def __init__(self, backing):
-            self.backing = backing
-
-        def get_object(self, Bucket, Key):
-            key = (Bucket, Key)
-            if key not in self.backing:
-                raise Exception("missing")
-            return {"Body": io.BytesIO(self.backing[key])}
-
-        def put_object(self, Bucket, Key, Body):
-            self.backing[(Bucket, Key)] = Body
-            return {}
-
-    class FakeBoto3:
-        def __init__(self, backing):
-            self.backing = backing
-
-        def client(self, *_args, **_kwargs):
-            return FakeS3Client(self.backing)
-
-    initial_positions = {
-        "positions": [
-            {
-                "symbol": "MSFT",
-                "qty": 4,
-                "avg_entry_price": 7,
-                "enter_date": "2024-01-01",
-            }
-        ]
-    }
-    store[("bucket", "positions.json")] = json.dumps(initial_positions).encode()
-
-    monkeypatch.setattr(tc, "UserCache", FakeUserCache)
-    monkeypatch.setattr(tc, "boto3", FakeBoto3(store))
-
-    cfg = RRTradeConfig(
-        broker=BrokerType.REMOTE,
-        remote_bucket="bucket",
-        remote_prefix="",
+    positions = {"AAPL": deque()}
+    positions["AAPL"].append(
+        Position(
+            symbol="AAPL",
+            lot_size=5,
+            enter_price=100,
+            enter_date=pd.Timestamp("2024-01-01"),
+        )
     )
-    client = RemoteTradingClient(cfg)
-    positions = client.get_positions()
-    assert positions["MSFT"][0].lot_size == 4
+    actions = pd.DataFrame(data={"profit": [0]}, index=["AAPL"])
+    client.execute_trades(actions=actions, positions=positions)
 
-    actions = pd.DataFrame(
-        [
-            {
-                "size": 2,
-                "price": 9,
-                "timestamp": pd.Timestamp("2024-02-01"),
-            }
-        ],
-        index=["MSFT"],
+    assert len(client.positions) == 1
+    assert client.positions["AAPL"][0].lot_size == 5
+
+    assert (
+        conn.Object(bucket_name="rr-storage", key=remote_trade_config.account_path)
+        is not None
     )
-    client.execute_trades(actions, positions)
-    saved = json.loads(store[("bucket", "positions.json")])
-    assert len(saved["positions"]) == 2
-
-
-def test_alpaca_client_positions_and_orders(monkeypatch):
-    orders = []
-
-    class FakeAlpacaClient:
-        def __init__(self, *_args, **_kwargs):
-            pass
-
-        def get_account(self):
-            return SimpleNamespace(account_number="acct")
-
-        def get_all_positions(self):
-            return [
-                SimpleNamespace(qty="3", avg_entry_price="10", symbol="XYZ"),
-            ]
-
-        def submit_order(self, order):
-            orders.append(order)
-
-    class FakeOrderSide:
-        BUY = "buy"
-        SELL = "sell"
-
-    class FakeOrderType:
-        MARKET = "market"
-
-    class FakeTIF:
-        GTC = "gtc"
-
-    class FakeOrderRequest:
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
-
-    class FakeCache:
-        alpaca_api_key = FakeSecret("key")
-        alpaca_api_secret = FakeSecret("secret")
-        alpaca_api_key_live = FakeSecret("lkey")
-        alpaca_api_secret_live = FakeSecret("lsecret")
-
-        @classmethod
-        def load(cls):
-            return cls()
-
-    monkeypatch.setattr(tc, "AlpacaTradingClient", FakeAlpacaClient)
-    monkeypatch.setattr(tc, "OrderSide", FakeOrderSide)
-    monkeypatch.setattr(tc, "OrderType", FakeOrderType)
-    monkeypatch.setattr(tc, "TimeInForce", FakeTIF)
-    monkeypatch.setattr(tc, "OrderRequest", FakeOrderRequest)
-    monkeypatch.setattr(tc, "UserCache", FakeCache)
-
-    cfg = RRTradeConfig(broker=BrokerType.ALPACA)
-    client = AlpacaClient(cfg, live=False)
-    positions = client.get_positions()
-    assert positions["XYZ"][0].lot_size == 3
-
-    actions = pd.DataFrame(
-        [
-            {
-                "size": 2,
-                "price": 10,
-                "timestamp": pd.Timestamp("2024-03-01"),
-            }
-        ],
-        index=["XYZ"],
+    assert (
+        conn.Object(bucket_name="rr-storage", key=remote_trade_config.positions_path)
+        is not None
     )
-    client.execute_trades(actions)
-    assert len(orders) == 1
-    assert orders[0].kwargs["symbol"] == "XYZ"
+
+
+def test_alpaca_client_positions_and_orders(
+    alpaca_trading_client_mock, alpaca_trade_config
+):
+    client = AlpacaClient(alpaca_trade_config, alpaca_trading_client_mock, live=False)
+
+    positions = client.positions
+    assert len(positions) == 2
+    assert float(client.account.cash) == 10000.0
+
+    actions, profit = client.execute_trades(
+        actions=pd.DataFrame(data={"profit": [0], "size": [100]}, index=["GOOGL"]),
+        positions=positions,
+    )

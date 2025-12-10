@@ -44,7 +44,10 @@ class AlpacaTradingClientMock:
 
     def submit_order(self, order_data: OrderRequest) -> Order:
         return Order(
-            id="order_123",
+            id=UUID("{12345678-1234-5678-1234-567812345678}"),
+            client_order_id="{12345678-1234-5678-1234-567812345678}",
+            created_at=datetime.datetime.fromisoformat("2023-01-01T10:00:00+00:00"),
+            extended_hours=False,
             symbol=order_data.symbol,
             qty=order_data.qty,
             side=order_data.side,
@@ -59,7 +62,7 @@ class AlpacaTradingClientMock:
 
     def get_account(self) -> TradeAccount:
         return TradeAccount(
-            id=UUID("account_123"),
+            id=UUID("{12345678-1234-5678-1234-567812345678}"),
             account_number="account_number_123",
             status=AccountStatus.ACTIVE,
             cash="10000.0",
@@ -73,7 +76,7 @@ class AlpacaTradingClientMock:
         return [
             Position(
                 symbol="AAPL",
-                asset_id=UUID("asset_123"),
+                asset_id=UUID("{12345678-1234-5678-1234-567812345678}"),
                 exchange=AssetExchange.NYSE,
                 asset_class=AssetClass.US_EQUITY,
                 side=PositionSide.LONG,
@@ -87,7 +90,7 @@ class AlpacaTradingClientMock:
             ),
             Position(
                 symbol="TSLA",
-                asset_id=UUID("asset_124"),
+                asset_id=UUID("{12345678-1234-5678-1234-567812345678}"),
                 exchange=AssetExchange.NYSE,
                 asset_class=AssetClass.US_EQUITY,
                 side=PositionSide.LONG,

@@ -99,14 +99,26 @@ class LocalTradingClient(TradingClient):
         logging.info("Initialized Local Trading Client")
 
     def __del__(self) -> None:
-        self.account_path.parent.mkdir(parents=True, exist_ok=True)
-        self.account_path.write_text(self.account.model_dump_json(indent=2))
+        self._write_positions()
+        self._write_account()
 
     @staticmethod
     def _resolve_path(path_field, default_name: str) -> Path:
         if path_field is not None:
             return path_field.as_path()
         raise ValueError(f"No path configured for local trading {default_name} data")
+
+    def _write_positions(self) -> None:
+        self.positions_path.parent.mkdir(parents=True, exist_ok=True)
+        self.positions_path.write_text(
+            json.dumps(self.positions, default=_json_default, indent=2)
+        )
+        logging.info("Wrote local positions to %s", self.positions_path)
+
+    def _write_account(self) -> None:
+        self.account_path.parent.mkdir(parents=True, exist_ok=True)
+        self.account_path.write_text(self.account.model_dump_json(indent=2))
+        logging.info("Wrote local account to %s", self.account_path)
 
     def _load_positions(self) -> dict[str, deque[Position]]:
         ret = dict[str, deque[Position]]()
@@ -155,7 +167,12 @@ class LocalTradingClient(TradingClient):
                 row.get("price"),
                 row.get("action"),
             )
-
+        if self.config.defer_trade_execution:
+            logging.info("Deferring trade execution; not writing to disk")
+        else:
+            logging.info("Writing trades to disk")
+            self._write_account()
+            self._write_positions()
         self._positions = positions
 
         return actions, actions["profit"].sum()
@@ -172,7 +189,6 @@ class RemoteTradingClient(TradingClient):
                 "endpoint_url": cache.r2_endpoint_url,
             }
         )
-
         self._client = boto3.client(**config.broker_kwargs)
         self.positions_key = str(config.positions_path)
         self.account_key = str(config.account_path)
@@ -291,8 +307,8 @@ class AlpacaClient(TradingClient):
     def __init__(
         self,
         config: RRTradeConfig,
-        live: bool = False,
         alpaca_account_client: Any = None,
+        live: bool = False,
     ):
         super().__init__(
             live=live, config=config, alpaca_account_client=alpaca_account_client

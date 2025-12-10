@@ -1,0 +1,12 @@
+{
+    "polygon_access_token_path": ".",
+    "alpaca_api_key_live": "",
+    "alpaca_api_secret_live": "",
+    "alpaca_api_key": "aaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "alpaca_api_secret": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "r2_access_key_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "r2_secret_access_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "r2_endpoint_url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com",
+    "out_dir": ".",
+    "backtest_dir": "."
+}
