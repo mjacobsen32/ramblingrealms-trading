@@ -95,7 +95,6 @@ class Agent:
         # Determine path
         if isinstance(config, AgentConfig):
             zip_path = config.save_path.as_path()
-            algo = config.algo.lower()
         else:
             zip_path = config
             # If config is str, we can't get algo, so will read from meta_data.json

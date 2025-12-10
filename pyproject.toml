@@ -5,12 +5,8 @@ description = "Rambling Realms Trading Platform"
 license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
-authors = [
-  { name = "Matthew Jacobsen", email = "matthewjacobsen1999@gmail.com" },
-]
-maintainers = [
-  { name = "Matthew Jacobsen", email = "matthewjacobsen1999@gmail.com" },
-]
+authors = [{ name = "Matthew Jacobsen", email = "mjacobsen.pro@gmail.com" }]
+maintainers = [{ name = "Matthew Jacobsen", email = "mjacobsen.pro@gmail.com" }]
 keywords = [
   "trading",
   "finance",
@@ -116,6 +112,8 @@ omit = [
   "**/test/**",
   "**/user_cache/**",
   "**/polygon_io.py",
+
+  # The CLI entrypoint's inject remote dependencies (hard to test), and not quite critical for unittesting
   "trading/cli/rr_trading.py",
 ]
 source = ["trading"]
