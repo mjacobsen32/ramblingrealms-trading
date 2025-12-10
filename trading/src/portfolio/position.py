@@ -346,6 +346,7 @@ class PositionManager:
     def _exit_positions(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Exit positions based on the provided DataFrame.
+        ! Removing the whole lots thing would reduce complexity and speed. AKA single "position" per symbol with size attribute.
         """
         for row in df.itertuples(index=True):
             sym = row.Index
@@ -357,11 +358,11 @@ class PositionManager:
                 remaining_lot -= max_to_take
                 queue[0][Position.IDX_LOT_SIZE] -= max_to_take
 
-                position = (
-                    queue.popleft()
-                    if queue[0][Position.IDX_LOT_SIZE] == 0
-                    else queue[0]
-                )
+                if queue[0][Position.IDX_LOT_SIZE] == 0:
+                    position = queue.popleft()
+                    self.df.at[sym, "position_counts"] -= 1
+                else:
+                    position = queue[0]
 
                 position_profit = position.exit(
                     exit_date=row.timestamp,
@@ -398,36 +399,26 @@ class PositionManager:
         sell_mask = (df["size"] < 0) & (
             self.df["holdings"].reindex(df.index).fillna(0) > 0
         )
-        exit_view = self._exit_positions(df[sell_mask])
 
         # Use explicit symbol indexes for self.df updates to avoid misaligned boolean indexing
         buy_symbols = df.index[buy_mask]
         sell_symbols = df.index[sell_mask]
 
-        self.df.loc[buy_symbols, "holdings"] += df.loc[buy_symbols, "size"]
+        df[sell_mask] = self._exit_positions(df[sell_mask])
+
+        df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
+
+        self._cash -= (df["size"] * df["price"]).sum()
+        self.df["holdings"] += df["size"]
         self.df.loc[buy_symbols, "position_counts"] += np.sign(
             df.loc[buy_symbols, "size"]
         )
 
-        self._cash -= (df.loc[buy_symbols, "size"] * df.loc[buy_symbols, "price"]).sum()
+        self.df.loc[sell_symbols, "rolling_profit"] += df.loc[sell_symbols, "profit"]
 
-        self.df.loc[sell_symbols, "holdings"] += exit_view.loc[sell_symbols, "size"]
-        self.df.loc[sell_symbols, "position_counts"] += np.sign(
-            exit_view.loc[sell_symbols, "size"]
-        )
-        self.df.loc[sell_symbols, "rolling_profit"] += exit_view.loc[
-            sell_symbols, "profit"
-        ]
+        self.df["price"] = df["price"]
 
-        self._cash += exit_view.loc[sell_symbols, "profit"].sum()
-
-        self.df["price"] = df["price"].reindex(self.df.index).fillna(0.0)
-
-        df.loc[sell_symbols, "size"] = exit_view.loc[sell_symbols, "size"]
-
-        df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
-
-        return df, exit_view["profit"].sum()
+        return df, df.loc[sell_symbols, "profit"].sum()
 
     def available_cash(self) -> float:
         """

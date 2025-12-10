@@ -210,24 +210,29 @@ class TradingEnv(gym.Env):
 
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "net_value"
-        ] = self.pf.net_value()
+        ] = self.pf.position_manager.net_value()
         previous_net_value = (
             self.stats.loc[
                 self.observation_timestamp[self.observation_index - 1], "net_value"
             ]
             if self.observation_index > 0
-            else self.pf.initial_cash
+            else self.pf.position_manager.initial_cash()
         )
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "returns"
-        ] = (self.pf.net_value() - previous_net_value) / previous_net_value
+        ] = (
+            self.pf.position_manager.net_value() - previous_net_value
+        ) / previous_net_value
 
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "cum_returns"
-        ] = (self.pf.net_value() - self.pf.initial_cash) / self.pf.initial_cash
+        ] = (
+            self.pf.position_manager.net_value()
+            - self.pf.position_manager.initial_cash()
+        ) / self.pf.position_manager.initial_cash()
 
         ret_info = {
-            "net_value": self.pf.net_value(),
+            "net_value": self.pf.position_manager.net_value(),
             "profit_change": d["profit"],
         }
 

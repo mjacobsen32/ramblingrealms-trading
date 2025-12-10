@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -141,15 +139,23 @@ def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_confi
     portfolio_config.initial_cash = 1000
     portfolio_config.max_positions = 5
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
-    assert pf.initial_cash == 1000, "Initial cash should be set to 1000"
-    assert pf.cash == 1000, "Initial cash should be set to 1000"
-    assert pf.total_value == 1000, "Total value should be equal to initial cash"
-    assert pf.nav == 0, "NAV should be initialized to 0"
+    assert (
+        pf.position_manager.initial_cash() == 1000
+    ), "Initial cash should be set to 1000"
+    assert (
+        pf.position_manager.available_cash() == 1000
+    ), "Initial cash should be set to 1000"
+    assert (
+        pf.position_manager.net_value() == 1000
+    ), "Total value should be equal to initial cash"
+    assert pf.position_manager.nav() == 0, "NAV should be initialized to 0"
     assert pf.vbt_pf == None, "VectorBT portfolio should be None initially"
 
     np.testing.assert_array_equal(
-        pf.state(), np.array([1000, 0, 0, 0])
-    ), "Initial state should be [cash, positions]"
+        pf.state(),
+        np.array([1000, 0, 0, 0]),
+        "Initial state should be [cash, positions]",
+    )
 
     for i, date in enumerate(dates):
         pf.update_position_batch(multi_tic_data.loc[date])
@@ -159,8 +165,10 @@ def test_portfolio_multi(multi_tic_data, dates, expected_states, portfolio_confi
             actual, expected, f"State at date {date} should match expected values"
         )
 
-    assert pf.total_value > 1000, "Total value should increase with positive trades"
-    assert pf.nav > 0, "NAV should be greater than 0 after trades"
+    assert (
+        pf.position_manager.net_value() > 1000
+    ), "Total value should increase with positive trades"
+    assert pf.position_manager.nav() > 0, "NAV should be greater than 0 after trades"
 
     vbt = pf.as_vbt_pf(multi_tic_data)
     assert vbt is not None, "VectorBT portfolio should be created"
@@ -293,9 +301,10 @@ def test_discrete_mode(normalized_multi_tic_data, dates, portfolio_config):
     portfolio_config.max_positions = 1
     pf = Portfolio(cfg=portfolio_config, symbols=["AAPL", "MSFT", "NVDA"])
 
-    np.testing.assert_array_equal(
-        pf.state(), np.array([1000, 0, 0, 0])
-    ), "Initial state should be [cash, positions]"
+    (
+        np.testing.assert_array_equal(pf.state(), np.array([1000, 0, 0, 0])),
+        "Initial state should be [cash, positions]",
+    )
 
     expected_positions = [
         [800.0, 10.0, 5.0, 0.0],
