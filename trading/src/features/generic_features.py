@@ -4,9 +4,7 @@ from typing import Any, ClassVar, Dict, List, Type
 import numpy as np
 import pandas as pd
 import vectorbt as vbt
-from alpaca.data.timeframe import TimeFrameUnit
-from pydantic import BaseModel, Field, model_validator
-from scipy.spatial.distance import mahalanobis
+from pydantic import BaseModel, Field
 from scipy.special import expit
 
 
@@ -547,6 +545,7 @@ class Turbulence(Feature):
     """
     Computes a market turbulence index using multiple return periods and proper covariance calculation.
     This measures how unusual current market conditions are compared to historical patterns.
+    ! TODO pretty sure turbulence is broken
     """
 
     TYPE: ClassVar[FeatureType] = FeatureType("turbulence")

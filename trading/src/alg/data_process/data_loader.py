@@ -2,7 +2,6 @@ import logging
 import os
 from typing import ClassVar, Dict, Type
 
-import numpy as np
 import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
@@ -108,9 +107,43 @@ class AlpacaDataLoader(DataSource):
                 end=pd.to_datetime(end_date),
                 **request.kwargs,
             )
-            df = pd.concat([df, client.get_stock_bars(request_params).df])
+            bars = client.get_stock_bars(request_params)
+            # `get_stock_bars` may return an object with a `.df` attribute or a dict
+            if hasattr(bars, "df"):
+                df = pd.concat([df, bars.df])
+            elif isinstance(bars, dict) and "df" in bars:
+                df = pd.concat([df, bars["df"]])
+            else:
+                # Fallback: try to coerce the return to a DataFrame
+                try:
+                    df = pd.concat([df, pd.DataFrame(bars)])
+                except Exception:
+                    logging.error(
+                        "Unknown bars return type from Alpaca client: %s", type(bars)
+                    )
+                    raise
             if cache_enabled:
+                logging.info("Caching data to %s", cache_file)
                 df.to_parquet(cache_file)
+            else:
+                logging.info("Caching is disabled; not saving data to cache.")
+
+        logging.info("Length of fetched data: %d", len(df))
+
+        if df.index.get_level_values("symbol").nunique() != len(
+            request.kwargs["symbol_or_symbols"]
+        ):
+            logging.error(
+                "Requested %d symbols, but received data for %d symbols.",
+                len(request.kwargs["symbol_or_symbols"]),
+                df.index.get_level_values("symbol").nunique(),
+            )
+            raise ValueError("Mismatch in number of symbols fetched from Alpaca.")
+        logging.info(
+            "Start of fetched data: %s; End of fetched data: %s",
+            df.index.get_level_values("timestamp")[0],
+            df.index.get_level_values("timestamp")[-1],
+        )
         return df
 
 
@@ -147,12 +180,17 @@ class DataLoader:
                 data_config.cache_enabled,
                 data_config.time_step_period,
             )
-            for feature in [
-                f
-                for f in self.feature_config.features
-                if f.source == request.dataset_name or f.source is None
-            ]:
-                self.df = feature.to_df(self.df, data)
+            for feature in [f for f in self.feature_config.features]:
+                if feature.source == request.dataset_name or feature.source is None:
+                    self.df = feature.to_df(self.df, data)
+                else:
+                    logging.warning(
+                        "Skipping feature %s for source %s",
+                        feature.name,
+                        request.dataset_name,
+                    )
+
+        # ! if df is empty, raise error probably due to features having mis matched source names
 
         self.columns = self.df.columns
         self.features = get_feature_cols(features=self.feature_config.features)
@@ -161,11 +199,16 @@ class DataLoader:
         self.df.dropna()
 
         logging.info(
-            "Data Successfully loaded...\nCurrent columns: %s\nCurrent Features: %s",
+            "Data Successfully Loaded. Num Rows: %d, Num features: %d",
+            len(self.df),
+            len(self.features),
+        )
+        logging.debug(
+            "\nCurrent columns: %s\nCurrent Features: %s",
             [f for f in self.columns],
             self.feature_config.features,
         )
-        logging.info(
+        logging.debug(
             "Current tickers: %s",
             self.df.index.get_level_values("symbol").unique().tolist(),
         )

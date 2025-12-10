@@ -1,21 +1,36 @@
+import datetime
 from pathlib import Path
 
 import pytest
-import typer
 from typer.testing import CliRunner
 
-from trading.cli.alg.alg import backtest, train
 from trading.cli.alg.config import ProjectPath
 from trading.cli.rr_trading import app
-from trading.src.alg.backtest.backtesting import BackTesting
+from trading.cli.trading.trade_config import RRTradeConfig
+from trading.src.trade.trade_api import Trade
+from trading.test.mocks.alpaca_trading_client_mock import AlpacaTradingClientMock
+from trading.test.mocks.stock_historical_data_client_mock import (
+    StockHistoricalDataClientMock,
+)
 
 CONFIG_DIR = Path(__file__).parent.parent / "configs"
 
-import re
+import os
 import shutil
-from unittest.mock import patch
+import tempfile
 
 runner = CliRunner()
+
+
+def setup_module(module):
+    temp_cache = tempfile.NamedTemporaryFile(delete=True, delete_on_close=True)
+    os.environ["RR_TRADING_USER_CACHE_PATH"] = temp_cache.name
+
+
+def teardown_module(module):
+    temp_cache_path = os.environ.get("RR_TRADING_USER_CACHE_PATH")
+    if temp_cache_path and os.path.exists(temp_cache_path):
+        os.remove(temp_cache_path)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -57,12 +72,12 @@ def test_setup(fake_keys):
         app,
         ["setup"],
         color=False,
-        input=f"y\n{key_path}\n{secret_path}\nn\ny\n{key_path}\n{secret_path}\nn\ny\n{key_path}\ny\n{key_path}\n{secret_path}\n",
+        input=f"y\n{key_path}\n{secret_path}\nn\ny\n{key_path}\n{secret_path}\nn\ny\n{key_path}\ny\n{key_path}\n{secret_path}\ny\n{key_path}\n{secret_path}\n",
     )
     assert result.exit_code == 0
 
 
-def test_train_backtest_analysis(temp_dirs):
+def test_train_backtest_analysis_trade(temp_dirs):
     train_res = runner.invoke(
         app,
         ["alg", "train", "--config", str(CONFIG_DIR / "generic_alg.json")],
@@ -94,3 +109,20 @@ def test_train_backtest_analysis(temp_dirs):
     )
     assert analysis_res.exit_code == 0
     assert "Analysis completed successfully." in analysis_res.output
+
+
+def test_trade_execution() -> None:
+    market_data_client = StockHistoricalDataClientMock()
+
+    alpaca_account_client = AlpacaTradingClientMock()
+
+    with Path.open(Path(str(CONFIG_DIR / "trade_config.json"))) as f:
+        rr_trade_config = RRTradeConfig.model_validate_json(f.read())
+
+    trade_client = Trade(
+        config=rr_trade_config,
+        market_data_client=market_data_client,
+        alpaca_account_client=alpaca_account_client,
+        live=False,
+    )
+    trade_client.run_model(predict_time=(datetime.datetime.fromisoformat("2025-01-01")))

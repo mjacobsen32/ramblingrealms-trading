@@ -8,7 +8,7 @@ from trading.cli.alg.config import RewardConfig
 from trading.src.alg.environments.reward_functions.base_reward_function import (
     RewardFunction,
 )
-from trading.src.alg.portfolio.portfolio import Portfolio
+from trading.src.portfolio.portfolio import Portfolio
 
 
 class BasicProfitMax(RewardFunction):
@@ -27,7 +27,7 @@ class BasicProfitMax(RewardFunction):
     def compute_reward(
         self, pf: Portfolio, df: pd.DataFrame, realized_profit: float
     ) -> float:
-        current_net = pf.net_value()
+        current_net = pf.position_manager.net_value()
         delta_net = current_net - self.previous_net
         self.previous_net = current_net
 

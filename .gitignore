@@ -1,5 +1,6 @@
 # data
 ./data
+data/accounts/
 
 # builds
 dist
@@ -36,3 +37,4 @@ results
 !trading/test/data/TEST_MULTI_TICKERS.parquet
 !trading/test/data/TEST_TIME_STEP.parquet
 !trading/test/data/TEST_SET.parquet
+!trading/test/data/LIVE.parquet

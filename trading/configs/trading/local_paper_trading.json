@@ -1,0 +1,8 @@
+{
+    "model_path": "{PROJECT_ROOT}/models/ddpg.1.0.zip",
+    "out_dir": "{PROJECT_ROOT}/out/trading",
+    "broker": "LOCAL",
+    "positions_path": "{PROJECT_ROOT}/data/positions/local_paper_trading_positions.json",
+    "account_path": "{PROJECT_ROOT}/data/accounts/local_paper_trading_account.json",
+    "defer_trade_execution": false
+}

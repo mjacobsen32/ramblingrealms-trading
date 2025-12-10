@@ -5,49 +5,45 @@ description = "Rambling Realms Trading Platform"
 license = { file = "LICENSE" }
 readme = "README.md"
 requires-python = ">=3.12,<4.0"
-authors = [
-    {name = "Matthew Jacobsen",email = "matthewjacobsen1999@gmail.com"}
-]
-maintainers = [
-    {name = "Matthew Jacobsen",email = "matthewjacobsen1999@gmail.com"}
-]
+authors = [{ name = "Matthew Jacobsen", email = "mjacobsen.pro@gmail.com" }]
+maintainers = [{ name = "Matthew Jacobsen", email = "mjacobsen.pro@gmail.com" }]
 keywords = [
-    "trading",
-    "finance",
-    "investing",
-    "stocks",
-    "cryptocurrency",
-    "portfolio management"
+  "trading",
+  "finance",
+  "investing",
+  "stocks",
+  "cryptocurrency",
+  "portfolio management",
 ]
 classifiers = []
 dependencies = [
-    "numpy>=2.2.5,<3.0.0",
-    "pandas>=2.2.3,<3.0.0",
-    "pyetrade>=2.1.1,<3.0.0",
-    "huggingface-hub>=0.31.1,<0.32.0",
-    "typer (>=0.7,<0.10)",
-    "rich>=14.0.0,<15.0.0",
-    "appdirs (>=1.4.4,<2.0.0)",
-    "tomli (>=2.2.1,<3.0.0)",
-    "tomli-w (>=1.2.0,<2.0.0)",
-    "click (>=8.1,<8.2)",
-    "polygon-api-client (>=1.14.5,<2.0.0)",
-    "pydantic (>=2.11.4,<3.0.0)",
-    "fastparquet (>=2024.11.0,<2025.0.0)",
-    "alpaca-py (>=0.37,<0.41.0)",
-    "torch (>=2.7.0,<3.0.0)",
-    "scikit-learn (>=1.6.1,<2.0.0)",
-    "matplotlib (>=3.10.3,<4.0.0)",
-    "vectorbt (>=0.28.0)",
-    "pandas-market-calendars (>=5.1.0,<6.0.0)",
-    "gymnasium (>=1.2.0,<2.0.0)",
-    "stable-baselines3 (>=2.6.0,<3.0.0)",
-    "tqdm (>=4.67.1,<5.0.0)",
-    "nbformat (>=5.10.4,<6.0.0)",
-    "kaleido (<=0.2.1)",
-    "anywidget (>=0.9.18,<0.10.0)",
-    "cudf-cu12 (>=25.8.0,<26.0.0)",
-    "quantstats (>=0.0.70,<0.0.71)",
+  "numpy>=2.2.5,<3.0.0",
+  "pandas>=2.2.3,<3.0.0",
+  "huggingface-hub>=0.31.1,<0.32.0",
+  "typer (>=0.7,<0.10)",
+  "rich>=14.0.0,<15.0.0",
+  "appdirs (>=1.4.4,<2.0.0)",
+  "tomli (>=2.2.1,<3.0.0)",
+  "tomli-w (>=1.2.0,<2.0.0)",
+  "click (>=8.1,<8.2)",
+  "polygon-api-client (>=1.14.5,<2.0.0)",
+  "pydantic (>=2.11.4,<3.0.0)",
+  "fastparquet (>=2024.11.0,<2025.0.0)",
+  "alpaca-py (>=0.37,<0.41.0)",
+  "torch (>=2.7.0,<3.0.0)",
+  "scikit-learn (>=1.6.1,<2.0.0)",
+  "matplotlib (>=3.10.3,<4.0.0)",
+  "vectorbt (>=0.28.0)",
+  "pandas-market-calendars (>=5.1.0,<6.0.0)",
+  "gymnasium (>=1.2.0,<2.0.0)",
+  "stable-baselines3 (>=2.6.0,<3.0.0)",
+  "tqdm (>=4.67.1,<5.0.0)",
+  "nbformat (>=5.10.4,<6.0.0)",
+  "kaleido (<=0.2.1)",
+  "anywidget (>=0.9.18,<0.10.0)",
+  "cudf-cu12 (>=25.8.0,<26.0.0)",
+  "quantstats (>=0.0.70,<0.0.71)",
+  "boto3 (>=1.42.5,<2.0.0)",
 ]
 
 [project.urls]
@@ -70,6 +66,8 @@ pytest-cov = "^6.2.1"
 genbadge = "^1.1.2"
 defusedxml = "^0.7.1"
 py-spy = "^0.4.1"
+types-requests = "^2.32.4.20250809"
+moto = "^5.1.18"
 
 
 [tool.poetry.group.docs.dependencies]
@@ -91,9 +89,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 version = "0.1.0"
-packages = [
-    { include = "trading" }
-]
+packages = [{ include = "trading" }]
 
 [tool.black]
 line-length = 88
@@ -111,32 +107,38 @@ poetry-plugin-export = ">=1.8"
 
 [tool.coverage.run]
 branch = true
-omit = ["**/tests/**", "**/test/**", "**/user_cache/**", "**/polygon_io.py", "**/etrade.py"]
-source = [
-    "trading",
+omit = [
+  "**/tests/**",
+  "**/test/**",
+  "**/user_cache/**",
+  "**/polygon_io.py",
+
+  # The CLI entrypoint's inject remote dependencies (hard to test), and not quite critical for unittesting
+  "trading/cli/rr_trading.py",
 ]
+source = ["trading"]
 
 [tool.coverage.report]
 show_missing = true
 fail_under = 90
 # Regexes for lines to exclude from consideration
 exclude_also = [
-    # Don't complain about missing debug-only code:
-    "def __repr__",
-    "if self\\.debug",
+  # Don't complain about missing debug-only code:
+  "def __repr__",
+  "if self\\.debug",
 
-    # Don't complain if tests don't hit defensive assertion code:
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "raise ValueError",
+  # Don't complain if tests don't hit defensive assertion code:
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "raise ValueError",
 
-    # Don't complain if non-runnable code isn't run:
-    "if 0:",
-    "if __name__ == .__main__.:",
+  # Don't complain if non-runnable code isn't run:
+  "if 0:",
+  "if __name__ == .__main__.:",
 
-    # Don't complain about abstract methods, they aren't run:
-    "@(abc\\.)?abstractmethod",
-    ]
+  # Don't complain about abstract methods, they aren't run:
+  "@(abc\\.)?abstractmethod",
+]
 
 ignore_errors = true
 

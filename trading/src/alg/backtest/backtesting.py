@@ -1,7 +1,7 @@
 import pandas as pd
 
 from trading.cli.alg.config import BackTestConfig
-from trading.src.alg.portfolio.portfolio import Portfolio
+from trading.src.portfolio.portfolio import Portfolio
 
 
 class BackTesting:

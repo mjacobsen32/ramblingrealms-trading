@@ -12,15 +12,15 @@
             "source": "TEST_SET",
             "enabled": true,
             "field": "close",
-            "period": 50
+            "period": 10
         },
         {
             "type": "macd",
             "name": "macd_small",
             "source": "TEST_SET",
             "enabled": true,
-            "fast_period": 12,
-            "slow_period": 26,
+            "fast_period": 6,
+            "slow_period": 10,
             "signal_period": 9,
             "field": "close"
         },
@@ -29,13 +29,6 @@
             "name": "rsi_15",
             "source": "TEST_SET",
             "period": 15,
-            "field": "close"
-        },
-        {
-            "type": "rsi",
-            "name": "rsi_60",
-            "source": "TEST_SET",
-            "period": 60,
             "field": "close"
         },
         {
@@ -50,12 +43,6 @@
             "name": "stochastic_20",
             "source": "TEST_SET",
             "period": 20
-        },
-        {
-            "type": "turbulence",
-            "name": "turbulence",
-            "source": "TEST_SET",
-            "lookback": 60
         }
     ]
 }

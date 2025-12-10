@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from trading.src.alg.portfolio.position import PositionManager
+from trading.src.portfolio.position import PositionManager
 from trading.test.alg.test_fixtures import *
 
 

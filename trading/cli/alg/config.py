@@ -1,9 +1,8 @@
 import logging
-import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, Dict, List, Self, Union
+from typing import Any, ClassVar, Dict, List, Union
 
 from alpaca.data.timeframe import TimeFrameUnit
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
@@ -22,6 +21,7 @@ class ProjectPath(BaseModel):
     PROJECT_ROOT: ClassVar[Path] = Path(__file__).resolve().parent.parent.parent.parent
     OUT_DIR: ClassVar[Path | None] = None
     BACKTEST_DIR: ClassVar[Path | None] = None
+    VERSION: ClassVar[str] = str()
     path: str = Field(str(), description="Path to the project root")
 
     @classmethod
@@ -52,6 +52,8 @@ class ProjectPath(BaseModel):
             value = value.replace("{OUT_DIR}", str(cls.OUT_DIR))
         elif "{BACKTEST_DIR}" in value:
             value = value.replace("{BACKTEST_DIR}", str(cls.BACKTEST_DIR))
+        if "{VERSION}" in value:
+            value = value.replace("{VERSION}", str(cls.VERSION))
         return {"path": value}
 
     def __str__(self) -> str:
@@ -92,7 +94,7 @@ class FeatureConfig(BaseModel):
         return data
 
     features: List[Feature] = Field(
-        default_factory=List[Feature], description="List of feature names"
+        default_factory=list, description="List of feature names"
     )
     fill_strategy: str = Field(
         "mean",
@@ -111,7 +113,7 @@ class DataRequests(BaseModel):
     dataset_name: str = Field("Generic", description="Name of the dataset")
     source: DataSourceType = Field(..., description="DataSourceType Enum")
     endpoint: str = Field(..., description="Endpoint of API")
-    kwargs: Dict = Field(..., description="Kwargs to pass in to the endpoint")
+    kwargs: Dict[str, Any] = Field(..., description="Kwargs to pass in to the endpoint")
 
 
 class DataConfig(BaseModel):
@@ -123,12 +125,14 @@ class DataConfig(BaseModel):
         "2020-01-01", description="Start date for the data collection"
     )
     end_date: str = Field("2023-01-01", description="End date for the data collection")
-    time_step_unit: str = Field(TimeFrameUnit.Day, description="Time step of the data")
+    time_step_unit: TimeFrameUnit = Field(
+        TimeFrameUnit.Day, description="Time step of the data"
+    )
     time_step_period: int = Field(
         1, description="Period of the time step (e.g., 1 for daily, 5 for 5-minute)"
     )
     cache_path: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Path to cache the downloaded data",
     )
     cache_enabled: bool = Field(
@@ -141,7 +145,7 @@ class DataConfig(BaseModel):
 
     @field_validator("time_step_unit")
     @classmethod
-    def validate_time_step_unit(cls, value: str) -> TimeFrameUnit:
+    def validate_time_step_unit(cls, value: TimeFrameUnit | str) -> TimeFrameUnit:
         """
         Validate the time_step_unit field to ensure it is a valid TimeFrameUnit.
         """
@@ -179,12 +183,18 @@ class TradeMode(str, Enum):
 
 class PortfolioConfig(BaseModel):
     initial_cash: int = Field(100_000, description="Starting funds in state space")
+    maintain_history: bool = Field(
+        True, description="Whether to maintain a history of past actions and states"
+    )
     buy_cost_pct: Union[float, List[float]] = Field(
         0.00, description="Corresponding cost for all assets or array per symbol"
     )
     sell_cost_pct: Union[float, List[float]] = Field(
-        0.00, description="Corresponding cost for all assets or array per symbol"
+        default=0.00,
+        description="Corresponding cost for all assets or array per symbol",
     )
+
+    # ! THESE ARE PSUEDO-MODEL-HYPERPARAMETERS, THEY MUST BE MAINTAINED ACCROSS TRAINING, TESTING, AND PRODUCTION ENVIRONMENTS
     max_positions: int | None = Field(
         None,
         description="Maximum number of open positions per asset at any time. If None, no limit is applied. Does not apply to Continuous action space",
@@ -205,21 +215,24 @@ class PortfolioConfig(BaseModel):
         0.1,
         description="Minimum action value to trigger a trade, used to avoid noise in continuous actions",
     )
-    maintain_history: bool = Field(
-        True, description="Whether to maintain a history of past actions and states"
+    max_exposure: float = Field(
+        1.0, description="Maximum exposure across the entire portfolio"
     )
+    # ! THESE ARE PSUEDO-MODEL-HYPERPARAMETERS, THEY MUST BE MAINTAINED ACCROSS TRAINING, TESTING, AND PRODUCTION ENVIRONMENTS
 
 
 class StockEnv(BaseModel):
-    turbulence_threshold: Union[float, None] = Field(
+    turbulence_threshold: float | None = Field(
         None,
         description="Maximum turbulence allowed in market for purchases to occur. If exceeded, positions are liquidated",
     )
     reward_config: RewardConfig = Field(
-        default_factory=RewardConfig, description="Reward function configuration"
+        default_factory=lambda: RewardConfig.model_construct(),
+        description="Reward function configuration",
     )
     portfolio_config: PortfolioConfig = Field(
-        default_factory=PortfolioConfig, description="Portfolio configuration"
+        default_factory=lambda: PortfolioConfig.model_construct(),
+        description="Portfolio configuration",
     )
     lookback_window: int = Field(
         10, description="Number of past timesteps to consider for state representation"
@@ -235,7 +248,7 @@ class AgentConfig(BaseModel):
         "ppo", description="Algorithm to use (e.g., 'ppo', 'a2c', 'dqn', etc.)"
     )
     save_path: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Path to save the trained agent model",
     )
     deterministic: bool = Field(
@@ -270,11 +283,11 @@ class BackTestConfig(BaseModel):
         False, description="Whether to save the backtesting results"
     )
     backtest_dir: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Directory for storing backtest results",
     )
     analysis_config: AnalysisConfig = Field(
-        default_factory=AnalysisConfig,
+        default_factory=lambda: AnalysisConfig.model_construct(),
     )
 
     @field_validator(
@@ -291,7 +304,7 @@ class BackTestConfig(BaseModel):
         return ProjectPath.model_validate(p)
 
     results_path: ProjectPath = Field(
-        default_factory=ProjectPath,
+        default_factory=lambda: ProjectPath.model_construct(),
         description="Path to save the backtesting results",
     )
 
@@ -303,23 +316,37 @@ class RRConfig(BaseModel):
 
     name: str = Field(..., description="Name of the algorithm")
     description: str = Field("", description="Description of the algorithm")
-    version: str = Field("1.0.0", description="Version of the algorithm")
-    out_dir: ProjectPath = Field(default_factory=ProjectPath)
-    agent_config: AgentConfig | ProjectPath = Field(
-        default_factory=AgentConfig, description="Agent configuration"
+    version: str = Field(str(), description="Version of the algorithm")
+    out_dir: ProjectPath = Field(default_factory=lambda: ProjectPath.model_construct())
+    agent_config: AgentConfig = Field(
+        default_factory=lambda: AgentConfig.model_construct(),
+        description="Agent configuration",
     )
-    data_config: DataConfig | ProjectPath = Field(
-        default_factory=DataConfig, description="Data configuration"
+    data_config: DataConfig = Field(
+        default_factory=lambda: DataConfig.model_construct(),
+        description="Data configuration",
     )
-    feature_config: FeatureConfig | ProjectPath = Field(
-        default_factory=FeatureConfig, description="Feature configuration"
+    feature_config: FeatureConfig = Field(
+        default_factory=lambda: FeatureConfig.model_construct(),
+        description="Feature configuration",
     )
-    stock_env: StockEnv | ProjectPath = Field(
-        default_factory=StockEnv, description="Stock Trading Environment Config"
+    stock_env: StockEnv = Field(
+        default_factory=lambda: StockEnv.model_construct(),
+        description="Stock Trading Environment Config",
     )
-    backtest_config: BackTestConfig | ProjectPath = Field(
-        default_factory=BackTestConfig, description="Backtesting configuration"
+    backtest_config: BackTestConfig = Field(
+        default_factory=lambda: BackTestConfig.model_construct(),
+        description="Backtesting configuration",
     )
+
+    @field_validator(
+        "version",
+        mode="before",
+    )
+    @classmethod
+    def validate_version(cls, value: str) -> str:
+        ProjectPath.VERSION = value
+        return value
 
     @field_validator(
         "out_dir",
@@ -358,7 +385,7 @@ class RRConfig(BaseModel):
                 return string_map[str(info.field_name)].model_validate_json(
                     value.as_path().read_text()
                 )
-        except ValidationError as e_one:
+        except ValidationError:
             if isinstance(value, BaseModel):
                 try:
                     return string_map[str(info.field_name)].model_validate(value)

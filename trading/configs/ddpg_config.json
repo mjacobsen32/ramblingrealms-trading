@@ -1,7 +1,7 @@
 {
     "algo": "ddpg",
-    "total_timesteps": 1e4,
-    "save_path": "{PROJECT_ROOT}/models/ppo_multi_ticker",
+    "total_timesteps": 1e3,
+    "save_path": "{PROJECT_ROOT}/models/ddpg.{VERSION}.zip",
         "kwargs": {
             "policy": "MlpPolicy",
             "learning_rate": {

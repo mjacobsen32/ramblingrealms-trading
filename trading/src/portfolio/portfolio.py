@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -10,7 +9,7 @@ from plotly import io as pio
 from vectorbt import _typing as tp
 
 from trading.cli.alg.config import PortfolioConfig, ProjectPath, TradeMode
-from trading.src.alg.portfolio.position import Position, PositionManager
+from trading.src.portfolio.position import PositionManager
 from trading.src.utility.utils import time_frame_unit_to_pd_timedelta
 
 
@@ -18,33 +17,35 @@ class Portfolio:
     """
     Portfolio class for managing trading positions and cash flow.
     Very much Stateful
+    TODO there is not a clean seperation between portfolio logic and the underlying broker api and state. It is good to have the portfolio state mirrored internally via the df, but self.cash, self.initial_cash, etc... are not reflections of the underlying broker api, (ALPACA, LOCAL, REMOTE).
+    ? position manager acts as the broker api here, interacting with the positions, trades, and orders, should we offload many of the portfolio attributes to the position manager? (and rename it)
     """
 
     def __init__(
         self,
         cfg: PortfolioConfig,
         symbols: list[str],
+        position_manager: PositionManager | None = None,
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
     ):
         """
         Initialize the Portfolio
         """
         self.cfg = cfg
-        self.initial_cash = cfg.initial_cash
-        self.total_value: float = cfg.initial_cash
-        self.cash = cfg.initial_cash
-        self.nav: float = 0.0
         self.vbt_pf: vbt.Portfolio | None = None
-        self.symbols = symbols
-        self._positions = PositionManager(
-            symbols=symbols,
-            max_lots=(
-                None if cfg.trade_mode == TradeMode.CONTINUOUS else cfg.max_positions
-            ),
-        )
+        if position_manager is None:
+            # Create a default PositionManager for caller provided symbols.
+            from trading.src.portfolio.position import PositionManager
 
+            position_manager = PositionManager(
+                symbols=symbols,
+                max_lots=cfg.max_positions,
+                maintain_history=cfg.maintain_history,
+                initial_cash=cfg.initial_cash,
+            )
+        self.position_manager = position_manager
         self.time_step = time_frame_unit_to_pd_timedelta(time_step)
-        self.df: pd.DataFrame | None = None
+        self.persistent_df: pd.DataFrame | None = None
 
     def as_vbt_pf(self, df: pd.DataFrame | None = None) -> vbt.Portfolio:
         """
@@ -53,22 +54,22 @@ class Portfolio:
         if self.vbt_pf is not None:
             return self.vbt_pf
         elif df is not None:
-            self.df = df
-        elif self.df is None:
+            self.persistent_df = df
+        elif self.persistent_df is None:
             raise ValueError("No DataFrame provided")
 
-        self.df.reset_index(level="symbol", inplace=True)
-        self.df.set_index(["timestamp"], inplace=True)
-        price = self.df.pivot(columns="symbol", values="price")
-        close = self.df.pivot(columns="symbol", values="close")
-        size = self.df.pivot(columns="symbol", values="size")
+        self.persistent_df.reset_index(level="symbol", inplace=True)
+        self.persistent_df.set_index(["timestamp"], inplace=True)
+        price = self.persistent_df.pivot(columns="symbol", values="price")
+        close = self.persistent_df.pivot(columns="symbol", values="close")
+        size = self.persistent_df.pivot(columns="symbol", values="size")
 
         self.vbt_pf = vbt.Portfolio.from_orders(
             close=close,
             price=price,
             size=size,
             size_type=0,  # amount
-            init_cash=self.initial_cash,
+            init_cash=self.position_manager.initial_cash(),
             log=True,
             cash_sharing=True,
             freq="d",
@@ -81,13 +82,12 @@ class Portfolio:
         Returns:
             pd.Series: [internal_cash, positions].
         """
-        return np.concatenate([[self.cash], self._positions["holdings"]])
-
-    def net_value(self) -> float:
-        """
-        Calculate the net value of the portfolio.
-        """
-        return self.total_value
+        return np.concatenate(
+            [
+                [self.position_manager.available_cash()],
+                self.position_manager["holdings"],
+            ]
+        )
 
     def enforce_trade_rules(
         self,
@@ -107,41 +107,53 @@ class Portfolio:
             No short selling / no negative positions allowed (yet)
         """
 
-        positions = self._positions["holdings"]
+        # Make sure we use numpy boolean arrays whenever we index numpy arrays
+        buy_mask_arr = buy_mask.to_numpy()
+        sell_mask_arr = sell_mask.to_numpy()
+
+        positions = np.asarray(self.position_manager["holdings"])
         if trade_mode == TradeMode.CONTINUOUS:
             # Sell proportionally based on signal strength
             df.loc[sell_mask, "size"] = np.clip(
-                df.loc[sell_mask, "size"], -positions[sell_mask], 0
+                df.loc[sell_mask, "size"].to_numpy(),
+                a_min=-positions[sell_mask_arr],
+                a_max=0,
             )
         elif trade_mode == TradeMode.DISCRETE:
             # Sell entire position if sell action is triggered
-            df.loc[sell_mask, "size"] = -positions[sell_mask]
+            df.loc[sell_mask, "size"] = -positions[sell_mask_arr]
 
         """
             Scale the actions to the portfolio value
         """
 
-        buy_limit = self.cfg.trade_limit_percent * self.total_value
+        buy_limit = self.cfg.trade_limit_percent * self.position_manager.net_value()
 
-        buy_values = df.loc[buy_mask, "size"] * prices[buy_mask]
+        buy_values = df.loc[buy_mask, "size"].to_numpy() * prices[buy_mask_arr]
 
         # Cap each trade at buy_limit
         capped_values = np.minimum(buy_values, buy_limit)
 
         attempted_buy = capped_values.sum()
 
-        if attempted_buy > self.cash:
-            buy_limit = min(buy_limit, self.cash // len(buy_mask))
+        if attempted_buy > self.position_manager.available_cash():
+            # use the number of buys not the length of the series to avoid division by zero/miscount
+            num_buys = int(buy_mask.sum())
+            buy_limit = min(
+                buy_limit, self.position_manager.available_cash() // max(num_buys, 1)
+            )
 
         logging.debug("Buy Limit dollar amount: %s", buy_limit)
 
         # Calculate the maximum shares allowed by hmax and buy_limit for each buy
-        max_shares_hmax = self.cfg.hmax // prices[buy_mask]
-        max_shares_buy_limit = buy_limit // prices[buy_mask]
+        max_shares_hmax = self.cfg.hmax // prices[buy_mask_arr]
+        max_shares_buy_limit = buy_limit // prices[buy_mask_arr]
         max_shares = np.minimum(max_shares_hmax, max_shares_buy_limit)
 
         # Clip the size to not exceed the minimum of both limits
-        df.loc[buy_mask, "size"] = np.clip(df.loc[buy_mask, "size"], 0, max_shares)
+        df.loc[buy_mask, "size"] = np.clip(
+            df.loc[buy_mask, "size"].to_numpy(), 0, max_shares
+        )
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
         logging.debug("Scaled Sizes: %s", df["size"])
 
@@ -162,11 +174,19 @@ class Portfolio:
         # Find actions above threshold
         above_thresh = df["action"].abs() > self.cfg.action_threshold
 
+        # Ensure prices is a numeric numpy array (convert from pd.Series if needed)
+        if isinstance(prices, pd.Series):
+            price_vals = prices.to_numpy().astype(np.float64)
+        else:
+            price_vals = np.asarray(prices).astype(np.float64)
+
         # Calculate max shares allowed by hmax and trade_limit
         max_trade_value = min(
-            self.cfg.hmax, self.cfg.trade_limit_percent * self.net_value()
+            self.cfg.hmax,
+            self.cfg.trade_limit_percent * self.position_manager.net_value(),
         )
-        max_shares = max_trade_value // prices
+        # safe integer division to get maximum number of shares per symbol
+        max_shares = (max_trade_value // price_vals).astype(np.float64)
 
         # Vectorized, faster assignment using numpy
         size = np.zeros_like(df["action"].values, dtype=np.float64)
@@ -179,7 +199,7 @@ class Portfolio:
             ].astype(np.float64)
         elif trade_mode == TradeMode.CONTINUOUS:
             size[above_idx] = np.round(
-                actions[above_idx] * max_shares[above_thresh]
+                actions[above_idx] * max_shares[above_idx]
             ).astype(np.float64)
 
         df.loc[:, "size"] = size
@@ -191,12 +211,7 @@ class Portfolio:
         @TODO clean up and make more efficient
         """
         # Reduce df to a single datetime index (symbols only)
-        df, step_profit = self._positions.step(df)
-
-        self.cash = self.cash - (df["size"] * df["price"]).sum()
-        self.nav = self._positions.nav(df["price"])
-        self.total_value = self.cash + self.nav
-
+        df, step_profit = self.position_manager.step(df)
         logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
 
         return step_profit
@@ -229,13 +244,15 @@ class Portfolio:
         Load backtesting results from a JSON file.
         """
         pf = vbt.Portfolio.load(str(file_path))
-        logging.info("Loaded backtest results from %s", file_path)
-        ret = cls(cfg=cfg, symbols=[])
+        logging.info("Loaded VectorBT results from %s", file_path)
+        from trading.src.portfolio.position import PositionManager
+
+        ret = cls(cfg=cfg, position_manager=PositionManager(symbols=[]), symbols=[])
         ret.vbt_pf = pf
         return ret
 
     def save(self, file_path: str, df: pd.DataFrame | None = None):
-        logging.info("Saving backtest results to %s", file_path)
+        logging.info("Saving VectorBT results to %s", file_path)
         self.as_vbt_pf(df=df).save(file_path)
 
     def save_plots(self, backtest_dir: Path):
@@ -256,12 +273,8 @@ class Portfolio:
         """
         Reset the portfolio to an empty state.
         """
-        self.initial_cash = self.initial_cash
-        self.total_value = self.initial_cash
-        self.cash = self.initial_cash
-        self.nav = 0.0
         self.vbt_pf = None
-        self._positions.reset()
+        self.position_manager.reset()
         logging.debug("Portfolio has been reset.\n%s", self)
 
     def set_vbt(self, pf: vbt.Portfolio):
@@ -277,19 +290,19 @@ class Portfolio:
         vbt_pf = self.as_vbt_pf()
         """
          plots: [
-             "value", 
-             "cash", 
-             "drawdowns", 
-             "orders", 
-             "trades", 
-             "trade_pnl", 
-             "asset_flow", 
-             "cash_flow", 
-             "assets", 
-             "asset_value", 
-             "cum_returns", 
-             "underwater", 
-             "gross_exposure", 
+             "value",
+             "cash",
+             "drawdowns",
+             "orders",
+             "trades",
+             "trade_pnl",
+             "asset_flow",
+             "cash_flow",
+             "assets",
+             "asset_value",
+             "cum_returns",
+             "underwater",
+             "gross_exposure",
              "net_exposure"
             ]
         """
@@ -373,13 +386,13 @@ class Portfolio:
         """
         String representation of the Portfolio.
         """
-        return f"Portfolio(initial_cash={self.initial_cash}, total_value={self.total_value}, cash={self.cash}, nav={self.nav})"
+        return f"Portfolio(initial_cash={self.position_manager.initial_cash()}, total_value={self.position_manager.net_value()}, cash={self.position_manager.available_cash()})"
 
     def get_positions(self) -> PositionManager:
         """
         Return the current positions in the portfolio.
         """
-        return self._positions
+        return self.position_manager
 
     def analysis(self, analysis_config, df: pd.DataFrame | None = None):
         logging.info(f"\nStats:\n{self.stats()}")

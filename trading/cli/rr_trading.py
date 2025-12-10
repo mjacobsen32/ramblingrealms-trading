@@ -1,20 +1,23 @@
+import datetime
 import logging
 from pathlib import Path
+from typing import Annotated
 
 import typer
+from alpaca.data.historical.stock import StockHistoricalDataClient
+from alpaca.trading.client import TradingClient as AlpacaTradingClient
 from pydantic import SecretStr
-from rich import print
 from rich.prompt import Prompt
 
 from trading.cli.alg import alg
 from trading.cli.data import data
-from trading.cli.etrade import etrade
+from trading.cli.trading.trade_config import RRTradeConfig
 from trading.cli.utils import init_logger
+from trading.src.trade.trade_api import Trade
 from trading.src.user_cache.user_cache import UserCache as User
 from trading.src.utility.utils import read_key
 
 app = typer.Typer(name="rr_trading", help="rr_trading CLI commands")
-app.add_typer(etrade.app, name="etrade", help="E-Trade API commands")
 app.add_typer(data.app, name="data", help="Data CLI commands")
 app.add_typer(alg.app, name="alg", help="Algorithmic commands")
 
@@ -67,44 +70,7 @@ def setup():
     """
     user = User.load()
     user.delete()
-    etrade = Prompt.ask("Do you want to set up E-Trade Live?", default="n")
-    if etrade.lower() == "y":
-        # E-Trade Live setup
-        user.etrade_live_secrets.set_api_key_from_file(
-            Path(Prompt.ask("Enter your E-Trade API key path"))
-        )
-        user.etrade_live_secrets.set_api_secret_from_file(
-            Path(Prompt.ask("Enter your E-Trade API secret path"))
-        )
-        user.save()
 
-        etrade_authenticate = Prompt.ask(
-            "Do you want to authenticate E-Trade now?", default="n"
-        )
-        if etrade_authenticate.lower() == "y":
-            # E-Trade authentication
-            from trading.cli.etrade.etrade import authenticate
-
-            authenticate(False)
-    etrade = Prompt.ask("Do you want to set up E-Trade Sandbox?", default="n")
-    if etrade.lower() == "y":
-        # E-Trade Sandbox setup
-        user.etrade_sandbox_secrets.set_api_key_from_file(
-            Path(Prompt.ask("Enter your E-Trade API key path"))
-        )
-        user.etrade_sandbox_secrets.set_api_secret_from_file(
-            Path(Prompt.ask("Enter your E-Trade API secret path"))
-        )
-        user.save()
-
-        etrade_authenticate = Prompt.ask(
-            "Do you want to authenticate E-Trade now?", default="n"
-        )
-        if etrade_authenticate.lower() == "y":
-            # E-Trade authentication
-            from trading.cli.etrade.etrade import authenticate
-
-            authenticate(True)
     polygon = Prompt.ask("Do you want to set up Polygon?", default="n")
     if polygon.lower() == "y":
         # Polygon setup
@@ -120,6 +86,134 @@ def setup():
         user.alpaca_api_secret = SecretStr(
             read_key(Prompt.ask("Enter your Alpaca API secret path"))
         )
+    alpaca_live = Prompt.ask("Do you want to set up Alpaca Live Trading?", default="n")
+    if alpaca_live.lower() == "y":
+        # Alpaca Live Trading setup
+        user.alpaca_api_key_live = SecretStr(
+            read_key(Prompt.ask("Enter your Alpaca API key path for Live Trading"))
+        )
+        user.alpaca_api_secret_live = SecretStr(
+            read_key(Prompt.ask("Enter your Alpaca API secret path for Live Trading"))
+        )
+    remote_portfolio = Prompt.ask(
+        "Do you want to set up remote portfolio management with an S3 Client? (requires write access)",
+        default="n",
+    )
+    if remote_portfolio.lower() == "y":
+        # Remote portfolio setup
+        user.r2_access_key_id = SecretStr(
+            read_key(Prompt.ask("Enter your S3 Client Access Key ID (PUBLIC) key path"))
+        )
+        user.r2_secret_access_key = SecretStr(
+            read_key(
+                Prompt.ask(
+                    "Enter your S3 Client Secret Access Key ID (PRIVATE) key path"
+                )
+            )
+        )
+        user.r2_endpoint_url = Prompt.ask("Enter your S3 Client Endpoint URL")
+
+
+@app.command(help="Run model on paper trading Alpaca Account")
+def paper_trade(
+    config: Annotated[
+        str,
+        typer.Option("--config", "-c", help="Path to the RRTrade configuration file."),
+    ],
+    predict_time: Annotated[
+        str,
+        typer.Option(
+            "--timestamp",
+            "-t",
+            help="Timestamp for which to run the model (YYYY-MM-DD).",
+        ),
+    ] = "",
+):
+    """
+    Run the model on the Alpaca paper trading account.
+    Explicit command for paper and live trading for total seperation
+    """
+    logging.info("Running model on Alpaca paper trading account...")
+    with Path.open(Path(config)) as f:
+        rr_trade_config = RRTradeConfig.model_validate_json(f.read())
+        logging.info(f"Loaded configuration from {config}")
+
+    user_cache = User().load()
+    alpaca_api_key = user_cache.alpaca_api_key
+    alpaca_api_secret = user_cache.alpaca_api_secret
+
+    market_data_client = StockHistoricalDataClient(
+        alpaca_api_key.get_secret_value(), alpaca_api_secret.get_secret_value()
+    )
+
+    alpaca_account_client: AlpacaTradingClient = AlpacaTradingClient(
+        alpaca_api_key.get_secret_value(),
+        alpaca_api_secret.get_secret_value(),
+        paper=True,
+    )
+    trade_client = Trade(
+        config=rr_trade_config,
+        market_data_client=market_data_client,
+        alpaca_account_client=alpaca_account_client,
+        live=False,
+    )
+    trade_client.run_model(
+        predict_time=(
+            datetime.datetime.fromisoformat(predict_time) if predict_time else None
+        )
+    )
+
+
+@app.command(help="Run model on live trading Alpaca Account")
+def live_trade(
+    config: Annotated[
+        str,
+        typer.Option("--config", "-c", help="Path to the RRTrade configuration file."),
+    ],
+    confirmation: Annotated[
+        bool, typer.Option("--confirm", "-y", help="Confirm live trading execution.")
+    ] = False,
+):
+    """
+    Run the model on the Alpaca live trading account.
+    Explicit command for paper and live trading for total seperation
+    """
+    logging.warning("Running model on Alpaca live trading account...")
+    confirmation_str = Prompt.ask(
+        "[red]Are you sure you want to proceed with live trading?[/red]", default="n"
+    )
+    if not confirmation and confirmation_str.lower() != "y":
+        logging.info("Live trading execution cancelled.")
+        return
+    logging.info("Running model on Alpaca live trading account...")
+
+    with Path.open(Path(config)) as f:
+        rr_trade_config = RRTradeConfig.model_validate_json(f.read())
+        logging.info(f"Loaded configuration from {config}")
+
+    user_cache = User().load()
+
+    alpaca_api_key = user_cache.alpaca_api_key_live
+    alpaca_api_secret = user_cache.alpaca_api_secret_live
+
+    market_data_client = StockHistoricalDataClient(
+        alpaca_api_key.get_secret_value(), alpaca_api_secret.get_secret_value()
+    )
+
+    alpaca_account_client: AlpacaTradingClient = AlpacaTradingClient(
+        alpaca_api_key.get_secret_value(),
+        alpaca_api_secret.get_secret_value(),
+        paper=True,
+    )
+
+    trade_client = Trade(
+        config=rr_trade_config,
+        market_data_client=market_data_client,
+        alpaca_account_client=alpaca_account_client,
+        live=True,
+    )
+
+    trade_client.run_model()
 
 
 if __name__ == "__main__":

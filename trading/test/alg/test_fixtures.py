@@ -1,6 +1,7 @@
 import pytest
 
 from trading.cli.alg.config import TradeMode
+from trading.cli.trading.trade_config import BrokerType
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +41,6 @@ def feature_config():
     from trading.cli.alg.config import FeatureConfig
     from trading.src.features.generic_features import (
         Candle,
-        Feature,
         FeatureType,
         FillStrategy,
     )
@@ -100,9 +100,10 @@ def agent_config():
 
     return AgentConfig(
         algo="ppo",
-        save_path="{PROJECT_ROOT}/trading/test/models/test_agent",
+        save_path="{PROJECT_ROOT}/trading/test/models/ppo.zip",
         deterministic=True,
         kwargs={"policy": "MlpPolicy", "n_steps": 2048},
+        total_timesteps=1000,
     )
 
 
@@ -111,7 +112,7 @@ def portfolio_config():
     """
     Fixture to create a simple portfolio configuration.
     """
-    from trading.cli.alg.config import PortfolioConfig, TradeMode
+    from trading.cli.alg.config import PortfolioConfig
 
     return PortfolioConfig(
         initial_cash=1_000_000,
@@ -121,6 +122,8 @@ def portfolio_config():
         max_positions=None,
         trade_mode=TradeMode.CONTINUOUS,
         trade_limit_percent=0.1,
+        action_threshold=0.01,
+        maintain_history=True,
     )
 
 
@@ -183,3 +186,68 @@ def backtest(agent, data_loader, trade_env):
         backtest_config=BackTestConfig(),
         data=data_loader.get_train_test()[1],
     )
+
+
+@pytest.fixture
+def remote_trade_config(portfolio_config):
+    """
+    Fixture to create a remote trade configuration.
+    """
+    from trading.cli.trading.trade_config import RRTradeConfig
+
+    return RRTradeConfig(
+        model_path="{PROJECT_ROOT}/trading/test/models/ppo.zip",
+        out_dir="{PROJECT_ROOT}/trading/test/temp/out/",
+        positions_path="paper_trading/positions/ppo.json",
+        account_path="paper_trading/accounts/ppo.json",
+        broker=BrokerType.REMOTE,
+        bucket_name="rr-storage",
+        broker_kwargs={"service_name": "s3"},
+        defer_trade_execution=False,
+        portfolio_config=portfolio_config,
+    )
+
+
+@pytest.fixture
+def local_trade_config(portfolio_config):
+    """
+    Fixture to create a remote trade configuration.
+    """
+    from trading.cli.trading.trade_config import RRTradeConfig
+
+    return RRTradeConfig(
+        model_path="{PROJECT_ROOT}/trading/test/models/ppo.zip",
+        out_dir="{PROJECT_ROOT}/trading/test/temp/out/",
+        positions_path="{PROJECT_ROOT}/trading/test/paper_trading/positions/ppo.json",
+        account_path="{PROJECT_ROOT}/trading/test/paper_trading/accounts/ppo.json",
+        broker=BrokerType.LOCAL,
+        bucket_name=None,
+        broker_kwargs={},
+        defer_trade_execution=False,
+        portfolio_config=portfolio_config,
+    )
+
+
+@pytest.fixture
+def alpaca_trade_config(portfolio_config):
+    """
+    Fixture to create a remote trade configuration.
+    """
+    from trading.cli.trading.trade_config import RRTradeConfig
+
+    return RRTradeConfig(
+        model_path="{PROJECT_ROOT}/trading/test/models/ppo.zip",
+        out_dir="{PROJECT_ROOT}/trading/test/temp/out/",
+        broker=BrokerType.ALPACA,
+        bucket_name=None,
+        broker_kwargs={},
+        defer_trade_execution=False,
+        portfolio_config=portfolio_config,
+    )
+
+
+@pytest.fixture
+def alpaca_trading_client_mock():
+    from trading.test.mocks.alpaca_trading_client_mock import AlpacaTradingClientMock
+
+    return AlpacaTradingClientMock()
