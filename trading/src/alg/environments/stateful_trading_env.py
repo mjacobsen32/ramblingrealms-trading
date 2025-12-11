@@ -31,11 +31,12 @@ class StatefulTradingEnv(BaseTradingEnv):
         super().__init__(data, cfg, features, time_step)
         
         # Initialize full portfolio management
+        from trading.cli.alg.config import TradeMode
         position_manager = PositionManager(
             symbols=self.symbols,
             max_lots=(
                 None
-                if cfg.portfolio_config.trade_mode == cfg.portfolio_config.trade_mode
+                if cfg.portfolio_config.trade_mode == TradeMode.CONTINUOUS
                 else cfg.portfolio_config.max_positions
             ),
             maintain_history=cfg.portfolio_config.maintain_history,
