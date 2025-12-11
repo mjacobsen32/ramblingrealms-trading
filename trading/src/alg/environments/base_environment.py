@@ -72,6 +72,8 @@ class BaseTradingEnv(gym.Env, ABC):
 
         self.observation_index = self.cfg.lookback_window
         self.terminal = False
+        # Initialize observation_timestamp early to avoid AttributeError
+        self.observation_timestamp = None
 
     def init_data(self, data: pd.DataFrame):
         """
@@ -152,7 +154,9 @@ class BaseTradingEnv(gym.Env, ABC):
         """Reset internal state counters."""
         self.observation_index = self.cfg.lookback_window
         self.terminal = False
-        self.observation_timestamp = self.data.index.get_level_values(
-            "timestamp"
-        ).unique()
+        # Ensure observation_timestamp is always set
+        if self.observation_timestamp is None or len(self.observation_timestamp) == 0:
+            self.observation_timestamp = self.data.index.get_level_values(
+                "timestamp"
+            ).unique()
         logging.debug("Environment reset:\n%s", self.render())

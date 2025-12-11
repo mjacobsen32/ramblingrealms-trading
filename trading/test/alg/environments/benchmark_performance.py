@@ -14,6 +14,9 @@ from trading.src.alg.environments.stateful_trading_env import StatefulTradingEnv
 
 CONFIG_DIR = Path(__file__).parent.parent.parent / "configs"
 
+# Performance target for FastTrainingEnv
+TARGET_STEPS_PER_SEC = 10000
+
 
 def benchmark_environment(env_class, env_name, num_episodes=5, num_steps_per_episode=100):
     """Benchmark an environment over multiple episodes."""
@@ -66,8 +69,8 @@ def benchmark_environment(env_class, env_name, num_episodes=5, num_steps_per_epi
     print(f"  Total steps: {total_steps}")
     print(f"  Total time: {total_time:.3f}s")
     print(f"  Average speed: {avg_steps_per_sec:.1f} steps/sec")
-    print(f"  Target: 10,000 steps/sec")
-    print(f"  Achievement: {(avg_steps_per_sec / 10000) * 100:.1f}% of target")
+    print(f"  Target: {TARGET_STEPS_PER_SEC:,} steps/sec")
+    print(f"  Achievement: {(avg_steps_per_sec / TARGET_STEPS_PER_SEC) * 100:.1f}% of target")
     
     return avg_steps_per_sec
 
@@ -105,10 +108,10 @@ def main():
         speedup = fast_speed / stateful_speed
         print(f"Speedup: {speedup:.2f}x faster")
     
-    if fast_speed >= 10000:
-        print(f"\n✓ Target achieved! FastTrainingEnv >= 10,000 steps/sec")
+    if fast_speed >= TARGET_STEPS_PER_SEC:
+        print(f"\n✓ Target achieved! FastTrainingEnv >= {TARGET_STEPS_PER_SEC:,} steps/sec")
     else:
-        print(f"\n✗ Target not achieved. Need {10000 - fast_speed:.1f} more steps/sec")
+        print(f"\n✗ Target not achieved. Need {TARGET_STEPS_PER_SEC - fast_speed:.1f} more steps/sec")
     
     print(f"{'='*60}\n")
 

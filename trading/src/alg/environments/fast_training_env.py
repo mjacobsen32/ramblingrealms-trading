@@ -128,14 +128,17 @@ class FastTrainingEnv(BaseTradingEnv):
         buy_mask = action > action_threshold
         sell_mask = action < -action_threshold
         
+        # Use configured trade limit percent for scaling
+        trade_limit = self.cfg.portfolio_config.trade_limit_percent
+        
         if self.cfg.portfolio_config.trade_mode == TradeMode.CONTINUOUS:
             # Continuous mode: scale actions by available capital/holdings
-            max_buy_per_stock = (portfolio_value_before * 0.1) / (current_prices + 1e-8)  # 10% per stock max
+            max_buy_per_stock = (portfolio_value_before * trade_limit) / (current_prices + 1e-8)
             buy_amounts = np.where(buy_mask, action * max_buy_per_stock, 0.0)
             sell_amounts = np.where(sell_mask, action * self.holdings, 0.0)
         else:
             # Discrete mode: all-in or all-out
-            max_shares = (portfolio_value_before * 0.1) / (current_prices + 1e-8)
+            max_shares = (portfolio_value_before * trade_limit) / (current_prices + 1e-8)
             buy_amounts = np.where(buy_mask, max_shares, 0.0)
             sell_amounts = np.where(sell_mask, -self.holdings, 0.0)
         
@@ -171,10 +174,11 @@ class FastTrainingEnv(BaseTradingEnv):
         portfolio_value_after = self.cash + np.dot(self.holdings, next_prices)
         
         # Simple reward: percentage change in portfolio value
-        reward = (portfolio_value_after - portfolio_value_before) / (portfolio_value_before + 1e-8)
+        pct_change = (portfolio_value_after - portfolio_value_before) / (portfolio_value_before + 1e-8)
         
-        # Normalize reward with tanh
-        reward = np.tanh(reward * 100.0)  # scale factor for sensitivity
+        # Normalize reward with tanh - use a default scaling factor for percentage changes
+        # This makes the reward more sensitive to small changes (1% = 100 in scaling)
+        reward = np.tanh(pct_change * 100.0)
         
         info = {
             "net_value": portfolio_value_after,
