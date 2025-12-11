@@ -15,6 +15,8 @@ from trading.src.alg.environments.stateful_trading_env import StatefulTradingEnv
 CONFIG_DIR = Path(__file__).parent.parent.parent / "configs"
 
 # Performance target for FastTrainingEnv
+# This target (10,000 steps/sec) represents approximately 50x speedup over the original
+# StatefulTradingEnv (~200 steps/sec), enabling faster experimentation and hyperparameter tuning.
 TARGET_STEPS_PER_SEC = 10000
 
 
