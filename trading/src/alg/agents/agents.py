@@ -4,13 +4,16 @@ import logging
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
+import gymnasium as gym
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC
 
 from trading.cli.alg.config import AgentConfig, DataConfig, ProjectPath
 from trading.src.alg.agents.lr_schedule import BaseLRSchedule
-from trading.src.alg.environments.trading_environment import TradingEnv
+
+if TYPE_CHECKING:
+    from trading.src.alg.environments.base_environment import BaseTradingEnv
 
 AGENT_REGISTRY: dict[str, Any] = {
     "ppo": PPO,
@@ -31,7 +34,7 @@ class Agent:
     def __init__(
         self,
         config: AgentConfig,
-        env: TradingEnv,
+        env: gym.Env,
         data_config: DataConfig | None = None,
         load: bool = False,
     ):
@@ -44,7 +47,7 @@ class Agent:
         """
         self.config: AgentConfig = config
         self.meta_data: dict = {}
-        self.env: TradingEnv = env
+        self.env: gym.Env = env
         if load:
             # When loading, we may not need a data_config; it's stored in meta_data
             self.model, self.meta_data = Agent.load_agent(config, self.env)
@@ -53,9 +56,16 @@ class Agent:
             self.meta_data = {
                 "type": config.algo,
                 "version": ProjectPath.VERSION,
-                "symbols": self.env.symbols,
-                "features": [f.model_dump(mode="json") for f in self.env.features],
-                "env_config": self.env.cfg.model_dump(mode="json"),
+                "symbols": getattr(self.env, "symbols", []),
+                "features": [
+                    f.model_dump(mode="json") for f in getattr(self.env, "features", [])
+                ],
+                "env_config": (
+                    cfg.model_dump(mode="json")
+                    if (cfg := getattr(self.env, "cfg", None))
+                    and hasattr(cfg, "model_dump")
+                    else {}
+                ),
                 "data_config": (
                     data_config.model_dump(mode="json") if data_config else {}
                 ),
@@ -64,7 +74,7 @@ class Agent:
 
     @classmethod
     def make_agent(
-        cls, config: AgentConfig, env: TradingEnv
+        cls, config: AgentConfig, env: gym.Env
     ) -> A2C | DDPG | DQN | PPO | SAC:
         """
         Creates an agent based on the provided configuration and environment.
@@ -86,7 +96,7 @@ class Agent:
         )
 
     @classmethod
-    def load_agent(cls, config: AgentConfig | Path, env: TradingEnv | None):
+    def load_agent(cls, config: AgentConfig | Path, env: gym.Env | None):
         """
         Loads an agent and its meta_data from a saved zip file without extracting to disk.
         Returns:

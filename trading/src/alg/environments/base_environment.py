@@ -112,6 +112,8 @@ class BaseTradingEnv(gym.Env, ABC):
         """Get the dataframe slice for observation at index i."""
         if i == -1:
             i = self.observation_index
+        if self.observation_timestamp is None:
+            raise ValueError("observation_timestamp not initialized")
         return self.data.loc[
             self.observation_timestamp[
                 i - self.cfg.lookback_window
@@ -122,6 +124,8 @@ class BaseTradingEnv(gym.Env, ABC):
         """Get prices at index i."""
         if i == -1:
             i = self.observation_index
+        if self.observation_timestamp is None:
+            raise ValueError("observation_timestamp not initialized")
         return self.data.loc[[self.observation_timestamp[i]]]["price"].to_numpy()
 
     @abstractmethod
@@ -129,9 +133,9 @@ class BaseTradingEnv(gym.Env, ABC):
         """Get the current observation from the environment."""
         pass
 
-    @abstractmethod
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
-        """Reset the environment to its initial state."""
+        """Reset the environment to its initial state. Can be overridden by subclasses."""
+        # Default implementation - subclasses should override
         pass
 
     @abstractmethod
@@ -141,6 +145,8 @@ class BaseTradingEnv(gym.Env, ABC):
 
     def render(self):
         """Render the environment state."""
+        if self.observation_timestamp is None:
+            return "Environment not initialized"
         return "Day: {}\nSlice: {}\nTickers: {}, Observation Space: {}, Action Space: {}, Features: {}".format(
             self.observation_timestamp[self.observation_index],
             self.data.loc[self.observation_timestamp[self.observation_index]],
