@@ -2,6 +2,7 @@
 Fast reward function optimized for training speed.
 Does not maintain any history or complex calculations.
 """
+
 import logging
 
 import numpy as np
@@ -39,28 +40,28 @@ class FastProfitReward(RewardFunction):
     ) -> float:
         """
         Compute reward based on simple portfolio value change.
-        
+
         Args:
             pf: Portfolio object (we extract net_value)
             df: DataFrame (not used in fast mode)
             realized_profit: Realized profit from trades (not used in fast mode)
-            
+
         Returns:
             Normalized reward value
         """
         current_value = pf.position_manager.net_value()
         delta_value = current_value - self.previous_value
-        
+
         # Update for next call
         self.previous_value = current_value
-        
+
         # Normalize with tanh for stability
         normalized_reward = np.tanh(delta_value / self.cfg.reward_scaling)
-        
+
         if np.isnan(normalized_reward) or np.isinf(normalized_reward):
             logging.warning("Invalid reward value: %s", normalized_reward)
             return 0.0
-        
+
         return float(normalized_reward)
 
 
@@ -90,33 +91,33 @@ class SimpleMomentumReward(RewardFunction):
         """
         Compute reward that emphasizes profit relative to portfolio size.
         Encourages growing the portfolio while being mindful of risk.
-        
+
         Args:
             pf: Portfolio object
             df: DataFrame (not used)
             realized_profit: Realized profit from trades
-            
+
         Returns:
             Normalized reward value
         """
         current_value = pf.position_manager.net_value()
-        
+
         # Calculate percentage return
         if self.previous_value > 0:
             pct_return = (current_value - self.previous_value) / self.previous_value
         else:
             pct_return = 0.0
-        
+
         # Update for next call
         self.previous_value = current_value
-        
+
         # Scale and normalize
         # Using percentage-based scaling makes the agent more sensitive to changes
         # 1% change = 100 in scaling, which maps well to tanh(-1, 1) range
         reward = np.tanh(pct_return * 100.0)
-        
+
         if np.isnan(reward) or np.isinf(reward):
             logging.warning("Invalid reward value: %s", reward)
             return 0.0
-        
+
         return float(reward)

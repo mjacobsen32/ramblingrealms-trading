@@ -9,9 +9,9 @@ from trading.cli.utils import init_file_logger
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.backtest.backtesting import BackTesting, Portfolio
 from trading.src.alg.data_process.data_loader import DataLoader
-from trading.src.alg.environments.trading_environment import TradingEnv
 from trading.src.alg.environments.fast_training_env import FastTrainingEnv
 from trading.src.alg.environments.stateful_trading_env import StatefulTradingEnv
+from trading.src.alg.environments.trading_environment import TradingEnv
 
 app = typer.Typer(
     name="alg", help="Algorithm training, testing, and evaluation commands."
@@ -50,7 +50,7 @@ def train(
         feature_config=alg_config.feature_config,
         fetch_data=fetch_data,
     )
-    
+
     # Use FastTrainingEnv for training (10x faster)
     train_env = FastTrainingEnv(
         data=data_loader.get_train_test()[0],
@@ -83,7 +83,7 @@ def train(
             ),
         )
         test_env.reset()
-        
+
         bt = BackTesting(
             model=model,
             env=test_env,
@@ -116,7 +116,7 @@ def backtest(
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    
+
     # Use StatefulTradingEnv for backtesting (accurate evaluation)
     test_env = StatefulTradingEnv(
         data=data_loader.get_train_test()[1],

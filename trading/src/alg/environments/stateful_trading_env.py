@@ -29,9 +29,10 @@ class StatefulTradingEnv(BaseTradingEnv):
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
     ):
         super().__init__(data, cfg, features, time_step)
-        
+
         # Initialize full portfolio management
         from trading.cli.alg.config import TradeMode
+
         position_manager = PositionManager(
             symbols=self.symbols,
             max_lots=(
@@ -48,10 +49,10 @@ class StatefulTradingEnv(BaseTradingEnv):
             time_step=time_step,
             position_manager=position_manager,
         )
-        
+
         # Reward function for evaluation
         self.reward_function = reward_factory_method(cfg.reward_config, self.pf.state())
-        
+
         # Statistics tracking for reward calculations
         self.stats = pd.DataFrame(
             0.0,
@@ -59,22 +60,22 @@ class StatefulTradingEnv(BaseTradingEnv):
             columns=["cum_returns", "returns", "net_value"],
             dtype=np.float32,
         )
-        
+
         # Initialize action tracking in data
         self.data["size"] = 0.0
         self.data["profit"] = 0.0
         self.data["action"] = 0.0
-        
+
         logging.info("StatefulTradingEnv initialized with full portfolio tracking")
 
     def _get_observation(self, i: int = -1) -> np.ndarray:
         """Get the current observation with full portfolio state."""
         if i == -1:
             i = self.observation_index
-        
+
         df = self._get_observation_df(i)
         prices = self._get_prices(i)
-        
+
         return self.observation(
             df, np.asarray(self.pf.state()), self.feature_cols, prices
         )
@@ -111,7 +112,7 @@ class StatefulTradingEnv(BaseTradingEnv):
 
         date_slice = self.data.loc[self.observation_timestamp[self.observation_index]]
         date_slice.loc[:, "action"] = action
-        
+
         logging.debug("action: %s, date_slice: %s", action, date_slice)
 
         # Execute trades through portfolio manager (enforces constraints)
@@ -121,7 +122,7 @@ class StatefulTradingEnv(BaseTradingEnv):
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "net_value"
         ] = self.pf.position_manager.net_value()
-        
+
         previous_net_value = (
             self.stats.loc[
                 self.observation_timestamp[self.observation_index - 1], "net_value"
@@ -129,7 +130,7 @@ class StatefulTradingEnv(BaseTradingEnv):
             if self.observation_index > 0
             else self.pf.position_manager.initial_cash()
         )
-        
+
         self.stats.loc[
             self.observation_timestamp[self.observation_index], "returns"
         ] = (
@@ -157,11 +158,11 @@ class StatefulTradingEnv(BaseTradingEnv):
         reward = self.reward_function.compute_reward(
             pf=self.pf, df=stats_slice, realized_profit=d["profit"]
         )
-        
+
         # Move to next step
         self.observation_index += 1
         self.terminal = self.observation_index >= self.max_steps - 1
-        
+
         return (
             self._get_observation(),
             reward,

@@ -157,11 +157,17 @@ class Agent:
         # Zip the directory contents into the final zip file
         with zipfile.ZipFile(save_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             for file in save_dir.iterdir():
-                zipf.write(file, arcname=file.name)
+                if file.is_file():
+                    zipf.write(file, arcname=file.name)
+                elif file.is_dir():
+                    # Recursively add directory contents
+                    for subfile in file.rglob("*"):
+                        if subfile.is_file():
+                            zipf.write(subfile, arcname=subfile.relative_to(save_dir))
 
         # Optionally, clean up the directory
-        for file in save_dir.iterdir():
-            file.unlink()
-        save_dir.rmdir()
+        import shutil
+
+        shutil.rmtree(save_dir)
 
         return self.model

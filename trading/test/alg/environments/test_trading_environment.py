@@ -7,9 +7,9 @@ import trading.src.alg.agents
 from trading.cli.alg.alg import backtest
 from trading.cli.alg.config import RRConfig
 from trading.src.alg.data_process.data_loader import DataLoader
-from trading.src.alg.environments.trading_environment import TradingEnv
 from trading.src.alg.environments.fast_training_env import FastTrainingEnv
 from trading.src.alg.environments.stateful_trading_env import StatefulTradingEnv
+from trading.src.alg.environments.trading_environment import TradingEnv
 from trading.test.alg.test_fixtures import *
 
 CONFIG_DIR = Path(__file__).parent.parent.parent / "configs"
@@ -57,7 +57,7 @@ def test_fast_training_env():
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    
+
     # Create fast training environment
     fast_env = FastTrainingEnv(
         data=data_loader.df,
@@ -65,33 +65,33 @@ def test_fast_training_env():
         features=alg_config.feature_config.features,
     )
     obs, info = fast_env.reset()
-    
+
     # Verify observation shape
     assert obs.shape == fast_env.observation_space.shape
-    
+
     # Test buy action
     action = np.ones(fast_env.stock_dimension) * 0.5
     obs, reward, terminated, truncated, info = fast_env.step(action)
-    
+
     # Verify we have holdings now
     assert np.sum(fast_env.holdings) > 0
     assert "net_value" in info
-    
+
     # Test hold
     action = np.zeros(fast_env.stock_dimension)
     obs, reward, terminated, truncated, info = fast_env.step(action)
-    
+
     # Test sell
     action = np.ones(fast_env.stock_dimension) * -0.5
     obs, reward, terminated, truncated, info = fast_env.step(action)
-    
+
     # Run through several steps
     for _ in range(10):
         action = np.random.uniform(-1, 1, fast_env.stock_dimension)
         obs, reward, terminated, truncated, info = fast_env.step(action)
         if terminated:
             break
-    
+
     # Verify environment can reset
     obs, info = fast_env.reset()
     assert np.all(fast_env.holdings == 0)
@@ -105,7 +105,7 @@ def test_stateful_trading_env():
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    
+
     # Create stateful trading environment
     stateful_env = StatefulTradingEnv(
         data=data_loader.df,
@@ -113,33 +113,33 @@ def test_stateful_trading_env():
         features=alg_config.feature_config.features,
     )
     obs, info = stateful_env.reset()
-    
+
     # Verify observation shape
     assert obs.shape == stateful_env.observation_space.shape
-    
+
     # Verify portfolio is initialized
     assert stateful_env.pf is not None
     assert stateful_env.pf.position_manager is not None
-    
+
     # Test buy action
     action = np.ones(stateful_env.stock_dimension) * 0.5
     obs, reward, terminated, truncated, info = stateful_env.step(action)
-    
+
     # Verify portfolio state tracking
     assert "net_value" in info
     assert "profit_change" in info
-    
+
     # Test sell
     action = np.ones(stateful_env.stock_dimension) * -0.5
     obs, reward, terminated, truncated, info = stateful_env.step(action)
-    
+
     # Run through several steps
     for _ in range(10):
         action = np.random.uniform(-1, 1, stateful_env.stock_dimension)
         obs, reward, terminated, truncated, info = stateful_env.step(action)
         if terminated:
             break
-    
+
     # Verify statistics are being tracked
     assert len(stateful_env.stats) > 0
 
@@ -151,7 +151,7 @@ def test_backward_compatibility():
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    
+
     # TradingEnv should still work and behave like StatefulTradingEnv
     env = TradingEnv(
         data=data_loader.df,
@@ -159,11 +159,11 @@ def test_backward_compatibility():
         features=alg_config.feature_config.features,
     )
     obs, info = env.reset()
-    
+
     # Should have full portfolio tracking
     assert hasattr(env, "pf")
     assert hasattr(env, "stats")
-    
+
     # Should be able to take steps
     action = np.ones(env.stock_dimension) * 0.5
     obs, reward, terminated, truncated, info = env.step(action)

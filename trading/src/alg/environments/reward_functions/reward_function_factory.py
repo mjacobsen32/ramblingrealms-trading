@@ -22,11 +22,11 @@ def reward_factory_method(
 ) -> RewardFunction:
     """
     Factory method to create a reward function instance based on the configuration.
-    
+
     Recommended for training with FastTrainingEnv:
     - fast_profit_reward: Ultra-fast, minimal computation
     - simple_momentum_reward: Fast with percentage-based rewards
-    
+
     Recommended for evaluation with StatefulTradingEnv:
     - basic_profit_max: Standard profit maximization
     - sharpe_ratio: Risk-adjusted returns
