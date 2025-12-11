@@ -161,11 +161,33 @@ Expected results:
 - StatefulTradingEnv: ~150-500 iterations/second
 - Speedup: ~20-50x faster training
 
+## Reward Functions
+
+### For Fast Training
+- **fast_profit_reward**: Ultra-fast, tracks only portfolio value changes
+- **simple_momentum_reward**: Fast percentage-based returns
+
+### For Evaluation
+- **basic_profit_max**: Standard profit maximization
+- **sharpe_ratio**: Risk-adjusted returns
+- **sortino_ratio**: Downside risk focus
+- **calmar_ratio**: Max drawdown focus
+
+Configure in your `stock_env.json`:
+```json
+{
+  "reward_config": {
+    "type": "fast_profit_reward",
+    "reward_scaling": 10000.0
+  }
+}
+```
+
 ## Future Improvements
 
 Possible enhancements:
 1. GPU-accelerated computations for even faster training
 2. Distributed training across multiple environments
 3. Adaptive reward scaling based on market conditions
-4. More sophisticated fast reward functions (momentum-based, etc.)
+4. Multi-objective reward functions combining profit and risk
 5. Caching mechanisms for frequently accessed data

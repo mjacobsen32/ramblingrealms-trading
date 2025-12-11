@@ -39,16 +39,30 @@ class FastTrainingEnv(BaseTradingEnv):
                      self.stock_dimension, self.cfg.lookback_window)
 
     def _precompute_price_arrays(self):
-        """Pre-compute price arrays for fast lookups."""
+        """Pre-compute price arrays and feature matrices for fast lookups."""
         # Create a 2D array: [timestep, symbol] for O(1) price lookups
         self.price_matrix = np.zeros((len(self.timestamps), self.stock_dimension), dtype=np.float32)
+        
+        # Pre-compute feature matrix: [timestep, features_per_symbol * num_symbols]
+        # This avoids expensive dataframe operations during training
+        num_features = len(self.feature_cols)
+        self.feature_matrix = np.zeros(
+            (len(self.timestamps), num_features * self.stock_dimension), 
+            dtype=np.float32
+        )
+        
         for i, ts in enumerate(self.timestamps):
-            prices = self.data.loc[[ts]]["price"].to_numpy()
+            data_slice = self.data.loc[[ts]]
+            prices = data_slice["price"].to_numpy()
             self.price_matrix[i, :] = prices
+            
+            # Flatten features for this timestep
+            features = data_slice[self.feature_cols].to_numpy().flatten()
+            self.feature_matrix[i, :] = features
 
     def _get_observation(self, i: int = -1) -> np.ndarray:
         """
-        Get observation with minimal computation.
+        Get observation with minimal computation using pre-computed matrices.
         Returns: [cash, holdings, current_prices, indicators]
         """
         if i == -1:
@@ -60,10 +74,23 @@ class FastTrainingEnv(BaseTradingEnv):
         # Get current prices from pre-computed matrix
         prices = self.price_matrix[i]
         
-        # Get indicators from dataframe
-        df = self._get_observation_df(i)
+        # Get features for the lookback window from pre-computed matrix
+        # Instead of slicing dataframe, we slice the feature matrix
+        start_idx = max(0, i - self.cfg.lookback_window)
+        end_idx = i + 1
+        feature_window = self.feature_matrix[start_idx:end_idx].flatten()
         
-        return self.observation(df, portfolio_state, self.feature_cols, prices)
+        # Combine all observations
+        observation = np.concatenate([portfolio_state, prices, feature_window], axis=0)
+        
+        logging.debug(
+            "Portfolio state: %s\nPrices: %s\nFeatures: %s",
+            portfolio_state.shape,
+            prices.shape,
+            feature_window.shape,
+        )
+        
+        return observation.astype(np.float32)
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         """Reset to initial state."""
