@@ -1,0 +1,9 @@
+{
+    "features": [
+        {
+            "type": "candle",
+            "name": "candle",
+            "enabled": true
+        }
+      ]
+}

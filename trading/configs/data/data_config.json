@@ -8,11 +8,11 @@
     "validation_split": 0.2,
     "requests": [
         {
-            "dataset_name": "AAPL_SPX_30_years",
+            "dataset_name": "ALL_SPX_30_years",
             "source": "alpaca",
             "endpoint": "StockBarsRequest",
             "kwargs": {
-                "symbol_or_symbols": ["AAPL"],
+                "symbol_or_symbols": ["ALL"],
                 "adjustment": "split"
             }
         }
