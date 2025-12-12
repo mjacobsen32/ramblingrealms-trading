@@ -83,6 +83,10 @@ class StatefulTradingEnv(BaseTradingEnv):
     def _reset_internal_states(self):
         """Reset internal states including portfolio."""
         super()._reset_internal_states()
+        # Initialize action tracking in data
+        self.data["size"] = 0.0
+        self.data["profit"] = 0.0
+        self.data["action"] = 0.0
         self.pf.reset()
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
@@ -127,7 +131,7 @@ class StatefulTradingEnv(BaseTradingEnv):
             self.stats.loc[
                 self.observation_timestamp[self.observation_index - 1], "net_value"
             ]
-            if self.observation_index > 0
+            if self.observation_index > self.cfg.lookback_window
             else self.pf.position_manager.initial_cash()
         )
 
