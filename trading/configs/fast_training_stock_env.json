@@ -7,8 +7,8 @@
     },
     "portfolio_config":{
         "initial_cash": 100000,
-        "buy_cost_pct": 0.0,
-        "sell_cost_pct": 0.0,
+        "buy_cost_pct": 0.02,
+        "sell_cost_pct": 0.02,
         "turbulence_threshold": null,
         "max_positions": null,
         "hmax": 10000,

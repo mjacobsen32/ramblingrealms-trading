@@ -12,7 +12,7 @@
         "backtest_dir": "{OUT_DIR}/backtest_results/",
         "results_path": "{BACKTEST_DIR}/fast_ppo_results.pkl",
         "analysis_config": {
-            "render_plots": false,
+            "render_plots": true,
             "save_plots": true,
             "to_csv": true
         }

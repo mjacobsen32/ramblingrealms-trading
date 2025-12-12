@@ -150,6 +150,11 @@ class Agent:
     def save(self, path: Optional[str] = None):
         # Determine save path
         save_zip_path = Path(path if path else str(self.config.save_path))
+
+        # Ensure save_zip_path points to a .zip file, not a directory, so zipfile.ZipFile() doesn't raise IsADirectoryError
+        if save_zip_path.suffix != ".zip":
+            save_zip_path = save_zip_path.with_suffix(".zip")
+
         save_dir = save_zip_path.with_suffix("")
 
         # Create directory for saving

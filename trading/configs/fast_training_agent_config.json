@@ -1,7 +1,7 @@
 {
     "algo": "ppo",
     "total_timesteps": 1e5,
-    "save_path": "{PROJECT_ROOT}/models/ppo_fast_training",
+    "save_path": "{PROJECT_ROOT}/models/ppo_fast_training.zip",
         "kwargs": {
             "policy": "MlpPolicy",
             "learning_rate": {

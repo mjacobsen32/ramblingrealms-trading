@@ -404,7 +404,7 @@ class PositionManager:
         buy_symbols = df.index[buy_mask]
         sell_symbols = df.index[sell_mask]
 
-        df[sell_mask] = self._exit_positions(df[sell_mask])
+        df.loc[sell_mask] = self._exit_positions(df[sell_mask])
 
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
 
