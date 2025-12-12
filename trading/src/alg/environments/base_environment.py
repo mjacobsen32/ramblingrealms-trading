@@ -28,7 +28,9 @@ class BaseTradingEnv(gym.Env, ABC):
     ):
         super().__init__()
         self.symbols = data.index.get_level_values("symbol").unique().tolist()
-        self.stock_dimension = len(data.index.get_level_values("symbol").unique())
+        self.stock_dimension = data.index.get_level_values("symbol").nunique()
+        if len(self.symbols) != self.stock_dimension:
+            raise ValueError("Data symbols length does not match stock dimension.")
         self.features = features
         self.feature_cols = feature_utils.get_feature_cols(features=self.features)
         self.init_data(data)
@@ -56,7 +58,7 @@ class BaseTradingEnv(gym.Env, ABC):
                 * (self.cfg.lookback_window + 1)
             )  # technical indicators for each stock
         )
-        logging.debug(
+        logging.info(
             "State space: %s, Features (%s): %s, Stock Dimension: %s, action space: %s, lookback window: %i",
             state_space,
             len(self.feature_cols),

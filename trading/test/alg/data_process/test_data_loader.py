@@ -44,6 +44,47 @@ def test_data_loader(data_loader):
     ), "DataFrame should not contain NaN values"
 
 
+# ! TODO: add test for delisted tickers (alpca does not provide this endpoint currently) Need to train and test with delisted tickers
+# ! to prevent survivorship bias
+
+
+def test_incomplete_multi_ticker(incomplete_multi_ticker_data_loader):
+    data_loader = incomplete_multi_ticker_data_loader
+
+    assert data_loader.df.shape[0] > 0, "DataFrame should not be empty"
+    symbols = data_loader.df.index.get_level_values("symbol")
+    assert symbols.nunique() == 4, "DataFrame should contain four tickers"
+    assert set(symbols.unique()) == {
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "HG",  # IPO'd on November 10th 2023
+    }, "DataFrame should contain AAPL, MSFT, GOOGL, and HG tickers"
+
+    df = data_loader.df.drop("timestamp", axis=1)
+    hg_df = df.xs("HG", level="symbol")
+    aapl_df = df.xs("AAPL", level="symbol")
+    msft_df = df.xs("MSFT", level="symbol")
+    googl_df = df.xs("GOOGL", level="symbol")
+
+    assert (
+        hg_df.shape == aapl_df.shape == msft_df.shape == googl_df.shape
+    ), "All tickers should have the same number of rows"
+
+    assert hg_df.iloc[0].equals(
+        hg_df.iloc[100]
+    ), "HG data should be backfilled correctly"
+    assert not aapl_df.iloc[0].equals(
+        aapl_df.iloc[1]
+    ), "AAPL data should not be backfilled"
+    assert not msft_df.iloc[0].equals(
+        msft_df.iloc[1]
+    ), "MSFT data should not be backfilled"
+    assert not googl_df.iloc[0].equals(
+        googl_df.iloc[1]
+    ), "GOOGL data should not be backfilled"
+
+
 def test_data_loader_split(data_loader):
     """
     Test the DataLoader's train-test split functionality.

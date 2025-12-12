@@ -6,6 +6,9 @@ import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+from alpaca.trading import Asset, GetAssetsRequest
+from alpaca.trading.client import TradingClient
+from alpaca.trading.enums import AssetClass, AssetStatus
 
 from trading.cli.alg.config import (
     DataConfig,
@@ -101,27 +104,50 @@ class AlpacaDataLoader(DataSource):
                 user.alpaca_api_key.get_secret_value(),
                 user.alpaca_api_secret.get_secret_value(),
             )
-            request_params = StockBarsRequest(
-                timeframe=TimeFrame(time_step_period, time_step_unit),
-                start=pd.to_datetime(start_date),
-                end=pd.to_datetime(end_date),
-                **request.kwargs,
-            )
-            bars = client.get_stock_bars(request_params)
-            # `get_stock_bars` may return an object with a `.df` attribute or a dict
-            if hasattr(bars, "df"):
-                df = pd.concat([df, bars.df])
-            elif isinstance(bars, dict) and "df" in bars:
-                df = pd.concat([df, bars["df"]])
-            else:
-                # Fallback: try to coerce the return to a DataFrame
-                try:
-                    df = pd.concat([df, pd.DataFrame(bars)])
-                except Exception:
-                    logging.error(
-                        "Unknown bars return type from Alpaca client: %s", type(bars)
+            if request.kwargs.get("symbol_or_symbols") == ["ALL"]:
+                trading_client = TradingClient(
+                    user.alpaca_api_key.get_secret_value(),
+                    user.alpaca_api_secret.get_secret_value(),
+                )
+                assets: list[str] = [
+                    asset.symbol
+                    for asset in trading_client.get_all_assets(
+                        GetAssetsRequest(
+                            status=AssetStatus.ACTIVE,
+                            asset_class=AssetClass.US_EQUITY,
+                        )
                     )
-                    raise
+                    if asset.tradable
+                ]
+                request.kwargs["symbol_or_symbols"] = assets
+            assets = request.kwargs["symbol_or_symbols"]
+            logging.info("Total number of symbols to fetch: %d", len(assets))
+            for start in range(0, len(assets), 200):
+                end = min(start + 200, len(assets))
+                logging.info("Fetching data for symbols %d to %d...", start, end)
+                request.kwargs["symbol_or_symbols"] = assets[start:end]
+                request_params = StockBarsRequest(
+                    timeframe=TimeFrame(time_step_period, time_step_unit),
+                    start=pd.to_datetime(start_date),
+                    end=pd.to_datetime(end_date),
+                    **request.kwargs,
+                )
+                bars = client.get_stock_bars(request_params)
+                # `get_stock_bars` may return an object with a `.df` attribute or a dict
+                if hasattr(bars, "df"):
+                    df = pd.concat([df, bars.df])
+                elif isinstance(bars, dict) and "df" in bars:
+                    df = pd.concat([df, bars["df"]])
+                else:
+                    # Fallback: try to coerce the return to a DataFrame
+                    try:
+                        df = pd.concat([df, pd.DataFrame(bars)])
+                    except Exception:
+                        logging.error(
+                            "Unknown bars return type from Alpaca client: %s",
+                            type(bars),
+                        )
+                        raise
             if cache_enabled:
                 logging.info("Caching data to %s", cache_file)
                 df.to_parquet(cache_file)
@@ -130,15 +156,11 @@ class AlpacaDataLoader(DataSource):
 
         logging.info("Length of fetched data: %d", len(df))
 
-        if df.index.get_level_values("symbol").nunique() != len(
-            request.kwargs["symbol_or_symbols"]
-        ):
-            logging.error(
-                "Requested %d symbols, but received data for %d symbols.",
-                len(request.kwargs["symbol_or_symbols"]),
-                df.index.get_level_values("symbol").nunique(),
-            )
-            raise ValueError("Mismatch in number of symbols fetched from Alpaca.")
+        logging.info(
+            "Processed %d symbols.",
+            df.index.get_level_values("symbol").nunique(),
+        )
+
         logging.info(
             "Start of fetched data: %s; End of fetched data: %s",
             df.index.get_level_values("timestamp")[0],
@@ -238,5 +260,9 @@ class DataLoader:
         """
         Saves the DataFrame to a CSV file.
         """
-        self.df.to_csv(path, index=True)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self.df.to_csv(
+            path,
+            index=True,
+        )
         logging.info("Data saved to %s", path)

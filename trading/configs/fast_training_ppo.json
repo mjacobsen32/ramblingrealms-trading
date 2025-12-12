@@ -5,7 +5,7 @@
     "out_dir": "{PROJECT_ROOT}/out/alg/fast_training/",
     "agent_config": "{PROJECT_ROOT}/trading/configs/agents/fast_training_agent_config.json",
     "feature_config": "{PROJECT_ROOT}/trading/configs/features/just_candle.json",
-    "data_config": "{PROJECT_ROOT}/trading/configs/data/multi_ticker_data_config.json",
+    "data_config": "{PROJECT_ROOT}/trading/configs/data/data_config.json",
     "stock_env": "{PROJECT_ROOT}/trading/configs/envs/fast_training_stock_env.json",
     "backtest_config": {
         "save_results": true,

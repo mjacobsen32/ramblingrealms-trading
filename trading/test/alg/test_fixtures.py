@@ -2,6 +2,7 @@ import pytest
 
 from trading.cli.alg.config import TradeMode
 from trading.cli.trading.trade_config import BrokerType
+from trading.test.features.test_features import FillStrategy
 
 
 @pytest.fixture(autouse=True)
@@ -64,6 +65,31 @@ def data_loader(data_config, feature_config):
     from trading.src.alg.data_process.data_loader import DataLoader
 
     data = DataLoader(data_config=data_config, feature_config=feature_config)
+    data.df["timestamp"] = data.df.index.get_level_values("timestamp")
+    data.df["size"] = 0.0
+    data.df["profit"] = 0.0
+    data.df["action"] = 0.0
+    return data
+
+
+@pytest.fixture
+def incomplete_multi_ticker_data_loader(data_config, feature_config):
+    from trading.src.alg.data_process.data_loader import DataLoader
+
+    data_config.requests[0].kwargs["symbol_or_symbols"] = [
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "HG",  # IPO'd on November 10th 2023
+    ]
+    data_config.requests[0].dataset_name = "TEST_INCOMPLETE_MULTI_TICKERS"
+    feature_config.features[0].source = "TEST_INCOMPLETE_MULTI_TICKERS"
+    feature_config.features[0].fill_strategy = FillStrategy.BACKWARD_FILL
+
+    data = DataLoader(data_config=data_config, feature_config=feature_config)
+
+    data.df.to_csv("{PROJECT_ROOT}/trading/test/temp/incomplete_all.csv")
+
     data.df["timestamp"] = data.df.index.get_level_values("timestamp")
     data.df["size"] = 0.0
     data.df["profit"] = 0.0
