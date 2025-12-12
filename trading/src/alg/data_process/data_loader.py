@@ -247,9 +247,18 @@ class DataLoader:
         Splits the DataFrame into training and validation sets based on the validation split ratio.
         """
 
-        split_idx = int(len(self.df) * (1 - self.data_config.validation_split))
-        train = self.df.iloc[:split_idx]
-        test = self.df.iloc[split_idx:]
+        unique_timestamps = sorted(self.df.index.get_level_values("timestamp").unique())
+        split_idx = int(
+            len(unique_timestamps) * (1 - self.data_config.validation_split)
+        )
+        train_timestamps = unique_timestamps[:split_idx]
+        test_timestamps = unique_timestamps[split_idx:]
+        train = self.df[
+            self.df.index.get_level_values("timestamp").isin(train_timestamps)
+        ]
+        test = self.df[
+            self.df.index.get_level_values("timestamp").isin(test_timestamps)
+        ]
         logging.info(
             "Train data: %s\nTest data: %s", self.data_info(train), self.data_info(test)
         )

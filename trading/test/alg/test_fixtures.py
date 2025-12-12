@@ -88,7 +88,7 @@ def incomplete_multi_ticker_data_loader(data_config, feature_config):
 
     data = DataLoader(data_config=data_config, feature_config=feature_config)
 
-    data.df.to_csv("{PROJECT_ROOT}/trading/test/temp/incomplete_all.csv")
+    data.df.to_csv("./incomplete_all.csv")
 
     data.df["timestamp"] = data.df.index.get_level_values("timestamp")
     data.df["size"] = 0.0

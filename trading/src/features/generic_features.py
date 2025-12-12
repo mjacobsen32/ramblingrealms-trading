@@ -274,16 +274,17 @@ class Candle(Feature):
     def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         # percent change from previous day
         # for now we are not piping to z-score, but we may later on, ideally we preserve large swings in raw data
-        df["open_norm"] = df["open"].pct_change().fillna(0.0)
-        df["high_norm"] = df["high"].pct_change().fillna(0.0)
-        df["low_norm"] = df["low"].pct_change().fillna(0.0)
-        df["close_norm"] = df["close"].pct_change().fillna(0.0)
-        df["vwap_norm"] = df["vwap"].pct_change().fillna(0.0)
-        df["price"] = df["close"]
+        df["open_norm"] = df["open"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["high_norm"] = df["high"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["low_norm"] = df["low"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["close_norm"] = df["close"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["vwap_norm"] = df["vwap"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["price"] = df["close"].fillna(0.0)
 
         # large swings, so we log the percent change, and pipe to z-score
         df["trade_count_norm"] = (
             df["trade_count"]
+            .fillna(0.0)
             .pct_change()
             .fillna(0.0)
             .transform(np.log1p)
@@ -291,6 +292,7 @@ class Candle(Feature):
         )
         df["volume_norm"] = (
             df["volume"]
+            .fillna(0.0)
             .pct_change()
             .fillna(0.0)
             .transform(np.log1p)
@@ -308,6 +310,8 @@ class Candle(Feature):
             ).apply(self.normalize)
         else:
             normalized = self.normalize(cleaned)
+        normalized.replace([np.inf, -np.inf], np.nan, inplace=True)
+        normalized.fillna(0.0, inplace=True)
         return normalized
 
     TYPE: ClassVar[FeatureType] = FeatureType.CANDLE
