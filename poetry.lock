@@ -4943,6 +4943,7 @@ files = [
 [package.dependencies]
 attrs = ">=22.2.0"
 rpds-py = ">=0.7.0"
+typing-extensions = {version = ">=4.4.0", markers = "python_version < \"3.13\""}
 
 [[package]]
 name = "regex"
@@ -6606,5 +6607,5 @@ repair = ["scipy (>=1.6.3)"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.13,<4.0"
-content-hash = "c4558d9e2adc9ffe231f0ef41fa4f657b01cf84579e7d5a313dc6e1c60b7aa82"
+python-versions = ">=3.12,<4.0"
+content-hash = "f625c97e701f7272c1ba493c42ef14a94d8fba7bf8f52ea9f657d8f64b47674b"
