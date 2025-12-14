@@ -115,8 +115,8 @@ class Position(np.ndarray):
     COLS = [
         "symbol",
         "lot_size",
-        "enter_price",
         "enter_date",
+        "enter_price",
         "exit_date",
         "exit_price",
         "exit_size",
@@ -142,8 +142,8 @@ class Position(np.ndarray):
         return [
             self.symbol,
             self.lot_size,
-            self.enter_price,
             self.enter_date,
+            self.enter_price,
             self.exit_date,
             self.exit_price,
             self.exit_size,
@@ -575,9 +575,9 @@ class LivePositionManager(PositionManager):
             pnl_pct=(
                 df["profit"].sum() / self.net_value() if self.net_value() != 0 else 0
             ),
-            rolling_pnl=self.trading_client.account._cash - self._initial_cash,
+            rolling_pnl=self.available_cash() - self._initial_cash,
             rolling_pnl_pct=(
-                self.trading_client.account._cash / self._initial_cash - 1
+                self.available_cash() / self._initial_cash - 1
                 if self._initial_cash != 0
                 else 0
             ),

@@ -122,29 +122,12 @@ class Trade:
         start, end = window[0], window[-1]
         logging.info("Loading data for model trade: [%s, %s]", start.date, end.date)
 
-        # TODO offload requests meta data construction
-        requests = [
-            DataRequests(
-                dataset_name="LIVE",
-                source=DataSourceType.ALPACA,
-                endpoint="StockBarsRequest",
-                kwargs={
-                    "symbol_or_symbols": self.active_symbols,
-                    "adjustment": "split",
-                },
-            )
-        ]
-
-        # TODO this is a bit hacky, refactor
         data_config = self.data_config
         data_config.start_date = str(start.date)
         data_config.end_date = str(end.date)
-        data_config.requests = requests
-        data_config.validation_split = 0.0  # no validation for trading
-        # data_config.cache_enabled = (
-        #     False if self.live else data_config.cache_enabled
-        # )  # no caching for trading live
-        data_config.cache_enabled = False  # no caching for trading live
+        data_config.cache_enabled = (
+            False if self.live else data_config.cache_enabled
+        )  # no caching for trading live
 
         logging.debug("Data Config: %s", data_config.model_dump_json(indent=4))
 
@@ -152,9 +135,6 @@ class Trade:
             features=self.meta_data["features"], fill_strategy="interpolate"
         )
 
-        # TODO HACKY!
-        for f in feature_config.features:
-            f.source = "LIVE"
         return DataLoader(data_config=data_config, feature_config=feature_config)
 
     def get_prices(self) -> np.ndarray:

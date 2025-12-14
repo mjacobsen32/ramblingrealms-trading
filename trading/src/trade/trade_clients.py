@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -72,8 +73,6 @@ class TradingClient(ABC):
         self.config: RRTradeConfig = config
         self.alpaca_account_client = alpaca_account_client
         self.defer_trade_execution = config.defer_trade_execution
-        self._positions: dict[str, deque[Position]] = self._load_positions()
-        self._account: TradeAccount = self._load_account()
 
     def close(
         self,
@@ -95,11 +94,19 @@ class TradingClient(ABC):
 
     @property
     def account(self) -> TradeAccount:
-        return self._account
+        if hasattr(self, "_account"):
+            return self._account
+        else:
+            self._account: TradeAccount = self._load_account()
+            return self._account
 
     @property
     def positions(self) -> dict[str, deque[Position]]:
-        return self._positions
+        if hasattr(self, "_positions"):
+            return self._positions
+        else:
+            self._positions: dict[str, deque[Position]] = self._load_positions()
+            return self._positions
 
     @abstractmethod
     def _load_positions(self) -> dict[str, deque[Position]]:
@@ -112,7 +119,6 @@ class TradingClient(ABC):
     def _load_pf_stats(self) -> list[PortfolioStats]:
         """
         This is not implemented for Alpaca cause the api manages these and it's just for historical tracking
-        Not implemented for local because we can just append only
 
         :param self: Description
         :return: Description
@@ -123,7 +129,6 @@ class TradingClient(ABC):
     def _load_closed_positions(self) -> list[Position]:
         """
         This is not implemented for Alpaca cause the api manages these and it's just for historical tracking
-        Not implemented for local because we can just append only
 
         :param self: Description
         :return: Description
@@ -184,13 +189,18 @@ class LocalTradingClient(TradingClient):
     def _write_pf_stats(self, stats: list[PortfolioStats]) -> None:
         self.account_value_series_path.parent.mkdir(parents=True, exist_ok=True)
         if self.account_value_series_path.suffix == ".parquet":
+            stats_dicts = [stat.model_dump() for stat in stats]
             pq.write_table(
-                table=pa.Table.from_pylist(stats, schema=portfolio_schema),
+                table=pa.Table.from_pylist(stats_dicts, schema=portfolio_schema),
                 where=self.account_value_series_path,
             )
         elif self.account_value_series_path.suffix == ".csv":
-            df = pd.DataFrame(stats, columns=Position.COLS)
-            df.to_csv(self.account_value_series_path.with_suffix(".csv"), index=False)
+            df = pd.DataFrame(stats, columns=PortfolioStats.COLS)
+            df.to_csv(self.account_value_series_path, index=False)
+        else:
+            raise ValueError(
+                f"Unsupported file format for portfolio stats: {self.account_value_series_path.suffix}"
+            )
         logging.info(
             "Wrote local portfolio stats to %s", self.account_value_series_path
         )
@@ -198,13 +208,16 @@ class LocalTradingClient(TradingClient):
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
         self.closed_positions_path.parent.mkdir(parents=True, exist_ok=True)
         if self.closed_positions_path.suffix == ".parquet":
-            pq.write_table(
-                table=pa.Table.from_pylist(closed_positions, schema=positions_schema),
-                where=self.closed_positions_path,
-            )
+            df = pd.DataFrame(closed_positions, columns=Position.COLS)
+            table = pa.Table.from_pandas(df)
+            pq.write_table(table, where=self.closed_positions_path)
         elif self.closed_positions_path.suffix == ".csv":
             df = pd.DataFrame(closed_positions, columns=Position.COLS)
-            df.to_csv(self.closed_positions_path.with_suffix(".csv"), index=False)
+            df.to_csv(self.closed_positions_path, index=False)
+        else:
+            raise ValueError(
+                f"Unsupported file format for closed positions: {self.closed_positions_path.suffix}"
+            )
         logging.info("Wrote local closed positions to %s", self.closed_positions_path)
 
     def _load_positions(self) -> dict[str, deque[Position]]:
@@ -243,6 +256,50 @@ class LocalTradingClient(TradingClient):
 
         logging.info("Loaded account id: %s; cash: %s", account.id, account.cash)
         return account
+
+    def _load_pf_stats(self) -> list[PortfolioStats]:
+        if not self.account_value_series_path.exists():
+            logging.info(
+                "No portfolio stats file found at %s", self.account_value_series_path
+            )
+            return []
+        if self.account_value_series_path.suffix == ".parquet":
+            table = pq.read_table(
+                self.account_value_series_path, schema=portfolio_schema
+            )
+            stats = [PortfolioStats(**row) for row in table.to_pylist()]
+        elif self.account_value_series_path.suffix == ".csv":
+            df = pd.read_csv(self.account_value_series_path)
+            stats = [PortfolioStats(**row) for _, row in df.iterrows()]
+        logging.info(
+            "Loaded %d portfolio stats from %s",
+            len(stats),
+            self.account_value_series_path,
+        )
+        return stats
+
+    def _load_closed_positions(self) -> list[Position]:
+        if not self.closed_positions_path.exists():
+            logging.info(
+                "No closed positions file found at %s", self.closed_positions_path
+            )
+            return []
+        if self.closed_positions_path.suffix == ".parquet":
+            table = pq.read_table(source=self.closed_positions_path)
+            df = table.to_pandas()
+            positions = [Position(**row) for _, row in df.iterrows()]
+        elif self.closed_positions_path.suffix == ".csv":
+            df = pd.read_csv(filepath_or_buffer=self.closed_positions_path)
+            for col in ["enter_date", "exit_date"]:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col], errors="coerce")
+            positions = [Position(**row) for _, row in df.iterrows()]
+        logging.info(
+            "Loaded %d closed positions from %s",
+            len(positions),
+            self.closed_positions_path,
+        )
+        return positions
 
 
 class RemoteTradingClient(TradingClient):
@@ -334,16 +391,64 @@ class RemoteTradingClient(TradingClient):
         logging.info("Loaded account id: %s; cash: %s", account.id, account.cash)
         return account
 
+    def _load_pf_stats(self) -> list[PortfolioStats]:
+        try:
+            stats_response = self._client.get_object(
+                Bucket=self.config.bucket_name,
+                Key=self.account_stats_key,
+            )
+            body = stats_response["Body"].read()
+            table = pq.read_table(source=io.BytesIO(body), schema=portfolio_schema)
+            stats = [PortfolioStats(**row) for row in table.to_pylist()]
+            logging.info(
+                "Loaded %d remote portfolio stats from bucket %s",
+                len(stats),
+                self.config.bucket_name,
+            )
+            return stats
+        except Exception as e:
+            logging.warning(
+                "Failed to load remote portfolio stats from bucket %s: %s",
+                self.config.bucket_name,
+                str(e),
+            )
+            logging.info("Initializing new remote portfolio stats")
+            return []
+
+    def _load_closed_positions(self) -> list[Position]:
+        try:
+            closed_positions_response = self._client.get_object(
+                Bucket=self.config.bucket_name,
+                Key=self.closed_positions_key,
+            )
+            body = closed_positions_response["Body"].read()
+            table = pq.read_table(source=io.BytesIO(body))
+            df = table.to_pandas()
+            positions: list[Position] = [Position(**row) for _, row in df.iterrows()]
+            logging.info(
+                "Loaded %d remote closed positions from bucket %s",
+                len(positions),
+                self.config.bucket_name,
+            )
+            return positions
+        except Exception as e:
+            logging.warning(
+                "Failed to load remote closed positions from bucket %s: %s",
+                self.config.bucket_name,
+                str(e),
+            )
+            logging.info("Initializing new remote closed positions")
+            return []
+
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
-        sink = pa.BufferOutputStream()
-        with pa.ipc.new_stream(sink, positions_schema) as writer:
-            for position in closed_positions:
-                batch = pa.RecordBatch.from_pylist([position], schema=positions_schema)
-                writer.write_batch(batch)
+        sink = io.BytesIO()
+        df = pd.DataFrame(closed_positions, columns=Position.COLS)
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, sink)
         self._client.put_object(
             Bucket=self.config.bucket_name,
             Key=self.closed_positions_key,
-            Body=sink.getvalue().to_pybytes(),
+            Body=sink.getvalue(),
             ContentType="application/parquet",
         )
         logging.info(
@@ -372,16 +477,14 @@ class RemoteTradingClient(TradingClient):
         logging.info("Wrote remote positions to bucket %s", self.config.bucket_name)
 
     def _write_pf_stats(self, stats: list[PortfolioStats]) -> None:
-        sink = pa.BufferOutputStream()
-        with pa.ipc.new_stream(sink, portfolio_schema) as writer:
-            for stat in stats:
-                batch = pa.RecordBatch.from_pylist([stat], schema=portfolio_schema)
-                writer.write_batch(batch)
-
+        sink = io.BytesIO()
+        stats_dicts = [stat.model_dump() for stat in stats]
+        table = pa.Table.from_pylist(stats_dicts, schema=portfolio_schema)
+        pq.write_table(table, sink)
         self._client.put_object(
             Bucket=self.config.bucket_name,
             Key=self.account_stats_key,
-            Body=sink.getvalue().to_pybytes(),
+            Body=sink.getvalue(),
             ContentType="application/parquet",
         )
         logging.info(
@@ -414,14 +517,10 @@ class AlpacaClient(TradingClient):
         return ret
 
     def _load_account(self) -> TradeAccount:
-        account = self.alpaca_account_client.get_account()
-        if isinstance(account, TradeAccount):
-            logging.info(
-                "Loaded Alpaca account id: %s; cash: %s", account.id, account.cash
-            )
-            return account
-        else:
-            raise ValueError("Failed to load Alpaca account as TradeAccount")
+        if hasattr(self, "_account"):
+            return self._account
+        self._account: TradeAccount = self.alpaca_account_client.get_account()
+        return self._account
 
     def execute_trades(
         self,

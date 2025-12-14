@@ -88,8 +88,6 @@ def incomplete_multi_ticker_data_loader(data_config, feature_config):
 
     data = DataLoader(data_config=data_config, feature_config=feature_config)
 
-    data.df.to_csv("./incomplete_all.csv")
-
     data.df["timestamp"] = data.df.index.get_level_values("timestamp")
     data.df["size"] = 0.0
     data.df["profit"] = 0.0
@@ -226,6 +224,8 @@ def remote_trade_config(portfolio_config):
         out_dir="{PROJECT_ROOT}/trading/test/temp/out/",
         positions_path="paper_trading/positions/ppo.json",
         account_path="paper_trading/accounts/ppo.json",
+        closed_positions_path="paper_trading/closed_positions/ppo.parquet",
+        account_value_series_path="paper_trading/account_value_series/ppo.parquet",
         broker=BrokerType.REMOTE,
         bucket_name="rr-storage",
         broker_kwargs={"service_name": "s3"},
@@ -246,6 +246,8 @@ def local_trade_config(portfolio_config):
         out_dir="{PROJECT_ROOT}/trading/test/temp/out/",
         positions_path="{PROJECT_ROOT}/trading/test/paper_trading/positions/ppo.json",
         account_path="{PROJECT_ROOT}/trading/test/paper_trading/accounts/ppo.json",
+        closed_positions_path="{PROJECT_ROOT}/trading/test/paper_trading/closed_positions/ppo.parquet",
+        account_value_series_path="{PROJECT_ROOT}/trading/test/paper_trading/account_value_series/ppo.parquet",
         broker=BrokerType.LOCAL,
         bucket_name=None,
         broker_kwargs={},
