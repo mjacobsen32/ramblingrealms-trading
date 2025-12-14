@@ -1004,10 +1004,7 @@ files = [
 ]
 
 [package.dependencies]
-cffi = [
-    {version = ">=1.14", markers = "python_full_version < \"3.14.0\" and platform_python_implementation != \"PyPy\""},
-    {version = ">=2.0.0", markers = "python_full_version >= \"3.14.0\" and platform_python_implementation != \"PyPy\""},
-]
+cffi = {version = ">=2.0.0", markers = "python_full_version >= \"3.14.0\" and platform_python_implementation != \"PyPy\""}
 
 [package.extras]
 docs = ["sphinx (>=5.3.0)", "sphinx-inline-tabs", "sphinx-rtd-theme (>=3.0.0)"]
@@ -4656,7 +4653,6 @@ files = [
 [package.dependencies]
 attrs = ">=22.2.0"
 rpds-py = ">=0.7.0"
-typing-extensions = {version = ">=4.4.0", markers = "python_version < \"3.13\""}
 
 [[package]]
 name = "regex"
@@ -6306,5 +6302,5 @@ repair = ["scipy (>=1.6.3)"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.12,<4.0"
-content-hash = "f625c97e701f7272c1ba493c42ef14a94d8fba7bf8f52ea9f657d8f64b47674b"
+python-versions = ">=3.14,<4.0"
+content-hash = "37d2034c63baf3fb8d9f566a8c8f39bb18adeac8b259c8207dca5a3e19f56173"
