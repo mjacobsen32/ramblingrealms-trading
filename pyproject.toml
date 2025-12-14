@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "Rambling Realms Trading Platform"
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.14,<4.0"
+requires-python = ">=3.13,<4.0"
 authors = [{ name = "Matthew Jacobsen", email = "mjacobsen.pro@gmail.com" }]
 maintainers = [{ name = "Matthew Jacobsen", email = "mjacobsen.pro@gmail.com" }]
 keywords = [
