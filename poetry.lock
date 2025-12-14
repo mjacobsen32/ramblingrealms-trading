@@ -300,7 +300,7 @@ version = "6.2.3"
 description = "Extensible memoizing collections and decorators"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cachetools-6.2.3-py3-none-any.whl", hash = "sha256:3fde34f7033979efb1e79b07ae529c2c40808bdd23b0b731405a48439254fba5"},
     {file = "cachetools-6.2.3.tar.gz", hash = "sha256:64e0a4ddf275041dd01f5b873efa87c91ea49022b844b8c5d1ad3407c0f42f1f"},
@@ -1032,7 +1032,7 @@ version = "12.9.4"
 description = "Python bindings for CUDA"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cuda_bindings-12.9.4-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a022c96b8bd847e8dc0675523431149a4c3e872f440e3002213dbb9e08f0331a"},
     {file = "cuda_bindings-12.9.4-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:4d3c842c2a4303b2a580fe955018e31aea30278be19795ae05226235268032e5"},
@@ -1073,7 +1073,7 @@ version = "0.3.2"
 description = "cuda.core: (experimental) pythonic CUDA module"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cuda_core-0.3.2-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7a2a1f7e96e68c0bbc710592e78ca09c951afc10238c739482e265da1e6ea102"},
     {file = "cuda_core-0.3.2-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:1058402b41320516d5022a1cdfc7063909bf620e91126f851d859302b77d02d1"},
@@ -1109,7 +1109,7 @@ version = "1.3.3"
 description = "Pathfinder for CUDA components"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cuda_pathfinder-1.3.3-py3-none-any.whl", hash = "sha256:9984b664e404f7c134954a771be8775dfd6180ea1e1aef4a5a37d4be05d9bbb1"},
 ]
@@ -1120,7 +1120,7 @@ version = "12.9.4"
 description = "CUDA Python: Performance meets Productivity"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cuda_python-12.9.4-py3-none-any.whl", hash = "sha256:d2cacea882a69863f1e7d27ee71d75f0684f4c76910aff839067e4f89c902279"},
 ]
@@ -1137,7 +1137,7 @@ version = "12.6.2"
 description = "CUDA Toolkit meta-package"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cuda_toolkit-12.6.2-py2.py3-none-any.whl", hash = "sha256:16898a1f53e40de0380925dcbfe8302c7a260a40d685782d76c7003c077f292d"},
 ]
@@ -1175,7 +1175,7 @@ version = "25.12.0"
 description = "cuDF - GPU Dataframe"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cudf_cu12-25.12.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:fa29602069656fc405ea579427b2b2bc772e4433c9f1ceab15811b8393b314e7"},
     {file = "cudf_cu12-25.12.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:33fc04a7a5fb281cb47ee6640691a1b5c8fa68175f2896b6886fd188023e372f"},
@@ -1220,7 +1220,7 @@ version = "13.6.0"
 description = "CuPy: NumPy & SciPy for GPU"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "cupy_cuda12x-13.6.0-cp310-cp310-manylinux2014_aarch64.whl", hash = "sha256:9e37f60f27ff9625dfdccc4688a09852707ec613e32ea9404f425dd22a386d14"},
     {file = "cupy_cuda12x-13.6.0-cp310-cp310-manylinux2014_x86_64.whl", hash = "sha256:e78409ea72f5ac7d6b6f3d33d99426a94005254fa57e10617f430f9fd7c3a0a1"},
@@ -1549,7 +1549,7 @@ version = "0.8.3"
 description = "Fast, re-entrant optimistic lock implemented in Cython"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "fastrlock-0.8.3-cp27-cp27m-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:bbbe31cb60ec32672969651bf68333680dacaebe1a1ec7952b8f5e6e23a70aa5"},
     {file = "fastrlock-0.8.3-cp27-cp27m-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:45055702fe9bff719cdc62caa849aa7dbe9e3968306025f639ec62ef03c65e88"},
@@ -1814,7 +1814,7 @@ version = "2025.12.0"
 description = "File-system specification"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "fsspec-2025.12.0-py3-none-any.whl", hash = "sha256:8bf1fe301b7d8acfa6e8571e3b1c3d158f909666642431cc78a1b7b4dbc5ec5b"},
     {file = "fsspec-2025.12.0.tar.gz", hash = "sha256:c505de011584597b1060ff778bb664c1bc022e87921b0e4f10cc9c44f9635973"},
@@ -2552,7 +2552,7 @@ version = "25.12.0"
 description = "cuDF - GPU Dataframe (C++)"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "libcudf_cu12-25.12.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:2ce038852a3695b777fb44595d89acbac4d0872cbf856be2ab1a185a87552478"},
     {file = "libcudf_cu12-25.12.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:5cf9f7f13c37a2dc2c1fa57c1aa50e5ceda6813cb47803719b16dddb5fb3e622"},
@@ -2569,7 +2569,7 @@ version = "25.12.0"
 description = "KvikIO - GPUDirect Storage (C++)"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "libkvikio_cu12-25.12.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:7f53442e02c6c5ea3c009ee065bb8934958073b7e557cafe77101ac534c328d9"},
     {file = "libkvikio_cu12-25.12.0-py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:06555daf9fec5f5ef7051524e107a50a8c3b527cdff9bb2e02debc1451238b05"},
@@ -2581,7 +2581,7 @@ version = "25.12.0"
 description = "rmm - RAPIDS Memory Manager"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "librmm_cu12-25.12.0-py3-none-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:e109520f018932e4bc82ccb5c3169f0ff20aa38ce83c200bfc6efcbf2f6b4e44"},
     {file = "librmm_cu12-25.12.0-py3-none-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:efb769b3c4c81840831edf2e152a281e92e7958da33fcf4b9689023c184f7e74"},
@@ -2682,7 +2682,7 @@ version = "0.44.0"
 description = "lightweight wrapper around basic LLVM functionality"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "llvmlite-0.44.0-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:9fbadbfba8422123bab5535b293da1cf72f9f478a65645ecd73e781f962ca614"},
     {file = "llvmlite-0.44.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:cccf8eb28f24840f2689fb1a45f9c0f7e582dd24e088dcf96e424834af11f791"},
@@ -2729,7 +2729,7 @@ version = "3.0.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "docs"]
+groups = ["main", "docs", "gpu"]
 files = [
     {file = "markdown-it-py-3.0.0.tar.gz", hash = "sha256:e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb"},
     {file = "markdown_it_py-3.0.0-py3-none-any.whl", hash = "sha256:355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1"},
@@ -2970,7 +2970,7 @@ version = "0.1.2"
 description = "Markdown URL utilities"
 optional = false
 python-versions = ">=3.7"
-groups = ["main", "docs"]
+groups = ["main", "docs", "gpu"]
 files = [
     {file = "mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8"},
     {file = "mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"},
@@ -3323,7 +3323,7 @@ version = "0.61.2"
 description = "compiling Python code using LLVM"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "numba-0.61.2-cp310-cp310-macosx_10_14_x86_64.whl", hash = "sha256:cf9f9fc00d6eca0c23fc840817ce9f439b9f03c8f03d6246c0e7f0cb15b7162a"},
     {file = "numba-0.61.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:ea0247617edcb5dd61f6106a56255baab031acc4257bddaeddb3a1003b4ca3fd"},
@@ -3358,7 +3358,7 @@ version = "0.19.1"
 description = "CUDA target for Numba"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "numba_cuda-0.19.1-py3-none-any.whl", hash = "sha256:2a0a144506993538615f697a888dd04de47eff9f521603cfa92a159161ab3941"},
     {file = "numba_cuda-0.19.1.tar.gz", hash = "sha256:181600ca8cbdc5984c3b4198880f71029b116dfde0397bceef666ff830a72c90"},
@@ -3388,7 +3388,7 @@ version = "2.2.6"
 description = "Fundamental package for array computing in Python"
 optional = false
 python-versions = ">=3.10"
-groups = ["main", "dev"]
+groups = ["main", "dev", "gpu"]
 files = [
     {file = "numpy-2.2.6-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b412caa66f72040e6d268491a59f2c43bf03eb6c96dd8f0307829feb7fa2b6fb"},
     {file = "numpy-2.2.6-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:8e41fd67c52b86603a91c1a505ebaef50b3314de0213461c7a6e99c9a3beff90"},
@@ -3467,7 +3467,7 @@ version = "12.9.27"
 description = "CUDA CCCL"
 optional = false
 python-versions = ">=3"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "nvidia_cuda_cccl_cu12-12.9.27-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:d7898b38aa68beaa234d48f0868273702342a196d6e2e9d0ef058dca2390ebea"},
     {file = "nvidia_cuda_cccl_cu12-12.9.27-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:37869e17ce2e1ecec6eddf1927cca0f8c34e64fd848d40453df559091e2d7117"},
@@ -3496,7 +3496,7 @@ version = "12.6.77"
 description = "CUDA nvcc"
 optional = false
 python-versions = ">=3"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "nvidia_cuda_nvcc_cu12-12.6.77-py3-none-manylinux2014_aarch64.whl", hash = "sha256:9a2aad43b8f4e4be9c237ece04f64450df77871eeebffad5a5a872714a97ca77"},
     {file = "nvidia_cuda_nvcc_cu12-12.6.77-py3-none-manylinux2014_x86_64.whl", hash = "sha256:b66bb5dd6b8ae62262586691977d3b4a425e91db61b4b9bc2f6b42bcd4154b96"},
@@ -3509,12 +3509,13 @@ version = "12.6.77"
 description = "NVRTC native runtime libraries"
 optional = false
 python-versions = ">=3"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "nvidia_cuda_nvrtc_cu12-12.6.77-py3-none-manylinux2014_aarch64.whl", hash = "sha256:5847f1d6e5b757f1d2b3991a01082a44aad6f10ab3c5c0213fa3e25bddc25a13"},
     {file = "nvidia_cuda_nvrtc_cu12-12.6.77-py3-none-manylinux2014_x86_64.whl", hash = "sha256:35b0cc6ee3a9636d5409133e79273ce1f3fd087abb0532d2d2e8fff1fe9efc53"},
     {file = "nvidia_cuda_nvrtc_cu12-12.6.77-py3-none-win_amd64.whl", hash = "sha256:f7007dbd914c56bd80ea31bc43e8e149da38f68158f423ba845fc3292684e45a"},
 ]
+markers = {main = "platform_machine == \"x86_64\" and platform_system == \"Linux\""}
 
 [[package]]
 name = "nvidia-cuda-runtime-cu12"
@@ -3522,7 +3523,7 @@ version = "12.6.77"
 description = "CUDA Runtime native Libraries"
 optional = false
 python-versions = ">=3"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "nvidia_cuda_runtime_cu12-12.6.77-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:6116fad3e049e04791c0256a9778c16237837c08b27ed8c8401e2e45de8d60cd"},
     {file = "nvidia_cuda_runtime_cu12-12.6.77-py3-none-manylinux2014_aarch64.whl", hash = "sha256:d461264ecb429c84c8879a7153499ddc7b19b5f8d84c204307491989a365588e"},
@@ -3530,6 +3531,7 @@ files = [
     {file = "nvidia_cuda_runtime_cu12-12.6.77-py3-none-manylinux2014_x86_64.whl", hash = "sha256:a84d15d5e1da416dd4774cb42edf5e954a3e60cc945698dc1d5be02321c44dc8"},
     {file = "nvidia_cuda_runtime_cu12-12.6.77-py3-none-win_amd64.whl", hash = "sha256:86c58044c824bf3c173c49a2dbc7a6c8b53cb4e4dca50068be0bf64e9dab3f7f"},
 ]
+markers = {main = "platform_machine == \"x86_64\" and platform_system == \"Linux\""}
 
 [[package]]
 name = "nvidia-cudnn-cu12"
@@ -3669,12 +3671,13 @@ version = "12.6.85"
 description = "Nvidia JIT LTO Library"
 optional = false
 python-versions = ">=3"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "nvidia_nvjitlink_cu12-12.6.85-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:eedc36df9e88b682efe4309aa16b5b4e78c2407eac59e8c10a6a47535164369a"},
     {file = "nvidia_nvjitlink_cu12-12.6.85-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:cf4eaa7d4b6b543ffd69d6abfb11efdeb2db48270d94dfd3a452c24150829e41"},
     {file = "nvidia_nvjitlink_cu12-12.6.85-py3-none-win_amd64.whl", hash = "sha256:e61120e52ed675747825cdd16febc6a0730537451d867ee58bee3853b1b13d1c"},
 ]
+markers = {main = "platform_machine == \"x86_64\" and platform_system == \"Linux\""}
 
 [[package]]
 name = "nvidia-nvtx-cu12"
@@ -3698,7 +3701,7 @@ version = "0.2.14"
 description = "Python NVTX - Python code annotation library"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "nvtx-0.2.14-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b70b2415ab97edf19514be226d5058898922c6b6bb1d7fdd5ef92d1e086f3e0f"},
     {file = "nvtx-0.2.14-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:23ab874f9c70e5433f39e40ca318ffcfc14fb43ed6798e6be5a30f74e4ca831f"},
@@ -3740,7 +3743,7 @@ version = "25.0"
 description = "Core utilities for Python packages"
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "dev", "docs"]
+groups = ["main", "dev", "docs", "gpu"]
 files = [
     {file = "packaging-25.0-py3-none-any.whl", hash = "sha256:29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484"},
     {file = "packaging-25.0.tar.gz", hash = "sha256:d443872c98d677bf60f6a1f2f8c1cb748e8fe762d2bf9d3148b5599295b0fc4f"},
@@ -3752,7 +3755,7 @@ version = "2.3.3"
 description = "Powerful data structures for data analysis, time series, and statistics"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "pandas-2.3.3-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:376c6446ae31770764215a6c937f72d917f214b43560603cd60da6408f183b6c"},
     {file = "pandas-2.3.3-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:e19d192383eab2f4ceb30b412b22ea30690c9e618f78870357ae1d682912015a"},
@@ -4282,7 +4285,7 @@ version = "22.0.0"
 description = "Python library for Apache Arrow"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "pyarrow-22.0.0-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:77718810bd3066158db1e95a63c160ad7ce08c6b0710bc656055033e39cdad88"},
     {file = "pyarrow-22.0.0-cp310-cp310-macosx_12_0_x86_64.whl", hash = "sha256:44d2d26cda26d18f7af7db71453b7b783788322d756e81730acb98f24eb90ace"},
@@ -4335,6 +4338,7 @@ files = [
     {file = "pyarrow-22.0.0-cp314-cp314t-win_amd64.whl", hash = "sha256:0c34fe18094686194f204a3b1787a27456897d8a2d62caf84b61e8dfbc0252ae"},
     {file = "pyarrow-22.0.0.tar.gz", hash = "sha256:3d600dc583260d845c7d8a6db540339dd883081925da2bd1c5cb808f720b3cd9"},
 ]
+markers = {gpu = "platform_machine == \"aarch64\" or platform_machine == \"x86_64\""}
 
 [[package]]
 name = "pycparser"
@@ -4535,7 +4539,7 @@ version = "2.19.2"
 description = "Pygments is a syntax highlighting package written in Python."
 optional = false
 python-versions = ">=3.8"
-groups = ["main", "dev", "docs"]
+groups = ["main", "dev", "docs", "gpu"]
 files = [
     {file = "pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b"},
     {file = "pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887"},
@@ -4550,7 +4554,7 @@ version = "25.12.0"
 description = "pylibcudf - Python bindings for libcudf"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "pylibcudf_cu12-25.12.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:f9a38a398838b50035f4f9f5453b3926e73f3f58d8ee2d1d2da61a6487dbb3aa"},
     {file = "pylibcudf_cu12-25.12.0-cp310-cp310-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a567a71a36719544cd51c210bb8b707f6e06cc7bdbda01cf10237b732165f822"},
@@ -4654,7 +4658,7 @@ version = "2.9.0.post0"
 description = "Extensions to the standard Python datetime module"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["main", "dev"]
+groups = ["main", "dev", "gpu"]
 files = [
     {file = "python-dateutil-2.9.0.post0.tar.gz", hash = "sha256:37dd54208da7e1cd875388217d5e00ebd4179249f90fb72437e91a35459a0ad3"},
     {file = "python_dateutil-2.9.0.post0-py2.py3-none-any.whl", hash = "sha256:a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427"},
@@ -4699,7 +4703,7 @@ version = "2025.2"
 description = "World timezone definitions, modern and historical"
 optional = false
 python-versions = "*"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00"},
     {file = "pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3"},
@@ -4922,7 +4926,7 @@ version = "0.2.3"
 description = "Logging framework for RAPIDS built around spdlog"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "rapids_logger-0.2.3-py3-none-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:119a0391a6965b773dc0e48c35e3872585e69418aedbc8b618ac2bf63ae12e28"},
     {file = "rapids_logger-0.2.3-py3-none-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:7fe67ef4049c5d8ba6154746325dcf7cc0f327f0efa8f2611fc8f64e67510f60"},
@@ -5118,7 +5122,7 @@ version = "14.2.0"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 optional = false
 python-versions = ">=3.8.0"
-groups = ["main", "docs"]
+groups = ["main", "docs", "gpu"]
 files = [
     {file = "rich-14.2.0-py3-none-any.whl", hash = "sha256:76bc51fe2e57d2b1be1f96c524b890b816e334ab4c1e45888799bfaab0021edd"},
     {file = "rich-14.2.0.tar.gz", hash = "sha256:73ff50c7c0c1c77c8243079283f4edb376f0f6442433aecb8ce7e6d0b92d1fe4"},
@@ -5137,7 +5141,7 @@ version = "25.12.0"
 description = "rmm - RAPIDS Memory Manager"
 optional = false
 python-versions = ">=3.10"
-groups = ["main"]
+groups = ["gpu"]
 files = [
     {file = "rmm_cu12-25.12.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c9fa1d3d4e667768517a682ea49b9502cd4e10a1c02813bd8446e51c84ac1f0f"},
     {file = "rmm_cu12-25.12.0-cp311-cp311-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:dada70521f51de9208bfbde3b86dce536e8c10cec9305f4394d27670742afe2f"},
@@ -5556,7 +5560,7 @@ version = "1.17.0"
 description = "Python 2 and 3 compatibility utilities"
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,>=2.7"
-groups = ["main", "dev"]
+groups = ["main", "dev", "gpu"]
 files = [
     {file = "six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"},
     {file = "six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"},
@@ -6314,7 +6318,7 @@ version = "4.15.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
 optional = false
 python-versions = ">=3.9"
-groups = ["main", "dev", "docs"]
+groups = ["main", "dev", "docs", "gpu"]
 files = [
     {file = "typing_extensions-4.15.0-py3-none-any.whl", hash = "sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548"},
     {file = "typing_extensions-4.15.0.tar.gz", hash = "sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466"},
@@ -6341,7 +6345,7 @@ version = "2025.3"
 description = "Provider of IANA time zone data"
 optional = false
 python-versions = ">=2"
-groups = ["main"]
+groups = ["main", "gpu"]
 files = [
     {file = "tzdata-2025.3-py2.py3-none-any.whl", hash = "sha256:06a47e5700f3081aab02b2e513160914ff0694bce9947d6b76ebd6bf57cfc5d1"},
     {file = "tzdata-2025.3.tar.gz", hash = "sha256:de39c2ca5dc7b0344f2eba86f49d614019d29f060fc4ebc8a417896a620b56a7"},
@@ -6608,4 +6612,4 @@ repair = ["scipy (>=1.6.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "f625c97e701f7272c1ba493c42ef14a94d8fba7bf8f52ea9f657d8f64b47674b"
+content-hash = "64bb66fffcd4c5f6c576d2228947ca23ee09b523c38c49d5ac883b1c77f7f014"

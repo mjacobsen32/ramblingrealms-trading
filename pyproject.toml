@@ -41,7 +41,6 @@ dependencies = [
   "nbformat (>=5.10.4,<6.0.0)",
   "kaleido (<=0.2.1)",
   "anywidget (>=0.9.18,<0.10.0)",
-  "cudf-cu12 (>=25.8.0,<26.0.0)",
   "quantstats (>=0.0.70,<0.0.71)",
   "boto3 (>=1.42.5,<2.0.0)",
   "pyarrow (>=22.0.0,<23.0.0)",
@@ -83,6 +82,12 @@ sphinxcontrib-programoutput = "^0.18"
 sphinx-click = "^6.0.0"
 sphinxcontrib-typer = "^0.5.1"
 sphinx-jsonschema = "^1.19.1"
+
+[tool.poetry.group.gpu]
+optional = true
+
+[tool.poetry.group.gpu.dependencies]
+cudf-cu12 = ">=25.8.0,<26.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
