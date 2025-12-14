@@ -1,17 +1,18 @@
 {
-    "start_date": "1995-06-05",
-    "end_date": "2025-06-05",
+    "start_date": "2025-06-01",
+    "end_date": "2025-12-12",
     "time_step_unit": "Day",
     "time_step_period": 1,
     "cache_path": "{PROJECT_ROOT}/data",
     "cache_enabled": true,
+    "validation_split": 0.2,
     "requests": [
         {
-            "dataset_name": "5_ticker_30_years",
+            "dataset_name": "ALL_6_MONTHS",
             "source": "alpaca",
             "endpoint": "StockBarsRequest",
             "kwargs": {
-                "symbol_or_symbols": ["MSFT", "NVDA", "AMZN", "TSLA"],
+                "symbol_or_symbols": ["ALL"],
                 "adjustment": "split"
             }
         }

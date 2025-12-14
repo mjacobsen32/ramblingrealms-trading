@@ -38,3 +38,4 @@ results
 !trading/test/data/TEST_TIME_STEP.parquet
 !trading/test/data/TEST_SET.parquet
 !trading/test/data/LIVE.parquet
+!trading/test/data/TEST_INCOMPLETE_MULTI_TICKERS.parquet

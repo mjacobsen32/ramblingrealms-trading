@@ -1,6 +1,6 @@
 {
     "algo": "ddpg",
-    "total_timesteps": 1e3,
+    "total_timesteps": 1e5,
     "save_path": "{PROJECT_ROOT}/models/ddpg.{VERSION}.zip",
         "kwargs": {
             "policy": "MlpPolicy",

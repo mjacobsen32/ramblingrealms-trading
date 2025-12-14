@@ -1,5 +1,6 @@
 import datetime
 import logging
+from pyexpat import features
 from typing import Any
 
 import numpy as np
@@ -10,6 +11,7 @@ from trading.cli.alg.config import DataConfig, DataRequests, FeatureConfig, Stoc
 from trading.cli.trading.trade_config import RRTradeConfig
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.data_process.data_loader import DataLoader, DataSourceType
+from trading.src.alg.environments.stateful_trading_env import StatefulTradingEnv
 from trading.src.alg.environments.trading_environment import TradingEnv
 from trading.src.features.utils import get_feature_cols, min_window_size
 from trading.src.portfolio.portfolio import (
@@ -27,9 +29,10 @@ class Trade:
         market_data_client: Any,
         alpaca_account_client: Any,
         live: bool,
+        predict_time: datetime.datetime | None = None,
+        end_predict_time: datetime.datetime | None = None,
     ):
         self.config = config
-
         self.model, self.meta_data = Agent.load_agent(config.model_path.as_path(), None)
         self.active_symbols = self.meta_data.get("symbols", [])
         logging.info(
@@ -60,15 +63,20 @@ class Trade:
                 if self.portfolio_config.trade_mode == TradeMode.CONTINUOUS
                 else self.portfolio_config.max_positions
             ),
-            maintain_history=False,
+            maintain_history=True,
             initial_cash=self.portfolio_config.initial_cash,
             initial_prices=self.get_prices(),
         )
-        self.pf = Portfolio(
-            cfg=self.portfolio_config,
-            symbols=self.active_symbols,
+
+        self.env = StatefulTradingEnv(
+            data=self._load_data(predict_time, end_predict_time).df,
+            cfg=self.env_config,
+            features=self.active_features,
+            time_step=(
+                self.data_config.time_step_unit,
+                self.data_config.time_step_period,
+            ),
             position_manager=position_manager,
-            time_step=(TimeFrameUnit.Day, 1),
         )
 
         logging.debug(
@@ -81,19 +89,36 @@ class Trade:
             self.active_features,
         )
 
-    def _load_data(self, datetime_now: datetime.datetime | None = None) -> DataLoader:
+    def _load_data(
+        self,
+        predict_time: datetime.datetime | None = None,
+        end_predict_time: datetime.datetime | None = None,
+    ) -> DataLoader:
         calendar = self.trading_client.alpaca_account_client.get_calendar()
-        min_window = min_window_size(self.active_features) + 1
+        if predict_time is not None and end_predict_time is not None:
+            range_of_days = end_predict_time.date() - predict_time.date()
+        else:
+            range_of_days = datetime.timedelta(days=1)
+        min_window = (
+            max(min_window_size(self.active_features), self.env_config.lookback_window)
+            + range_of_days.days
+            + 1
+        )
         logging.info("Determined min window size from features: %d", min_window)
         # TODO this does not allow for live trading in intraday sessions
-        if datetime_now is None:
+        if predict_time is None:
             prediction_time = datetime.datetime.now().date()
         else:
-            prediction_time = datetime_now.date()
+            prediction_time = predict_time.date()
+            if end_predict_time is not None:
+                end_prediction_time = end_predict_time.date()
 
-        window = [entry for entry in calendar if entry.date < prediction_time][
-            -(min_window):
-        ]
+        window = [
+            entry
+            for entry in calendar
+            if entry.date
+            < (prediction_time if end_predict_time is None else end_prediction_time)
+        ][-(min_window):]
         start, end = window[0], window[-1]
         logging.info("Loading data for model trade: [%s, %s]", start.date, end.date)
 
@@ -116,9 +141,10 @@ class Trade:
         data_config.end_date = str(end.date)
         data_config.requests = requests
         data_config.validation_split = 0.0  # no validation for trading
-        data_config.cache_enabled = (
-            False if self.live else data_config.cache_enabled
-        )  # no caching for trading live
+        # data_config.cache_enabled = (
+        #     False if self.live else data_config.cache_enabled
+        # )  # no caching for trading live
+        data_config.cache_enabled = False  # no caching for trading live
 
         logging.debug("Data Config: %s", data_config.model_dump_json(indent=4))
 
@@ -137,45 +163,13 @@ class Trade:
         prices = [trade.price for trade in latest.values()]
         return np.array(prices)
 
-    def run_model(self, predict_time: datetime.datetime | None = None) -> dict:
-        self.data_loader = self._load_data(predict_time)
-        df = self.data_loader.df
-        prices = self.get_prices()
+    def run_model(self, predict_time: datetime.datetime | None = None) -> None:
 
-        logging.debug("Latest prices: %s", prices)
-        logging.debug("df head:\n%s", self.data_loader.df.tail())
-        logging.debug("portfolio_state:\n%s", self.pf.state())
-        logging.debug("feature columns: %s", get_feature_cols(self.active_features))
+        obs, _ = self.env.reset()
+        terminated, truncated = False, False
 
-        obs = TradingEnv.observation(
-            df[-(self.env_config.lookback_window + 1) :],
-            self.pf.state(),
-            get_feature_cols(self.active_features),
-            prices,
-        )
+        while not terminated and not truncated:
+            action, _states = self.model.predict(obs)
+            obs, reward, terminated, truncated, info = self.env.step(action)
 
-        logging.debug("Observation: %s", obs)
-        logging.debug("Observation shape: %s", obs.shape)
-
-        actions, _states = self.model.predict(obs)
-
-        logging.info("Model Actions: %s", actions)
-        logging.debug("data: %s", df.tail())
-
-        df["size"] = 1.0
-        df["profit"] = 0.0
-        df["price"] = 1.0
-        df["action"] = 1.0
-        df["timestamp"] = df.index.get_level_values("timestamp")
-
-        current_slice = df.iloc[[-1]]
-        current_slice = current_slice.droplevel(0)
-        current_slice.loc[:, "action"] = actions
-        current_slice.loc[:, "price"] = prices
-
-        ret = self.pf.step(current_slice, True)
-
-        logging.info("Scaled actions: %s", ret["scaled_actions"])
-        logging.info("Profit: %s", ret["profit"])
-
-        return ret
+        return None
