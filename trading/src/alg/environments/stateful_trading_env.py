@@ -27,22 +27,27 @@ class StatefulTradingEnv(BaseTradingEnv):
         cfg: StockEnv,
         features: List[Feature],
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
+        position_manager: PositionManager | None = None,
     ):
         super().__init__(data, cfg, features, time_step)
 
         # Initialize full portfolio management
         from trading.cli.alg.config import TradeMode
 
-        position_manager = PositionManager(
-            symbols=self.symbols,
-            max_lots=(
-                None
-                if cfg.portfolio_config.trade_mode == TradeMode.CONTINUOUS
-                else cfg.portfolio_config.max_positions
-            ),
-            maintain_history=cfg.portfolio_config.maintain_history,
-            initial_cash=cfg.portfolio_config.initial_cash,
-        )
+        if position_manager is None:
+            position_manager = PositionManager(
+                symbols=self.symbols,
+                max_lots=(
+                    None
+                    if cfg.portfolio_config.trade_mode == TradeMode.CONTINUOUS
+                    else cfg.portfolio_config.max_positions
+                ),
+                maintain_history=cfg.portfolio_config.maintain_history,
+                initial_cash=cfg.portfolio_config.initial_cash,
+            )
+        elif isinstance(position_manager, PositionManager):
+            pass
+
         self.pf: Portfolio = Portfolio(
             cfg=cfg.portfolio_config,
             symbols=data.index.get_level_values("symbol").unique(),
@@ -168,7 +173,7 @@ class StatefulTradingEnv(BaseTradingEnv):
         self.terminal = self.observation_index >= self.max_steps - 1
 
         return (
-            self._get_observation(),
+            self._get_observation() if not self.terminal else None,
             reward,
             self.terminal,
             False,

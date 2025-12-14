@@ -4,18 +4,33 @@ from abc import ABC, abstractmethod
 from collections import deque
 from pathlib import Path
 from typing import Any
+from unittest.mock import Base
 
 import boto3
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from alpaca.trading.enums import AccountStatus
 from alpaca.trading.models import Position as AlpacaPosition
-from alpaca.trading.models import TradeAccount
+from alpaca.trading.models import TradeAccount as AlpacaTradeAccount
 from alpaca.trading.requests import MarketOrderRequest
+from pydantic import BaseModel
 
 from trading.cli.trading.trade_config import BrokerType, RRTradeConfig
-from trading.src.portfolio.position import Position, PositionDecoder, PositionEncoder
+from trading.src.portfolio.position import (
+    PortfolioStats,
+    Position,
+    PositionDecoder,
+    PositionEncoder,
+    portfolio_schema,
+    positions_schema,
+)
 from trading.src.user_cache.user_cache import UserCache
+
+
+class TradeAccount(AlpacaTradeAccount):
+    initial_cash: float | None = None
 
 
 def _json_default(obj: object):  # -> str | Any:
@@ -54,11 +69,23 @@ class TradingClient(ABC):
 
     def __init__(self, live: bool, config: RRTradeConfig, alpaca_account_client: Any):
         self.live = live
-        self.config = config
+        self.config: RRTradeConfig = config
         self.alpaca_account_client = alpaca_account_client
+        self.defer_trade_execution = config.defer_trade_execution
+        self._positions: dict[str, deque[Position]] = self._load_positions()
+        self._account: TradeAccount = self._load_account()
 
-        self._account = self._load_account()
-        self._positions = self._load_positions()
+    def close(
+        self,
+        closed_positions: list[Position],
+        open_positions: dict[str, deque[Position]],
+        pf_history: list[PortfolioStats],
+        cash: float,
+    ) -> None:
+        self._write_open_positions(open_positions=open_positions)
+        self._write_closed_positions(closed_positions=closed_positions)
+        self._write_pf_stats(stats=pf_history)
+        self._write_account(cash)
 
     def get_clock(self):
         return self.alpaca_account_client.get_clock()
@@ -82,25 +109,58 @@ class TradingClient(ABC):
     def _load_account(self) -> TradeAccount:
         raise NotImplementedError
 
-    @abstractmethod
-    def execute_trades(
-        self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
-    ) -> tuple[pd.DataFrame, float]:
-        raise NotImplementedError
+    def _load_pf_stats(self) -> list[PortfolioStats]:
+        """
+        This is not implemented for Alpaca cause the api manages these and it's just for historical tracking
+        Not implemented for local because we can just append only
+
+        :param self: Description
+        :return: Description
+        :rtype: list[Position]
+        """
+        return []
+
+    def _load_closed_positions(self) -> list[Position]:
+        """
+        This is not implemented for Alpaca cause the api manages these and it's just for historical tracking
+        Not implemented for local because we can just append only
+
+        :param self: Description
+        :return: Description
+        :rtype: list[Position]
+        """
+        return []
+
+    def _write_open_positions(self, open_positions: dict[str, deque[Position]]) -> None:
+        pass
+
+    def _write_account(self, cash: float) -> None:
+        pass
+
+    def _write_pf_stats(self, stats: list[PortfolioStats]) -> None:
+        pass
+
+    def _write_closed_positions(self, closed_positions: list[Position]) -> None:
+        pass
+
+    def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+        return actions, actions["profit"].sum()  # Optional to implement
 
 
 class LocalTradingClient(TradingClient):
     def __init__(self, config: RRTradeConfig, alpaca_account_client: Any, live: bool):
         self.positions_path = self._resolve_path(config.positions_path, "positions")
         self.account_path = self._resolve_path(config.account_path, "account")
+        self.closed_positions_path = self._resolve_path(
+            config.closed_positions_path, "closed_positions"
+        )
+        self.account_value_series_path = self._resolve_path(
+            config.account_value_series_path, "account_value_series"
+        )
         super().__init__(
             live=live, config=config, alpaca_account_client=alpaca_account_client
         )
         logging.info("Initialized Local Trading Client")
-
-    def __del__(self) -> None:
-        self._write_positions()
-        self._write_account()
 
     @staticmethod
     def _resolve_path(path_field, default_name: str) -> Path:
@@ -108,17 +168,44 @@ class LocalTradingClient(TradingClient):
             return path_field.as_path()
         raise ValueError(f"No path configured for local trading {default_name} data")
 
-    def _write_positions(self) -> None:
+    def _write_open_positions(self, open_positions: dict[str, deque[Position]]) -> None:
         self.positions_path.parent.mkdir(parents=True, exist_ok=True)
         self.positions_path.write_text(
-            json.dumps(self.positions, default=_json_default, indent=2)
+            json.dumps(open_positions, default=_json_default, indent=2)
         )
         logging.info("Wrote local positions to %s", self.positions_path)
 
-    def _write_account(self) -> None:
+    def _write_account(self, cash: float) -> None:
+        self._account.cash = str(cash)
         self.account_path.parent.mkdir(parents=True, exist_ok=True)
-        self.account_path.write_text(self.account.model_dump_json(indent=2))
+        self.account_path.write_text(self._account.model_dump_json(indent=2))
         logging.info("Wrote local account to %s", self.account_path)
+
+    def _write_pf_stats(self, stats: list[PortfolioStats]) -> None:
+        self.account_value_series_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.account_value_series_path.suffix == ".parquet":
+            pq.write_table(
+                table=pa.Table.from_pylist(stats, schema=portfolio_schema),
+                where=self.account_value_series_path,
+            )
+        elif self.account_value_series_path.suffix == ".csv":
+            df = pd.DataFrame(stats, columns=Position.COLS)
+            df.to_csv(self.account_value_series_path.with_suffix(".csv"), index=False)
+        logging.info(
+            "Wrote local portfolio stats to %s", self.account_value_series_path
+        )
+
+    def _write_closed_positions(self, closed_positions: list[Position]) -> None:
+        self.closed_positions_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.closed_positions_path.suffix == ".parquet":
+            pq.write_table(
+                table=pa.Table.from_pylist(closed_positions, schema=positions_schema),
+                where=self.closed_positions_path,
+            )
+        elif self.closed_positions_path.suffix == ".csv":
+            df = pd.DataFrame(closed_positions, columns=Position.COLS)
+            df.to_csv(self.closed_positions_path.with_suffix(".csv"), index=False)
+        logging.info("Wrote local closed positions to %s", self.closed_positions_path)
 
     def _load_positions(self) -> dict[str, deque[Position]]:
         ret = dict[str, deque[Position]]()
@@ -149,33 +236,13 @@ class LocalTradingClient(TradingClient):
                 account_number=self.config.account_number,
                 status=AccountStatus.ACTIVE,
                 cash=str(init_cash),
+                initial_cash=init_cash,
             )
         else:
             account = TradeAccount.model_validate_json(self.account_path.read_text())
 
         logging.info("Loaded account id: %s; cash: %s", account.id, account.cash)
         return account
-
-    def execute_trades(
-        self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
-    ) -> tuple[pd.DataFrame, float]:
-        self._positions = positions
-        for sym, row in actions.iterrows():
-            logging.info(
-                "sym: %s, size: %s, at price: %s, with signal: %s",
-                sym,
-                row.get("size"),
-                row.get("price"),
-                row.get("action"),
-            )
-        if self.config.defer_trade_execution:
-            logging.info("Deferring trade execution; not writing to disk")
-        else:
-            logging.info("Writing trades to disk")
-            self._write_account()
-            self._write_positions()
-
-        return actions, actions["profit"].sum()
 
 
 class RemoteTradingClient(TradingClient):
@@ -190,8 +257,10 @@ class RemoteTradingClient(TradingClient):
             }
         )
         self._client = boto3.client(**config.broker_kwargs)
-        self.positions_key = str(config.positions_path)
+        self.open_positions_key = str(config.positions_path)
         self.account_key = str(config.account_path)
+        self.closed_positions_key = str(config.closed_positions_path)
+        self.account_stats_key = str(config.account_value_series_path)
 
         super().__init__(
             live=True, config=config, alpaca_account_client=alpaca_account_client
@@ -199,37 +268,12 @@ class RemoteTradingClient(TradingClient):
 
         logging.info("RemoteTradingClient Initialized with S3 client")
 
-    def __del__(self) -> None:
-        if self.config.defer_trade_execution:
-            self._write_account()
-            self._write_positions()
-
-    def _write_account(self) -> None:
-        self._client.put_object(
-            Bucket=self.config.bucket_name,
-            Key=self.account_key,
-            Body=self.account.model_dump_json(indent=2).encode("utf-8"),
-            ContentType="application/json",
-        )
-        logging.info("Wrote remote account to bucket %s", self.config.bucket_name)
-
-    def _write_positions(self) -> None:
-        self._client.put_object(
-            Bucket=self.config.bucket_name,
-            Key=self.positions_key,
-            Body=json.dumps(self.positions, default=_json_default, indent=2).encode(
-                "utf-8"
-            ),
-            ContentType="application/json",
-        )
-        logging.info("Wrote remote positions to bucket %s", self.config.bucket_name)
-
     def _load_positions(self) -> dict[str, deque[Position]]:
         ret = dict[str, deque[Position]]()
         try:
             positions_response = self._client.get_object(
                 Bucket=self.config.bucket_name,
-                Key=self.positions_key,
+                Key=self.open_positions_key,
             )
             data = json.loads(positions_response["Body"].read().decode("utf-8"))
             count = 0
@@ -285,21 +329,64 @@ class RemoteTradingClient(TradingClient):
                     account_number=self.config.account_number,
                     status=AccountStatus.ACTIVE,
                     cash=str(init_cash),
+                    initial_cash=init_cash,
                 )
         logging.info("Loaded account id: %s; cash: %s", account.id, account.cash)
         return account
 
-    def execute_trades(
-        self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
-    ) -> tuple[pd.DataFrame, float]:
-        self._positions = positions
-        if self.config.defer_trade_execution:
-            logging.info("Deferring trade execution; not uploading trades")
-        else:
-            logging.info("Uploading trades to remote storage")
-            self._write_account()
-            self._write_positions()
-        return actions, actions["profit"].sum()
+    def _write_closed_positions(self, closed_positions: list[Position]) -> None:
+        sink = pa.BufferOutputStream()
+        with pa.ipc.new_stream(sink, positions_schema) as writer:
+            for position in closed_positions:
+                batch = pa.RecordBatch.from_pylist([position], schema=positions_schema)
+                writer.write_batch(batch)
+        self._client.put_object(
+            Bucket=self.config.bucket_name,
+            Key=self.closed_positions_key,
+            Body=sink.getvalue().to_pybytes(),
+            ContentType="application/parquet",
+        )
+        logging.info(
+            "Wrote remote closed positions to bucket %s", self.config.bucket_name
+        )
+
+    def _write_account(self, cash: float) -> None:
+        self._account.cash = str(cash)
+        self._client.put_object(
+            Bucket=self.config.bucket_name,
+            Key=self.account_key,
+            Body=self._account.model_dump_json(indent=2).encode("utf-8"),
+            ContentType="application/json",
+        )
+        logging.info("Wrote remote account to bucket %s", self.config.bucket_name)
+
+    def _write_open_positions(self, open_positions: dict[str, deque[Position]]) -> None:
+        self._client.put_object(
+            Bucket=self.config.bucket_name,
+            Key=self.open_positions_key,
+            Body=json.dumps(open_positions, default=_json_default, indent=2).encode(
+                "utf-8"
+            ),
+            ContentType="application/json",
+        )
+        logging.info("Wrote remote positions to bucket %s", self.config.bucket_name)
+
+    def _write_pf_stats(self, stats: list[PortfolioStats]) -> None:
+        sink = pa.BufferOutputStream()
+        with pa.ipc.new_stream(sink, portfolio_schema) as writer:
+            for stat in stats:
+                batch = pa.RecordBatch.from_pylist([stat], schema=portfolio_schema)
+                writer.write_batch(batch)
+
+        self._client.put_object(
+            Bucket=self.config.bucket_name,
+            Key=self.account_stats_key,
+            Body=sink.getvalue().to_pybytes(),
+            ContentType="application/parquet",
+        )
+        logging.info(
+            "Wrote remote portfolio stats to bucket %s", self.config.bucket_name
+        )
 
 
 # TODO implement batched orders
@@ -337,7 +424,8 @@ class AlpacaClient(TradingClient):
             raise ValueError("Failed to load Alpaca account as TradeAccount")
 
     def execute_trades(
-        self, actions: pd.DataFrame, positions: dict[str, deque[Position]]
+        self,
+        actions: pd.DataFrame,
     ) -> tuple[pd.DataFrame, float]:
         logging.info(
             "Executing %d trades via Alpaca client", len(actions[actions["size"] != 0])
@@ -363,7 +451,5 @@ class AlpacaClient(TradingClient):
             )
             self.alpaca_account_client.submit_order(order)
             logging.info("Submitting order: %s", order)
-
-        self._positions = positions
 
         return actions, actions["profit"].sum()

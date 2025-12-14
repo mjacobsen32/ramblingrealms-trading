@@ -53,6 +53,14 @@ class RRTradeConfig(BaseModel):
         default=None,
         description="Path to positions JSON for local/remote brokers.",
     )
+    closed_positions_path: ProjectPath | None = Field(
+        default=None,
+        description="Path to closed positions JSON for local/remote brokers.",
+    )
+    account_value_series_path: ProjectPath | None = Field(
+        default=None,
+        description="Path to account value series JSON for local/remote brokers.",
+    )
     account_path: ProjectPath | None = Field(
         default=None,
         description="Path to account JSON for local/remote brokers.",

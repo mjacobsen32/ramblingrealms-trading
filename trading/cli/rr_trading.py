@@ -128,6 +128,14 @@ def paper_trade(
             help="Timestamp for which to run the model (YYYY-MM-DD).",
         ),
     ] = "",
+    predict_time_end: Annotated[
+        str,
+        typer.Option(
+            "--timestamp_end",
+            "-e",
+            help="Timestamp for which to end if wanting a forward testing range: (YYYY-MM-DD).",
+        ),
+    ] = "",
 ):
     """
     Run the model on the Alpaca paper trading account.
@@ -156,12 +164,16 @@ def paper_trade(
         market_data_client=market_data_client,
         alpaca_account_client=alpaca_account_client,
         live=False,
-    )
-    trade_client.run_model(
         predict_time=(
             datetime.datetime.fromisoformat(predict_time) if predict_time else None
-        )
+        ),
+        end_predict_time=(
+            datetime.datetime.fromisoformat(predict_time_end)
+            if predict_time_end
+            else None
+        ),
     )
+    trade_client.run_model()
 
 
 @app.command(help="Run model on live trading Alpaca Account")
