@@ -7,6 +7,7 @@ from trading.src.features.generic_features import FillStrategy, OperationType
 @pytest.fixture
 def sin_wave_time_series():
     import matplotlib.pyplot as plt
+    import numpy as np
     import pandas as pd
 
     np.random.seed(42)  # For reproducibility
@@ -24,7 +25,7 @@ def sin_wave_time_series():
     trade_count_values = np.random.randint(1, 1000, n)
     vwap_values = (close_values * volume_values).cumsum() / volume_values.cumsum()
 
-    return pd.DataFrame(
+    df = pd.DataFrame(
         {
             "open": open_values,
             "high": high_values,
@@ -35,6 +36,15 @@ def sin_wave_time_series():
             "vwap": vwap_values,
         }
     )
+
+    # Add multi-index with timestamp and symbol
+    timestamps = pd.date_range(start="2020-01-01", periods=n, freq="D")
+    symbols = ["TEST"] * n
+    df.index = pd.MultiIndex.from_arrays(
+        [timestamps, symbols], names=["timestamp", "symbol"]
+    )
+
+    return df
 
 
 @pytest.fixture

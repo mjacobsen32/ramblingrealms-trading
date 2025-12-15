@@ -41,9 +41,9 @@ dependencies = [
   "nbformat (>=5.10.4,<6.0.0)",
   "kaleido (<=0.2.1)",
   "anywidget (>=0.9.18,<0.10.0)",
-  "cudf-cu12 (>=25.8.0,<26.0.0)",
   "quantstats (>=0.0.70,<0.0.71)",
   "boto3 (>=1.42.5,<2.0.0)",
+  "pyarrow (>=22.0.0,<23.0.0)",
 ]
 
 [project.urls]
@@ -51,6 +51,7 @@ repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
 
 [project.scripts]
 rr_trading = "trading.cli.rr_trading:app"
+benchmark-performance = "trading.test.alg.environments.benchmark_performance:main"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
@@ -82,6 +83,12 @@ sphinxcontrib-programoutput = "^0.18"
 sphinx-click = "^6.0.0"
 sphinxcontrib-typer = "^0.5.1"
 sphinx-jsonschema = "^1.19.1"
+
+[tool.poetry.group.gpu]
+optional = true
+
+[tool.poetry.group.gpu.dependencies]
+cudf-cu12 = ">=25.8.0,<26.0.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -131,6 +138,15 @@ exclude_also = [
   "raise AssertionError",
   "raise NotImplementedError",
   "raise ValueError",
+
+  # Don't complain about logging calls:
+  "logging\\.debug\\(",
+  "logging\\.warning\\(",
+  "logging\\.error\\(",
+  "logging\\.info\\(",
+
+  # Don't complain about empty functions (e.g. interfaces):
+  "pass",
 
   # Don't complain if non-runnable code isn't run:
   "if 0:",

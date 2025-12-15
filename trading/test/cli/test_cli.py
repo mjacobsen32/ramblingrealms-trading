@@ -60,6 +60,13 @@ def test_main():
     assert result.exit_code == 0
 
 
+def test_loggers():
+    result = runner.invoke(
+        app, "--log-level-file INFO --log-level-console INFO --help", color=False
+    )
+    assert result.exit_code == 0
+
+
 def test_print_config():
     result = runner.invoke(app, ["print-config"], color=False)
     assert result.exit_code == 0

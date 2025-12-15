@@ -54,6 +54,10 @@ class ProjectPath(BaseModel):
             value = value.replace("{BACKTEST_DIR}", str(cls.BACKTEST_DIR))
         if "{VERSION}" in value:
             value = value.replace("{VERSION}", str(cls.VERSION))
+        if "{TIMESTAMP}" in value:
+            value = value.replace(
+                "{TIMESTAMP}", str(datetime.now().strftime("%Y%m%d_%H%M%S"))
+            )
         return {"path": value}
 
     def __str__(self) -> str:

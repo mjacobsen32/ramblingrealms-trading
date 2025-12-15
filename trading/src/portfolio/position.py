@@ -2,14 +2,58 @@ import json
 import logging
 from collections import deque
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 import pandas as pd
+import pyarrow as pa
 from alpaca.trading.models import Position as AlpacaPosition
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from trading.src.trade.trade_clients import TradingClient
+
+portfolio_schema = pa.schema(
+    [
+        ("net_value", pa.float64()),
+        ("cash", pa.float64()),
+        ("pnl", pa.float64()),
+        ("pnl_pct", pa.float64()),
+        ("date", pa.string()),
+        ("rolling_pnl", pa.float64()),
+        ("rolling_pnl_pct", pa.float64()),
+    ]
+)
+
+
+class PortfolioStats(BaseModel):
+    COLS: ClassVar[list[str]] = [
+        "net_value",
+        "cash",
+        "pnl",
+        "pnl_pct",
+        "date",
+        "rolling_pnl",
+        "rolling_pnl_pct",
+    ]
+    net_value: float = 0.0
+    cash: float = 0.0
+    pnl: float = 0.0
+    pnl_pct: float = 0.0
+    rolling_pnl: float = 0.0
+    rolling_pnl_pct: float = 0.0
+    date: str = ""
+
+    def to_row(self) -> list:
+        return [
+            self.net_value,
+            self.cash,
+            self.pnl,
+            self.pnl_pct,
+            self.date,
+            self.rolling_pnl,
+            self.rolling_pnl_pct,
+        ]
 
 
 class PositionType(str, Enum):
@@ -48,6 +92,20 @@ def PositionDecoder(dct):
     )
 
 
+positions_schema = pa.schema(
+    [
+        ("symbol", pa.string()),
+        ("lot_size", pa.float64()),
+        ("enter_price", pa.float64()),
+        ("enter_date", pa.timestamp("ns")),
+        ("exit_date", pa.timestamp("ns")),
+        ("exit_price", pa.float64()),
+        ("exit_size", pa.float64()),
+        ("position_type", pa.string()),
+    ]
+)
+
+
 class Position(np.ndarray):
     """
     Represents a position in the portfolio, backed by a numpy array.
@@ -57,8 +115,8 @@ class Position(np.ndarray):
     COLS = [
         "symbol",
         "lot_size",
-        "enter_price",
         "enter_date",
+        "enter_price",
         "exit_date",
         "exit_price",
         "exit_size",
@@ -72,6 +130,25 @@ class Position(np.ndarray):
     IDX_EXIT_PRICE = 5
     IDX_EXIT_SIZE = 6
     IDX_POSITION_TYPE = 7
+
+    def to_row(self) -> list:
+        """
+        This method is for completeness and consistency, as it derives from np.ndarray, it is alread a list-like object.
+
+        :param self: Description
+        :return: Description
+        :rtype: list[Any]
+        """
+        return [
+            self.symbol,
+            self.lot_size,
+            self.enter_date,
+            self.enter_price,
+            self.exit_date,
+            self.exit_price,
+            self.exit_size,
+            self.position_type.value,
+        ]
 
     @classmethod
     def from_alpaca_position(cls, alpaca_position: AlpacaPosition) -> "Position":
@@ -239,10 +316,12 @@ class PositionManager:
         else:
             self.df = df
         if positions is not None:
-            self.positions = positions
+            self.open_positions = positions
         else:
-            self.positions = {symbol: deque(maxlen=self.max_lots) for symbol in symbols}
-        self.history: list[Position] = []
+            self.open_positions = {
+                symbol: deque(maxlen=self.max_lots) for symbol in symbols
+            }
+        self.closed_positions: list[Position] = []
         self.maintain_history = maintain_history
         logging.info("Initializing PositionManager with symbols: %s", symbols)
 
@@ -256,9 +335,9 @@ class PositionManager:
         """
         Save the positions to a CSV file.
         """
-        for _, queue in self.positions.items():
-            self.history.extend(queue)
-        df = pd.DataFrame(self.history, columns=Position.COLS)
+        for _, queue in self.open_positions.items():
+            self.closed_positions.extend(queue)
+        df = pd.DataFrame(self.closed_positions, columns=Position.COLS)
         df.to_csv(path, index=False)
 
     def reset(self):
@@ -268,8 +347,8 @@ class PositionManager:
         self.df["holdings"] = 0.0
         self.df["position_counts"] = 0
         self.df["rolling_profit"] = 0.0
-        self.history = []
-        self.positions = {symbol: deque() for symbol in self.symbols}
+        self.closed_positions = []
+        self.open_positions = {symbol: deque() for symbol in self.symbols}
 
     @classmethod
     def from_client(
@@ -320,21 +399,21 @@ class PositionManager:
     ) -> None:
         """Populate this PositionManager from a mapping of positions (e.g. from a TradingClient)."""
         for sym, pos_list in client_positions.items():
-            if sym not in self.positions:
+            if sym not in self.open_positions:
                 logging.warning(
                     "Symbol %s not in PositionManager symbols; skipping", sym
                 )
                 continue
             total = 0.0
             for pos in pos_list:
-                self.positions[sym].append(pos)
+                self.open_positions[sym].append(pos)
                 total += float(pos.lot_size)
             df.loc[sym, "holdings"] = total
             df.loc[sym, "position_counts"] = len(pos_list)
 
     def _append(self, df: pd.DataFrame):
         for sym, row in df.iterrows():
-            self.positions[sym].append(
+            self.open_positions[sym].append(
                 Position(
                     symbol=str(sym),
                     lot_size=row["size"],
@@ -351,7 +430,7 @@ class PositionManager:
         for row in df.itertuples(index=True):
             sym = row.Index
             remaining_lot = -row.size  # total to sell
-            queue = self.positions[sym]
+            queue = self.open_positions[sym]
             profit = 0.0
             while remaining_lot > 0 and len(queue) > 0:
                 max_to_take = min(queue[0][Position.IDX_LOT_SIZE], remaining_lot)
@@ -371,7 +450,7 @@ class PositionManager:
                 )
                 profit += position_profit
                 if self.maintain_history:
-                    self.history.append(position.copy())
+                    self.closed_positions.append(position.copy())
                 logging.debug("Exiting: %s profit=%s", position, position_profit)
 
             df.at[row.Index, "profit"] = profit
@@ -404,7 +483,7 @@ class PositionManager:
         buy_symbols = df.index[buy_mask]
         sell_symbols = df.index[sell_mask]
 
-        df[sell_mask] = self._exit_positions(df[sell_mask])
+        df.loc[sell_mask] = self._exit_positions(df[sell_mask])
 
         df.loc[~buy_mask & ~sell_mask, "size"] = 0.0
 
@@ -472,14 +551,37 @@ class LivePositionManager(PositionManager):
         )
         # copy manager attributes (including _cash) into this LivePositionManager instance
         self.__dict__.update(manager.__dict__)
+        self.pf_history: list[PortfolioStats] = []
         self.trading_client = trading_client
 
-    def reset(self):
-        raise NotImplementedError(
-            "LivePositionManager reset not implemented yet. And it will not be!"
+    def __del__(self):
+        self.trading_client.close(
+            closed_positions=self.closed_positions,
+            open_positions=self.open_positions,
+            pf_history=self.pf_history,
+            cash=self._cash,
         )
+
+    def reset(self):
+        pass  # Override to do nothing; live positions are managed externally
 
     def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:
         df, profit = super().step(df)
-        df, profit = self.trading_client.execute_trades(df, self.positions)
+        stats = PortfolioStats(
+            net_value=self.net_value(),
+            cash=self.available_cash(),
+            pnl=df["profit"].sum(),
+            date=str(df["timestamp"].max()),
+            pnl_pct=(
+                df["profit"].sum() / self.net_value() if self.net_value() != 0 else 0
+            ),
+            rolling_pnl=self.available_cash() - self._initial_cash,
+            rolling_pnl_pct=(
+                self.available_cash() / self._initial_cash - 1
+                if self._initial_cash != 0
+                else 0
+            ),
+        )
+        self.pf_history.append(stats)
+        df, profit = self.trading_client.execute_trades(actions=df)
         return df, profit

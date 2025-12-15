@@ -87,9 +87,35 @@ class Feature(BaseModel):
     # Registry for subclasses
     _registry: ClassVar[Dict[FeatureType, Type["Feature"]]] = {}
 
+    def shape(self, data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Shape the data to ensure all symbols have the same timestamps.
+        Missing timestamps for symbols are filled with NaNs.
+
+        Args:
+            data (pd.DataFrame): Input DataFrame with MultiIndex (timestamp, symbol).
+
+        Returns:
+            pd.DataFrame: Shaped DataFrame where all symbols have identical timestamps.
+        """
+        # Get all unique timestamps across all symbols
+        all_timestamps = data.index.get_level_values("timestamp").unique()
+
+        # Unstack to have symbols as columns
+        unstacked = data.unstack(level="symbol")
+
+        # Reindex to ensure all timestamps are present
+        unstacked = unstacked.reindex(all_timestamps)
+
+        # Stack back with dropna=False to keep NaNs
+        shaped = unstacked.stack(level="symbol", dropna=False)
+
+        return shaped
+
     def clean_columns(self, cols: List[str], df: pd.DataFrame) -> pd.DataFrame:
         """
         Clean the DataFrame by filling NaN values in specified columns with given strategy.
+        Filling is applied per symbol to avoid cross-contamination between symbols.
         Args:
             cols (List[str]): List of column names to clean.
             df (pd.DataFrame): DataFrame to clean.
@@ -101,17 +127,25 @@ class Feature(BaseModel):
             df.dropna(axis=0, inplace=True, subset=cols)
             return df
 
-        for col in cols:
-            if self.fill_strategy is FillStrategy.BACKWARD_FILL:
-                df[col] = df[col].bfill()
-            elif self.fill_strategy is FillStrategy.INTERPOLATE:
-                interpolated = df[col].interpolate(
-                    method="linear", limit_direction="both"
-                )
-                df[col] = df[col].where(~df[col].isna(), interpolated)
-            elif self.fill_strategy is FillStrategy.ZERO:
-                df[col] = df[col].fillna(0.0)
+        # Apply filling per symbol to prevent using data from other symbols
+        grouped = df.groupby(level="symbol", group_keys=False)
 
+        def apply_fill(group):
+            for col in cols:
+                if self.fill_strategy is FillStrategy.BACKWARD_FILL:
+                    group[col] = group[col].bfill()
+                elif self.fill_strategy is FillStrategy.INTERPOLATE:
+                    interpolated = group[col].interpolate(
+                        method="linear", limit_direction="both"
+                    )
+                    group[col] = group[col].where(~group[col].isna(), interpolated)
+                elif self.fill_strategy is FillStrategy.ZERO:
+                    group[col] = group[col].fillna(0.0)
+                else:
+                    raise ValueError(f"Unknown fill strategy: {self.fill_strategy}")
+            return group
+
+        df = grouped.apply(apply_fill)
         return df
 
     def get_feature_names(self) -> List[str]:
@@ -240,16 +274,17 @@ class Candle(Feature):
     def normalize(self, df: pd.DataFrame) -> pd.DataFrame:
         # percent change from previous day
         # for now we are not piping to z-score, but we may later on, ideally we preserve large swings in raw data
-        df["open_norm"] = df["open"].pct_change().fillna(0.0)
-        df["high_norm"] = df["high"].pct_change().fillna(0.0)
-        df["low_norm"] = df["low"].pct_change().fillna(0.0)
-        df["close_norm"] = df["close"].pct_change().fillna(0.0)
-        df["vwap_norm"] = df["vwap"].pct_change().fillna(0.0)
-        df["price"] = df["close"]
+        df["open_norm"] = df["open"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["high_norm"] = df["high"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["low_norm"] = df["low"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["close_norm"] = df["close"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["vwap_norm"] = df["vwap"].fillna(value=0.0).pct_change().fillna(0.0)
+        df["price"] = df["close"].fillna(0.0)
 
         # large swings, so we log the percent change, and pipe to z-score
         df["trade_count_norm"] = (
             df["trade_count"]
+            .fillna(0.0)
             .pct_change()
             .fillna(0.0)
             .transform(np.log1p)
@@ -257,6 +292,7 @@ class Candle(Feature):
         )
         df["volume_norm"] = (
             df["volume"]
+            .fillna(0.0)
             .pct_change()
             .fillna(0.0)
             .transform(np.log1p)
@@ -266,13 +302,16 @@ class Candle(Feature):
         return df
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        cleaned = self.clean_columns(self.get_raw_feature_names(), data)
-        if "symbol" in (df.index.names or []):
-            normalized = cleaned.groupby(level="symbol", group_keys=False).apply(
-                self.normalize
-            )
+        shaped = self.shape(data)
+        cleaned = self.clean_columns(self.get_raw_feature_names(), shaped)
+        if "symbol" in cleaned.index.names:
+            normalized: pd.DataFrame = cleaned.groupby(
+                level="symbol", group_keys=False
+            ).apply(self.normalize)
         else:
             normalized = self.normalize(cleaned)
+        normalized.replace([np.inf, -np.inf], np.nan, inplace=True)
+        normalized.fillna(0.0, inplace=True)
         return normalized
 
     TYPE: ClassVar[FeatureType] = FeatureType.CANDLE
@@ -286,7 +325,13 @@ class MovingWindow(Feature):
     """
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        df[self.name] = self.operation(df, self.field, self.period)
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_moving(group):
+            group[self.name] = self.operation(group, self.field, self.period)
+            return group
+
+        df = grouped.apply(apply_moving)
         return self.clean_columns(self.get_feature_names(), df)
 
     TYPE: ClassVar[FeatureType] = FeatureType.MOVING_WINDOW
@@ -318,13 +363,19 @@ class ATR(Feature):
         return [self.name]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        df[self.name] = vbt.ATR.run(
-            high=df[self.field_high],
-            low=df[self.field_low],
-            close=df[self.field_close],
-            window=self.period,
-        ).atr
-        df[self.name + "_norm"] = df[self.name] / df["close"]
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_atr(group):
+            group[self.name] = vbt.ATR.run(
+                high=group[self.field_high],
+                low=group[self.field_low],
+                close=group[self.field_close],
+                window=self.period,
+            ).atr
+            group[self.name + "_norm"] = group[self.name] / group["close"]
+            return group
+
+        df = grouped.apply(apply_atr)
         cleaned = self.clean_columns([self.name, self.name + "_norm"], df)
         return cleaned
 
@@ -340,11 +391,17 @@ class RSI(Feature):
     ewm: bool = Field(False, description="Use Exponential Weighted Average for RSI")
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        df[self.name] = vbt.RSI.run(
-            close=df[self.field],
-            window=self.period,
-            ewm=self.ewm,
-        ).rsi
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_rsi(group):
+            group[self.name] = vbt.RSI.run(
+                close=group[self.field],
+                window=self.period,
+                ewm=self.ewm,
+            ).rsi
+            return group
+
+        df = grouped.apply(apply_rsi)
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -383,21 +440,23 @@ class MACD(Feature):
         return df
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        macd = vbt.MACD.run(
-            close=df[self.field],
-            fast_window=self.fast_period,
-            slow_window=self.slow_period,
-            signal_window=self.signal_period,
-            macd_ewm=self.ewm,
-            signal_ewm=self.signal_ewm,
-        )
-        df[f"{self.name}"] = macd.macd
-        df[f"{self.name}_signal"] = macd.signal
-        df[f"{self.name}_hist"] = macd.macd - macd.signal
-        if "symbol" in (df.index.names or []):
-            df = df.groupby(level="symbol", group_keys=False).apply(self.normalize)
-        else:
-            df = self.normalize(df)
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_macd(group):
+            macd = vbt.MACD.run(
+                close=group[self.field],
+                fast_window=self.fast_period,
+                slow_window=self.slow_period,
+                signal_window=self.signal_period,
+                macd_ewm=self.ewm,
+                signal_ewm=self.signal_ewm,
+            )
+            group[f"{self.name}"] = macd.macd
+            group[f"{self.name}_signal"] = macd.signal
+            group[f"{self.name}_hist"] = macd.macd - macd.signal
+            return self.normalize(group)
+
+        df = grouped.apply(apply_macd)
         return self.clean_columns(
             self.get_feature_names() + self.get_raw_feature_names(), df
         )
@@ -433,19 +492,21 @@ class BollingerBands(Feature):
         return df
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        bbands = vbt.BBANDS.run(
-            close=df[self.field],
-            window=self.period,
-            ewm=self.ewm,
-            alpha=self.alpha,
-        )
-        df[f"{self.name}_upper"] = bbands.upper
-        df[f"{self.name}_lower"] = bbands.lower
-        df[f"{self.name}_mid"] = bbands.middle
-        if "symbol" in (df.index.names or []):
-            df = df.groupby(level="symbol", group_keys=False).apply(self.normalize)
-        else:
-            df = self.normalize(df)
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_bbands(group):
+            bbands = vbt.BBANDS.run(
+                close=group[self.field],
+                window=self.period,
+                ewm=self.ewm,
+                alpha=self.alpha,
+            )
+            group[f"{self.name}_upper"] = bbands.upper
+            group[f"{self.name}_lower"] = bbands.lower
+            group[f"{self.name}_mid"] = bbands.middle
+            return self.normalize(group)
+
+        df = grouped.apply(apply_bbands)
         return self.clean_columns(
             self.get_feature_names() + self.get_raw_feature_names(), df
         )
@@ -468,11 +529,17 @@ class MSTD(Feature):
     )
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        df[self.name] = vbt.MSTD.run(
-            close=df[self.field],
-            window=self.window,
-            ewm=self.ewm,
-        ).mstd
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_mstd(group):
+            group[self.name] = vbt.MSTD.run(
+                close=group[self.field],
+                window=self.window,
+                ewm=self.ewm,
+            ).mstd
+            return group
+
+        df = grouped.apply(apply_mstd)
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -496,14 +563,16 @@ class OBV(Feature):
         return df
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        df[self.name] = vbt.OBV.run(
-            close=df[self.field_close],
-            volume=df[self.field_volume],
-        ).obv
-        if "symbol" in (df.index.names or []):
-            df = df.groupby(level="symbol", group_keys=False).apply(self.normalize)
-        else:
-            df = self.normalize(df)
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_obv(group):
+            group[self.name] = vbt.OBV.run(
+                close=group[self.field_close],
+                volume=group[self.field_volume],
+            ).obv
+            return self.normalize(group)
+
+        df = grouped.apply(apply_obv)
         return self.clean_columns(self.get_feature_names(), df)
 
 
@@ -527,17 +596,25 @@ class Stochastic(Feature):
         return [f"{self.name}_k", f"{self.name}_d", self.name]
 
     def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
-        kd = vbt.STOCH.run(
-            high=df[self.field_high],
-            low=df[self.field_low],
-            close=df[self.field_close],
-            k_window=self.k_window,
-            d_window=self.d_window,
-            d_ewm=self.ewm,
-        )
-        df[self.name + "_k"] = kd.percent_k
-        df[self.name + "_d"] = kd.percent_d
-        df[self.name] = kd.percent_k - kd.percent_d  # Stochastic Oscillator value
+        grouped = df.groupby(level="symbol", group_keys=False)
+
+        def apply_stoch(group):
+            kd = vbt.STOCH.run(
+                high=group[self.field_high],
+                low=group[self.field_low],
+                close=group[self.field_close],
+                k_window=self.k_window,
+                d_window=self.d_window,
+                d_ewm=self.ewm,
+            )
+            group[self.name + "_k"] = kd.percent_k
+            group[self.name + "_d"] = kd.percent_d
+            group[self.name] = (
+                kd.percent_k - kd.percent_d
+            )  # Stochastic Oscillator value
+            return group
+
+        df = grouped.apply(apply_stoch)
         return self.clean_columns(self.get_feature_names(), df)
 
 

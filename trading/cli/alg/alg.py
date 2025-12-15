@@ -9,6 +9,8 @@ from trading.cli.utils import init_file_logger
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.backtest.backtesting import BackTesting, Portfolio
 from trading.src.alg.data_process.data_loader import DataLoader
+from trading.src.alg.environments.fast_training_env import FastTrainingEnv
+from trading.src.alg.environments.stateful_trading_env import StatefulTradingEnv
 from trading.src.alg.environments.trading_environment import TradingEnv
 
 app = typer.Typer(
@@ -48,7 +50,9 @@ def train(
         feature_config=alg_config.feature_config,
         fetch_data=fetch_data,
     )
-    trade_env = TradingEnv(
+
+    # Use FastTrainingEnv for training (10x faster)
+    train_env = FastTrainingEnv(
         data=data_loader.get_train_test()[0],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
@@ -57,25 +61,37 @@ def train(
             alg_config.data_config.time_step_period,
         ),
     )
-    trade_env.reset()
+    train_env.reset()
 
-    logging.info("Environment Initialized.")
+    logging.info("FastTrainingEnv Initialized for high-speed training.")
 
-    model = Agent(alg_config.agent_config, trade_env, alg_config.data_config)
+    model = Agent(alg_config.agent_config, train_env, alg_config.data_config)
     model.learn()
 
     if not dry_run:
         model.save()
 
     if not no_test:
+        # Use StatefulTradingEnv for backtesting (accurate evaluation)
+        test_env = StatefulTradingEnv(
+            data=data_loader.get_train_test()[1],
+            cfg=alg_config.stock_env,
+            features=alg_config.feature_config.features,
+            time_step=(
+                alg_config.data_config.time_step_unit,
+                alg_config.data_config.time_step_period,
+            ),
+        )
+        test_env.reset()
+
         bt = BackTesting(
             model=model,
-            env=trade_env,
+            env=test_env,
             backtest_config=alg_config.backtest_config,
             data=data_loader.get_train_test()[1],
         )
         pf = bt.run()
-        pf.analysis(alg_config.backtest_config.analysis_config, trade_env.data)
+        pf.analysis(alg_config.backtest_config.analysis_config, test_env.data)
     ProjectPath.cache()
     logging.info("Training completed successfully.")
 
@@ -100,7 +116,9 @@ def backtest(
     data_loader = DataLoader(
         data_config=alg_config.data_config, feature_config=alg_config.feature_config
     )
-    trade_env = TradingEnv(
+
+    # Use StatefulTradingEnv for backtesting (accurate evaluation)
+    test_env = StatefulTradingEnv(
         data=data_loader.get_train_test()[1],
         cfg=alg_config.stock_env,
         features=alg_config.feature_config.features,
@@ -109,19 +127,19 @@ def backtest(
             alg_config.data_config.time_step_period,
         ),
     )
-    trade_env.reset()
+    test_env.reset()
 
-    logging.info("Environment Initialized.")
+    logging.info("StatefulTradingEnv Initialized for backtesting.")
     model = Agent(
         config=alg_config.agent_config,
-        env=trade_env,
+        env=test_env,
         data_config=alg_config.data_config,
         load=True,
     )
 
     bt = BackTesting(
         model=model,
-        env=trade_env,
+        env=test_env,
         backtest_config=alg_config.backtest_config,
         data=(
             data_loader.get_train_test()[1]
@@ -130,7 +148,7 @@ def backtest(
         ),
     )
     pf = bt.run()
-    pf.analysis(alg_config.backtest_config.analysis_config, trade_env.data)
+    pf.analysis(alg_config.backtest_config.analysis_config, test_env.data)
     ProjectPath.cache()
     logging.info("Backtesting completed successfully.")
 
