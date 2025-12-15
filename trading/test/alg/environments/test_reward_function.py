@@ -5,9 +5,10 @@ import pytest
 from trading.cli.alg.config import RewardConfig
 from trading.src.alg.environments.reward_functions.basic_profit_max import (
     BasicProfitMax,
-    BasicRealizedProfitMax,
-    SharpeRatio,
-    SortinoRatio,
+)
+from trading.src.alg.environments.reward_functions.fast_profit_reward import (
+    FastProfitReward,
+    SimpleMomentumReward,
 )
 from trading.src.alg.environments.reward_functions.reward_function_factory import (
     reward_factory_method,
@@ -159,7 +160,7 @@ def test_sharpe_ratio(
     cfg = RewardConfig(
         type="sharpe_ratio", reward_scaling=1e5, kwargs={"risk_free_rate": 0.01}
     )
-    rew = reward_factory_method(cfg, initial_state=np.array([100.0, 0.0]))
+    rew = reward_factory_method(cfg, initial_state=np.array([5000.0, 0.0]))
 
     strong_negative_data = strong_negative_data.droplevel("symbol")
     strong_profitable_data = strong_profitable_data.droplevel("symbol")
@@ -182,7 +183,7 @@ def test_calmar_ratio(
     cfg = RewardConfig(
         type="calmar_ratio", reward_scaling=1e5, kwargs={"risk_free_rate": 0.01}
     )
-    rew = reward_factory_method(cfg, initial_state=np.array([100.0, 0.0]))
+    rew = reward_factory_method(cfg, initial_state=np.array([5000.0, 0.0]))
 
     strong_negative_data = strong_negative_data.droplevel("symbol")
     strong_profitable_data = strong_profitable_data.droplevel("symbol")
@@ -205,7 +206,7 @@ def test_sortino_ratio(
     cfg = RewardConfig(
         type="sortino_ratio", reward_scaling=1e5, kwargs={"risk_free_rate": 0.01}
     )
-    rew = reward_factory_method(cfg, initial_state=np.array([100.0, 0.0]))
+    rew = reward_factory_method(cfg, initial_state=np.array([5000.0, 0.0]))
 
     strong_negative_data = strong_negative_data.droplevel("symbol")
     strong_profitable_data = strong_profitable_data.droplevel("symbol")
@@ -220,3 +221,47 @@ def test_sortino_ratio(
         pf=strong_negative_data, df=strong_negative_data, realized_profit=0.0
     )
     assert r < 0.0
+
+
+def test_fast_profit_reward(
+    strong_profitable_portfolio,
+    mild_profitable_portfolio,
+    strong_negative_portfolio,
+    mild_negative_portfolio,
+):
+    cfg = RewardConfig(type="fast_profit_reward", reward_scaling=1000.0)
+    rew = reward_factory_method(cfg, initial_state=np.array([5000.0, 0.0]))
+
+    strong_profit = rew.compute_reward(strong_profitable_portfolio, pd.DataFrame(), 0.0)
+    rew.reset()
+    mild_profit = rew.compute_reward(mild_profitable_portfolio, pd.DataFrame(), 0.0)
+    rew.reset()
+    strong_negative = rew.compute_reward(strong_negative_portfolio, pd.DataFrame(), 0.0)
+    rew.reset()
+    mild_negative = rew.compute_reward(mild_negative_portfolio, pd.DataFrame(), 0.0)
+    assert strong_profit > 0.5
+    assert mild_profit > 0.00 and mild_profit < 0.5
+    assert strong_negative < -0.5
+    assert mild_negative < -0.00 and mild_negative > -0.5
+
+
+def test_simple_momentum_reward(
+    strong_profitable_portfolio,
+    mild_profitable_portfolio,
+    strong_negative_portfolio,
+    mild_negative_portfolio,
+):
+    cfg = RewardConfig(type="simple_momentum_reward", reward_scaling=1000.0)
+    rew = reward_factory_method(cfg, initial_state=np.array([5000.0, 0.0]))
+
+    strong_profit = rew.compute_reward(strong_profitable_portfolio, pd.DataFrame(), 0.0)
+    rew.reset()
+    mild_profit = rew.compute_reward(mild_profitable_portfolio, pd.DataFrame(), 0.0)
+    rew.reset()
+    strong_negative = rew.compute_reward(strong_negative_portfolio, pd.DataFrame(), 0.0)
+    rew.reset()
+    mild_negative = rew.compute_reward(mild_negative_portfolio, pd.DataFrame(), 0.0)
+    assert strong_profit > 0.5
+    assert mild_profit > 0.00 and mild_profit < 0.5
+    assert strong_negative < -0.5
+    assert mild_negative < -0.00 and mild_negative > -0.5

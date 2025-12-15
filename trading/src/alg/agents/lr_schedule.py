@@ -17,9 +17,7 @@ class BaseLRSchedule:
             return LinearLRSchedule(cfg)
         elif isinstance(cfg, float):
             return BaseLRSchedule(cfg)
-        elif isinstance(cfg, dict):
-            raise ValueError(f"Unknown learning rate schedule type: {cfg['type']}")
-        return BaseLRSchedule(cfg)
+        raise ValueError(f"Unknown learning rate schedule type: {cfg}")
 
     def func(self, progress_remaining: float) -> float:
         """

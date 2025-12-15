@@ -114,7 +114,7 @@ class SimpleMomentumReward(RewardFunction):
         # Scale and normalize
         # Using percentage-based scaling makes the agent more sensitive to changes
         # 1% change = 100 in scaling, which maps well to tanh(-1, 1) range
-        reward = np.tanh(pct_return * 100.0)
+        reward = np.tanh(pct_return)
 
         if np.isnan(reward) or np.isinf(reward):
             logging.warning("Invalid reward value: %s", reward)

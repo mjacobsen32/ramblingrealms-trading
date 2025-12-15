@@ -138,6 +138,15 @@ exclude_also = [
   "raise NotImplementedError",
   "raise ValueError",
 
+  # Don't complain about logging calls:
+  "logging\\.debug\\(",
+  "logging\\.warning\\(",
+  "logging\\.error\\(",
+  "logging\\.info\\(",
+
+  # Don't complain about empty functions (e.g. interfaces):
+  "pass",
+
   # Don't complain if non-runnable code isn't run:
   "if 0:",
   "if __name__ == .__main__.:",

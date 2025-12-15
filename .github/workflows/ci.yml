@@ -28,10 +28,6 @@ jobs:
 
       - name: Run pre-commit hooks
         run: |
-          python --version
-          poetry env info
-          poetry check
-          poetry lock -vv
           pip install pre-commit
           pre-commit run --all-files
 

@@ -11,11 +11,7 @@ from alpaca.trading.models import TradeAccount
 from moto import mock_aws
 
 from trading.src.portfolio.position import PortfolioStats, Position, PositionManager
-from trading.src.trade.trade_clients import (
-    AlpacaClient,
-    LocalTradingClient,
-    RemoteTradingClient,
-)
+from trading.src.trade.trade_clients import TradingClient
 from trading.src.user_cache.user_cache import UserCache
 from trading.test.alg.test_fixtures import *
 from trading.test.conftest import *
@@ -86,6 +82,14 @@ def pf_history() -> list[PortfolioStats]:
     ]
 
 
+def test_get_clock(alpaca_trading_client_mock, alpaca_trade_config):
+    client = TradingClient.from_config(
+        alpaca_trade_config, alpaca_trading_client_mock, live=False
+    )
+    clock = client.get_clock()
+    calendar = client.get_calendar()
+
+
 def test_position_manager_from_client_populates_holdings():
     class FakeClient:
         @property
@@ -135,7 +139,7 @@ def test_local_client_read_write_positions(
     local_trade_config.account_value_series_path.path = str(
         tmp_path / "account_value_series.parquet"
     )
-    client = LocalTradingClient(
+    client = TradingClient.from_config(
         local_trade_config, alpaca_trading_client_mock, live=False
     )
 
@@ -196,7 +200,7 @@ def test_remote_client_uses_s3_store(
     )
     conn.create_bucket(Bucket="rr-storage")
 
-    client = RemoteTradingClient(
+    client = TradingClient.from_config(
         remote_trade_config, alpaca_trading_client_mock, live=False
     )
 
@@ -255,7 +259,9 @@ def test_remote_client_uses_s3_store(
 def test_alpaca_client_positions_and_orders(
     alpaca_trading_client_mock, alpaca_trade_config
 ):
-    client = AlpacaClient(alpaca_trade_config, alpaca_trading_client_mock, live=False)
+    client = TradingClient.from_config(
+        alpaca_trade_config, alpaca_trading_client_mock, live=False
+    )
 
     positions = client.positions
     assert len(positions) == 2
