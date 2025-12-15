@@ -51,6 +51,7 @@ repository = "https://github.com/mjacobsen32/ramblingrealms-trading"
 
 [project.scripts]
 rr_trading = "trading.cli.rr_trading:app"
+benchmark-performance = "trading.test.alg.environments.benchmark_performance:main"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"

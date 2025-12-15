@@ -49,7 +49,6 @@ class Agent:
         self.meta_data: dict = {}
         self.env: gym.Env = env
         if load:
-            # When loading, we may not need a data_config; it's stored in meta_data
             self.model, self.meta_data = Agent.load_agent(config, self.env)
         else:
             self.model = Agent.make_agent(config=config, env=self.env)
@@ -148,39 +147,31 @@ class Agent:
         return self.model.predict(obs, self.config.deterministic)
 
     def save(self, path: Optional[str] = None):
-        # Determine save path
         save_zip_path = Path(path if path else str(self.config.save_path))
 
-        # Ensure save_zip_path points to a .zip file, not a directory, so zipfile.ZipFile() doesn't raise IsADirectoryError
         if save_zip_path.suffix != ".zip":
             save_zip_path = save_zip_path.with_suffix(".zip")
 
         save_dir = save_zip_path.with_suffix("")
 
-        # Create directory for saving
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save model zip inside the directory
         model_zip_path = save_dir / "model.zip"
         self.model.save(str(model_zip_path))
 
-        # Save meta_data as JSON
         meta_path = save_dir / "meta_data.json"
         with open(meta_path, "w") as f:
             json.dump(self.meta_data, f, indent=2)
 
-        # Zip the directory contents into the final zip file
         with zipfile.ZipFile(save_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             for file in save_dir.iterdir():
                 if file.is_file():
                     zipf.write(file, arcname=file.name)
                 elif file.is_dir():
-                    # Recursively add directory contents
                     for subfile in file.rglob("*"):
                         if subfile.is_file():
                             zipf.write(subfile, arcname=subfile.relative_to(save_dir))
 
-        # Optionally, clean up the directory
         import shutil
 
         shutil.rmtree(save_dir)
