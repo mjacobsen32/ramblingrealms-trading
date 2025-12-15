@@ -28,7 +28,7 @@ jobs:
 
       - name: Run pre-commit hooks
         run: |
-          python --versin
+          python --version
           poetry env info
           poetry check
           poetry lock -vv
