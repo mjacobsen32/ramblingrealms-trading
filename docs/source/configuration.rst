@@ -1,9 +1,9 @@
 Configuration
 =============
 
-.. autopydantic_model:: trading.cli.alg.config.RRConfig 
+.. autopydantic_model:: trading.cli.alg.config.RRConfig
 
-.. autopydantic_model:: trading.cli.alg.config.AgentConfig 
+.. autopydantic_model:: trading.cli.alg.config.AgentConfig
 
 .. autopydantic_model:: trading.cli.alg.config.BackTestConfig
 
@@ -26,5 +26,11 @@ Configuration
 .. autopydantic_model:: trading.cli.alg.config.DataRequests
 
 .. autoclass:: trading.cli.alg.config.DataSourceType
+   :undoc-members:
+   :members:
+
+.. autopydantic_model:: trading.cli.trading.trade_config.RRTradeConfig
+
+.. autoclass:: trading.cli.trading.trade_config.BrokerType
    :undoc-members:
    :members:

@@ -2,8 +2,6 @@
 Getting Started
 ===============
 
-This is the content of my new page.
-
 .. _section-label:
 
 Installation
@@ -46,6 +44,7 @@ Not integrated yet.
 ^^^^^^^^^^^^
 Setup wizard
 ^^^^^^^^^^^^
+Use the setup wizard to configure api keys which the application will consume via a user cache object, stored at `~/.config/rr-trading/user_cache.json`
 
 .. typer:: trading.cli.rr_trading:app.setup
    :prog: rr_trading setup
