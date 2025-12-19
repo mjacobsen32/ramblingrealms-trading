@@ -95,6 +95,10 @@ class TradingClient(ABC):
 
     @property
     def account(self) -> TradeAccount:
+        if hasattr(self, "_account"):
+            return self._account
+        else:
+            self._account = self._load_account()
         return self._account
 
     @property
