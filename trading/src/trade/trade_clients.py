@@ -189,10 +189,12 @@ class LocalTradingClient(TradingClient):
     def _write_pf_stats(self, stats: list[PortfolioStats]) -> None:
         self.account_value_series_path.parent.mkdir(parents=True, exist_ok=True)
         if self.account_value_series_path.suffix == ".parquet":
-            stats_dicts = [stat.model_dump() for stat in stats]
+            df = pd.DataFrame(stats, columns=PortfolioStats.COLS)
+            table = pa.Table.from_pandas(df, schema=portfolio_schema)
             pq.write_table(
-                table=pa.Table.from_pylist(stats_dicts, schema=portfolio_schema),
+                table=table,
                 where=self.account_value_series_path,
+                compression="snappy",
             )
         elif self.account_value_series_path.suffix == ".csv":
             df = pd.DataFrame(stats, columns=PortfolioStats.COLS)
@@ -209,8 +211,14 @@ class LocalTradingClient(TradingClient):
         self.closed_positions_path.parent.mkdir(parents=True, exist_ok=True)
         if self.closed_positions_path.suffix == ".parquet":
             df = pd.DataFrame(closed_positions, columns=Position.COLS)
-            table = pa.Table.from_pandas(df)
-            pq.write_table(table, where=self.closed_positions_path)
+            table = pa.Table.from_pandas(
+                df, schema=positions_schema, preserve_index=False
+            )
+            pq.write_table(
+                table=table,
+                where=self.closed_positions_path,
+                compression="snappy",
+            )
         elif self.closed_positions_path.suffix == ".csv":
             df = pd.DataFrame(closed_positions, columns=Position.COLS)
             df.to_csv(self.closed_positions_path, index=False)
@@ -443,8 +451,12 @@ class RemoteTradingClient(TradingClient):
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
         sink = io.BytesIO()
         df = pd.DataFrame(closed_positions, columns=Position.COLS)
-        table = pa.Table.from_pandas(df)
-        pq.write_table(table, sink)
+        table = pa.Table.from_pandas(df, schema=positions_schema, preserve_index=False)
+        pq.write_table(
+            table=table,
+            where=sink,
+            compression="snappy",
+        )
         self._client.put_object(
             Bucket=self.config.bucket_name,
             Key=self.closed_positions_key,

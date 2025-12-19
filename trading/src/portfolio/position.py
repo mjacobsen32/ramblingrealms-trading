@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from collections import deque
@@ -8,6 +9,7 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 from alpaca.trading.models import Position as AlpacaPosition
+from fastparquet.converted_types import nullable
 from pydantic import BaseModel
 
 if TYPE_CHECKING:
@@ -15,13 +17,13 @@ if TYPE_CHECKING:
 
 portfolio_schema = pa.schema(
     [
-        ("net_value", pa.float64()),
-        ("cash", pa.float64()),
-        ("pnl", pa.float64()),
-        ("pnl_pct", pa.float64()),
-        ("date", pa.string()),
-        ("rolling_pnl", pa.float64()),
-        ("rolling_pnl_pct", pa.float64()),
+        pa.field("net_value", pa.float64(), nullable=False),
+        pa.field("cash", pa.float64(), nullable=False),
+        pa.field("pnl", pa.float64(), nullable=False),
+        pa.field("pnl_pct", pa.float64(), nullable=False),
+        pa.field("date", pa.timestamp("ns", tz="UTC"), nullable=False),
+        pa.field("rolling_pnl", pa.float64(), nullable=False),
+        pa.field("rolling_pnl_pct", pa.float64(), nullable=False),
     ]
 )
 
@@ -42,7 +44,20 @@ class PortfolioStats(BaseModel):
     pnl_pct: float = 0.0
     rolling_pnl: float = 0.0
     rolling_pnl_pct: float = 0.0
-    date: str = ""
+    date: datetime.datetime = datetime.datetime.utcnow()
+
+    def __iter__(self):
+        return iter(
+            [
+                self.net_value,
+                self.cash,
+                self.pnl,
+                self.pnl_pct,
+                self.date,
+                self.rolling_pnl,
+                self.rolling_pnl_pct,
+            ]
+        )
 
     def to_row(self) -> list:
         return [
@@ -94,14 +109,14 @@ def PositionDecoder(dct):
 
 positions_schema = pa.schema(
     [
-        ("symbol", pa.string()),
-        ("lot_size", pa.float64()),
-        ("enter_price", pa.float64()),
-        ("enter_date", pa.timestamp("ns")),
-        ("exit_date", pa.timestamp("ns")),
-        ("exit_price", pa.float64()),
-        ("exit_size", pa.float64()),
-        ("position_type", pa.string()),
+        pa.field("symbol", pa.string(), nullable=False),
+        pa.field("lot_size", pa.float64(), nullable=False),
+        pa.field("enter_date", pa.timestamp("ns", tz="UTC"), nullable=False),
+        pa.field("enter_price", pa.float64(), nullable=False),
+        pa.field("exit_date", pa.timestamp("ns", tz="UTC"), nullable=False),
+        pa.field("exit_price", pa.float64(), nullable=False),
+        pa.field("exit_size", pa.float64(), nullable=False),
+        pa.field("position_type", pa.string(), nullable=False),
     ]
 )
 
@@ -246,8 +261,8 @@ class Position(np.ndarray):
             [
                 self.symbol,
                 self.lot_size,
-                self.enter_price,
                 self.enter_date,
+                self.enter_price,
                 self.exit_date,
                 self.exit_price,
                 self.exit_size,
@@ -567,17 +582,18 @@ class LivePositionManager(PositionManager):
 
     def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:
         df, profit = super().step(df)
+        # I think the pnl_pct should be from the previous net_worth
         stats = PortfolioStats(
             net_value=self.net_value(),
             cash=self.available_cash(),
             pnl=df["profit"].sum(),
-            date=str(df["timestamp"].max()),
+            date=df["timestamp"].max(),
             pnl_pct=(
                 df["profit"].sum() / self.net_value() if self.net_value() != 0 else 0
             ),
-            rolling_pnl=self.available_cash() - self._initial_cash,
+            rolling_pnl=self.net_value() - self._initial_cash,
             rolling_pnl_pct=(
-                self.available_cash() / self._initial_cash - 1
+                self.net_value() / self._initial_cash - 1
                 if self._initial_cash != 0
                 else 0
             ),

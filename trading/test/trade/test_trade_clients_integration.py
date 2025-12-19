@@ -1,3 +1,4 @@
+import datetime
 import os
 from collections import deque
 from pathlib import Path
@@ -10,7 +11,12 @@ from alpaca.trading.enums import AccountStatus
 from alpaca.trading.models import TradeAccount
 from moto import mock_aws
 
-from trading.src.portfolio.position import PortfolioStats, Position, PositionManager
+from trading.src.portfolio.position import (
+    PortfolioStats,
+    Position,
+    PositionManager,
+    PositionType,
+)
 from trading.src.trade.trade_clients import TradingClient
 from trading.src.user_cache.user_cache import UserCache
 from trading.test.alg.test_fixtures import *
@@ -59,10 +65,12 @@ def closed_positions() -> list[Position]:
         Position(
             symbol="MSFT",
             lot_size=0,
-            enter_price=200,
             enter_date=pd.Timestamp("2023-12-01"),
-            exit_price=220,
+            enter_price=200,
             exit_date=pd.Timestamp("2024-03-01"),
+            exit_price=220,
+            exit_size=5,
+            position_type=PositionType.LONG,
         )
     ]
 
@@ -71,7 +79,7 @@ def closed_positions() -> list[Position]:
 def pf_history() -> list[PortfolioStats]:
     return [
         PortfolioStats(
-            date=str(pd.Timestamp(ts_input="2024-01-01")),
+            date=pd.Timestamp(ts_input="2024-01-01"),
             net_value=100000.0,
             cash=90000.0,
             pnl_pct=1.1,
@@ -250,6 +258,19 @@ def test_remote_client_uses_s3_store(
     closed_positions_loaded = client._load_closed_positions()
     assert len(closed_positions_loaded) == 1
     assert closed_positions_loaded[0].symbol == "MSFT"
+    assert closed_positions_loaded[0].exit_price == 220.0
+    assert closed_positions_loaded[0].exit_date == pd.Timestamp(
+        datetime.datetime(
+            year=2024, month=3, day=1, hour=0, minute=0, tzinfo=datetime.timezone.utc
+        )
+    )
+    assert closed_positions_loaded[0].lot_size == 0
+    assert closed_positions_loaded[0].enter_price == 200.0
+    assert closed_positions_loaded[0].enter_date == pd.Timestamp(
+        datetime.datetime(
+            year=2023, month=12, day=1, hour=0, minute=0, tzinfo=datetime.timezone.utc
+        )
+    )
 
     pf_history_loaded = client._load_pf_stats()
     assert len(pf_history_loaded) == 1
