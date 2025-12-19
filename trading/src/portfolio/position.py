@@ -599,5 +599,5 @@ class LivePositionManager(PositionManager):
             ),
         )
         self.pf_history.append(stats)
-        df, profit = self.trading_client.execute_trades(actions=df)
+        df, profit, order = self.trading_client.execute_trades(actions=df)
         return df, profit

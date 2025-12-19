@@ -45,7 +45,7 @@ class AlpacaTradingClientMock:
     def submit_order(self, order_data: OrderRequest) -> Order:
         return Order(
             id=UUID("{12345678-1234-5678-1234-567812345678}"),
-            client_order_id="{12345678-1234-5678-1234-567812345678}",
+            client_order_id="12345678-1234-5678-1234-567812345678",
             created_at=datetime.datetime.fromisoformat("2023-01-01T10:00:00+00:00"),
             extended_hours=False,
             symbol=order_data.symbol,

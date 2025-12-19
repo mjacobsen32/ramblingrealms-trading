@@ -149,8 +149,10 @@ class TradingClient(ABC):
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
         pass
 
-    def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
-        return actions, actions["profit"].sum()  # Optional to implement
+    def execute_trades(
+        self, actions: pd.DataFrame
+    ) -> tuple[pd.DataFrame, float, MarketOrderRequest | None]:
+        return actions, actions["profit"].sum(), None  # Optional to implement
 
 
 class LocalTradingClient(TradingClient):
@@ -538,7 +540,7 @@ class AlpacaClient(TradingClient):
     def execute_trades(
         self,
         actions: pd.DataFrame,
-    ) -> tuple[pd.DataFrame, float]:
+    ) -> tuple[pd.DataFrame, float, MarketOrderRequest | None]:
         logging.info(
             "Executing %d trades via Alpaca client", len(actions[actions["size"] != 0])
         )
@@ -561,7 +563,7 @@ class AlpacaClient(TradingClient):
                 type="market",
                 time_in_force="day",
             )
-            self.alpaca_account_client.submit_order(order)
+            order_response = self.alpaca_account_client.submit_order(order)
             logging.info("Submitting order: %s", order)
 
-        return actions, actions["profit"].sum()
+        return actions, actions["profit"].sum(), order_response

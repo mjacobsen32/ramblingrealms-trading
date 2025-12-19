@@ -300,6 +300,8 @@ def test_alpaca_client_positions_and_orders(
     assert len(positions) == 2
     assert float(client.account.cash) == 10000.0
 
-    actions, profit = client.execute_trades(
+    actions, profit, order = client.execute_trades(
         actions=pd.DataFrame(data={"profit": [0], "size": [100]}, index=["GOOGL"])
     )
+
+    assert order.client_order_id == "12345678-1234-5678-1234-567812345678"
