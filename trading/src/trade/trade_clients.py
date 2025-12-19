@@ -73,6 +73,7 @@ class TradingClient(ABC):
         self.config: RRTradeConfig = config
         self.alpaca_account_client = alpaca_account_client
         self.defer_trade_execution = config.defer_trade_execution
+        self._account = self.account
 
     def close(
         self,
@@ -97,8 +98,8 @@ class TradingClient(ABC):
         if hasattr(self, "_account"):
             return self._account
         else:
-            self._account: TradeAccount = self._load_account()
-            return self._account
+            self._account = self._load_account()
+        return self._account
 
     @property
     def positions(self) -> dict[str, deque[Position]]:
@@ -148,8 +149,10 @@ class TradingClient(ABC):
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
         pass
 
-    def execute_trades(self, actions: pd.DataFrame) -> tuple[pd.DataFrame, float]:
-        return actions, actions["profit"].sum()  # Optional to implement
+    def execute_trades(
+        self, actions: pd.DataFrame
+    ) -> tuple[pd.DataFrame, float, MarketOrderRequest | None]:
+        return actions, actions["profit"].sum(), None  # Optional to implement
 
 
 class LocalTradingClient(TradingClient):
@@ -189,10 +192,12 @@ class LocalTradingClient(TradingClient):
     def _write_pf_stats(self, stats: list[PortfolioStats]) -> None:
         self.account_value_series_path.parent.mkdir(parents=True, exist_ok=True)
         if self.account_value_series_path.suffix == ".parquet":
-            stats_dicts = [stat.model_dump() for stat in stats]
+            df = pd.DataFrame(stats, columns=PortfolioStats.COLS)
+            table = pa.Table.from_pandas(df, schema=portfolio_schema)
             pq.write_table(
-                table=pa.Table.from_pylist(stats_dicts, schema=portfolio_schema),
+                table=table,
                 where=self.account_value_series_path,
+                compression="snappy",
             )
         elif self.account_value_series_path.suffix == ".csv":
             df = pd.DataFrame(stats, columns=PortfolioStats.COLS)
@@ -209,8 +214,14 @@ class LocalTradingClient(TradingClient):
         self.closed_positions_path.parent.mkdir(parents=True, exist_ok=True)
         if self.closed_positions_path.suffix == ".parquet":
             df = pd.DataFrame(closed_positions, columns=Position.COLS)
-            table = pa.Table.from_pandas(df)
-            pq.write_table(table, where=self.closed_positions_path)
+            table = pa.Table.from_pandas(
+                df, schema=positions_schema, preserve_index=False
+            )
+            pq.write_table(
+                table=table,
+                where=self.closed_positions_path,
+                compression="snappy",
+            )
         elif self.closed_positions_path.suffix == ".csv":
             df = pd.DataFrame(closed_positions, columns=Position.COLS)
             df.to_csv(self.closed_positions_path, index=False)
@@ -443,8 +454,12 @@ class RemoteTradingClient(TradingClient):
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
         sink = io.BytesIO()
         df = pd.DataFrame(closed_positions, columns=Position.COLS)
-        table = pa.Table.from_pandas(df)
-        pq.write_table(table, sink)
+        table = pa.Table.from_pandas(df, schema=positions_schema, preserve_index=False)
+        pq.write_table(
+            table=table,
+            where=sink,
+            compression="snappy",
+        )
         self._client.put_object(
             Bucket=self.config.bucket_name,
             Key=self.closed_positions_key,
@@ -525,7 +540,7 @@ class AlpacaClient(TradingClient):
     def execute_trades(
         self,
         actions: pd.DataFrame,
-    ) -> tuple[pd.DataFrame, float]:
+    ) -> tuple[pd.DataFrame, float, MarketOrderRequest | None]:
         logging.info(
             "Executing %d trades via Alpaca client", len(actions[actions["size"] != 0])
         )
@@ -548,7 +563,7 @@ class AlpacaClient(TradingClient):
                 type="market",
                 time_in_force="day",
             )
-            self.alpaca_account_client.submit_order(order)
+            order_response = self.alpaca_account_client.submit_order(order)
             logging.info("Submitting order: %s", order)
 
-        return actions, actions["profit"].sum()
+        return actions, actions["profit"].sum(), order_response
