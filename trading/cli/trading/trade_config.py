@@ -1,7 +1,9 @@
+import logging
+import uuid
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from trading.cli.alg.config import PortfolioConfig, ProjectPath
 
@@ -28,8 +30,8 @@ class RRTradeConfig(BaseModel):
         - require trade approval
     """
 
-    id: UUID = Field(
-        default=UUID("00000000-0000-0000-0000-000000000001"),
+    id: UUID | None = Field(
+        default_factory=uuid.uuid4,
         description="User ID for the trading account.",
     )
     account_number: str = Field(
@@ -77,3 +79,19 @@ class RRTradeConfig(BaseModel):
         default=False,
         description="If True, trade executions will be deferred until program termination, utilizing batched writes.",
     )
+
+    @model_validator(mode="before")
+    def ensure_id(cls, values):
+        id_value = values.get("id")
+        if id_value is None and ProjectPath.ACTIVE_UUID is None:
+            new_id = uuid.uuid4()
+            ProjectPath.ACTIVE_UUID = new_id
+            logging.warning(
+                "No ACCOUNT UUID provided, generating a new one: %s\n"
+                "If you want to connect to a specific remote account please provide a uuid via command line or in the config",
+                new_id,
+            )
+            values["id"] = new_id
+        if id_value is None:
+            values["id"] = ProjectPath.ACTIVE_UUID
+        return values

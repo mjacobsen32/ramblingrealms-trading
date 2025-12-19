@@ -131,5 +131,10 @@ def test_trade_execution() -> None:
         market_data_client=market_data_client,
         alpaca_account_client=alpaca_account_client,
         live=False,
+        predict_time=datetime.datetime.fromisoformat("2025-01-01"),
+        end_predict_time=datetime.datetime.fromisoformat("2025-01-01"),
     )
-    trade_client.run_model(predict_time=(datetime.datetime.fromisoformat("2025-01-01")))
+    trade_client.run_model(
+        predict_time=(datetime.datetime.fromisoformat("2025-01-01")),
+        end_predict_time=datetime.datetime.fromisoformat("2025-01-01"),
+    )

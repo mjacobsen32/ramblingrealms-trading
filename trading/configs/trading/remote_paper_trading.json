@@ -1,10 +1,10 @@
 {
     "model_path": "{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/ppo_fast_training.zip",
     "out_dir": "{PROJECT_ROOT}/out/trading",
-    "positions_path":"paper_trading/positions/50_tick_learned_NVDA.json",
-    "account_path":"paper_trading/accounts/50_tick_learned_NVDA.json",
-    "closed_positions_path":"paper_trading/closed_positions/50_tick_learned_NVDA/{TIMESTAMP}.parquet",
-    "account_value_series_path":"paper_trading/account_value_series/50_tick_learned_NVDA/{TIMESTAMP}.parquet",
+    "positions_path":"paper_trading/positions/{UUID}.json",
+    "account_path":"paper_trading/accounts/{UUID}.json",
+    "closed_positions_path":"paper_trading/closed_positions/{UUID}/{TIMESTAMP}.parquet",
+    "account_value_series_path":"paper_trading/account_value_series/{UUID}/{TIMESTAMP}.parquet",
     "broker": "REMOTE",
     "bucket_name": "rr-storage",
     "broker_kwargs":{

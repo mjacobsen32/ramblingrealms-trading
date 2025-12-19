@@ -162,13 +162,30 @@ class BaseTradingEnv(gym.Env, ABC):
             self.feature_cols,
         )
 
-    def _reset_internal_states(self):
+    def _reset_internal_states(self, timestamp: pd.Timestamp | None = None):
         """Reset internal state counters."""
-        self.observation_index = self.cfg.lookback_window
         self.terminal = False
         # Ensure observation_timestamp is always set
         if self.observation_timestamp is None or len(self.observation_timestamp) == 0:
             self.observation_timestamp = self.data.index.get_level_values(
                 "timestamp"
             ).unique()
+        if timestamp is not None:
+            obs_ts = self.observation_timestamp
+            if obs_ts is None:
+                raise ValueError("observation_timestamp not initialized")
+            obs_tz = getattr(obs_ts, "tz", None)
+            if timestamp.tzinfo is None and obs_tz is not None:
+                timestamp = timestamp.tz_localize(obs_tz)
+            elif timestamp.tzinfo is not None and obs_tz is None:
+                timestamp = timestamp.tz_convert(None)
+            # pick the last timestamp <= requested timestamp
+            ts_idx = obs_ts.searchsorted(timestamp, side="right") - 1
+            if ts_idx < 0:
+                raise ValueError(
+                    f"Timestamp {timestamp} precedes available data starting at {obs_ts.min()}"
+                )
+            self.observation_index = ts_idx
+        else:
+            self.observation_index = self.cfg.lookback_window
         logging.debug("Environment reset:\n%s", self.render())

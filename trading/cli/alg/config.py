@@ -1,4 +1,5 @@
 import logging
+import uuid
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -22,6 +23,7 @@ class ProjectPath(BaseModel):
     OUT_DIR: ClassVar[Path | None] = None
     BACKTEST_DIR: ClassVar[Path | None] = None
     VERSION: ClassVar[str] = str()
+    ACTIVE_UUID: ClassVar[uuid.UUID | None] = None
     path: str = Field(str(), description="Path to the project root")
 
     @classmethod
@@ -58,6 +60,12 @@ class ProjectPath(BaseModel):
             value = value.replace(
                 "{TIMESTAMP}", str(datetime.now().strftime("%Y%m%d_%H%M%S"))
             )
+        if "{UUID}" in value:
+            if cls.ACTIVE_UUID is None:
+                raise ValueError(
+                    "ACTIVE_UUID is not set, cannot replace {UUID} in path."
+                )
+            value = value.replace("{UUID}", str(cls.ACTIVE_UUID))
         return {"path": value}
 
     def __str__(self) -> str:

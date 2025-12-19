@@ -4,6 +4,7 @@ from pyexpat import features
 from typing import Any
 
 import numpy as np
+import pandas as pd
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrameUnit
 
@@ -29,8 +30,8 @@ class Trade:
         market_data_client: Any,
         alpaca_account_client: Any,
         live: bool,
-        predict_time: datetime.datetime | None = None,
-        end_predict_time: datetime.datetime | None = None,
+        predict_time: datetime.datetime,
+        end_predict_time: datetime.datetime,
     ):
         self.config = config
         self.model, self.meta_data = Agent.load_agent(config.model_path.as_path(), None)
@@ -91,40 +92,33 @@ class Trade:
 
     def _load_data(
         self,
-        predict_time: datetime.datetime | None = None,
-        end_predict_time: datetime.datetime | None = None,
+        predict_time: datetime.datetime,
+        end_predict_time: datetime.datetime,
     ) -> DataLoader:
         calendar = self.trading_client.alpaca_account_client.get_calendar()
-        if predict_time is not None and end_predict_time is not None:
-            range_of_days = end_predict_time.date() - predict_time.date()
-        else:
-            range_of_days = datetime.timedelta(days=1)
-        min_window = (
-            max(min_window_size(self.active_features), self.env_config.lookback_window)
+        range_of_days = end_predict_time.date() - predict_time.date()
+
+        effective_lookback = (
+            self.env_config.lookback_window
+            + min_window_size(self.active_features)
             + range_of_days.days
             + 1
         )
-        logging.info("Determined min window size from features: %d", min_window)
-        # TODO this does not allow for live trading in intraday sessions
-        if predict_time is None:
-            prediction_time = datetime.datetime.now().date()
-        else:
-            prediction_time = predict_time.date()
-            if end_predict_time is not None:
-                end_prediction_time = end_predict_time.date()
 
-        window = [
-            entry
-            for entry in calendar
-            if entry.date
-            < (prediction_time if end_predict_time is None else end_prediction_time)
-        ][-(min_window):]
-        start, end = window[0], window[-1]
-        logging.info("Loading data for model trade: [%s, %s]", start.date, end.date)
+        window = [entry for entry in calendar if entry.date <= end_predict_time.date()][
+            -(effective_lookback):
+        ]
+
+        data_start, data_end = window[0], window[-1]
+        logging.info(
+            "Loading data window to satisfy lookback+horizon: [%s, %s]",
+            data_start.date,
+            data_end.date,
+        )
 
         data_config = self.data_config
-        data_config.start_date = str(start.date)
-        data_config.end_date = str(end.date)
+        data_config.start_date = str(data_start.date)
+        data_config.end_date = str(data_end.date)
         data_config.cache_enabled = (
             False if self.live else data_config.cache_enabled
         )  # no caching for trading live
@@ -143,9 +137,13 @@ class Trade:
         prices = [trade.price for trade in latest.values()]
         return np.array(prices)
 
-    def run_model(self, predict_time: datetime.datetime | None = None) -> None:
+    def run_model(
+        self,
+        predict_time: datetime.datetime,
+        end_predict_time: datetime.datetime | None,
+    ) -> None:
 
-        obs, _ = self.env.reset()
+        obs, _ = self.env.reset(timestamp=pd.Timestamp(predict_time))
         terminated, truncated = False, False
 
         while not terminated and not truncated:

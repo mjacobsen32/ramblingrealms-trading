@@ -85,19 +85,25 @@ class StatefulTradingEnv(BaseTradingEnv):
             df, np.asarray(self.pf.state()), self.feature_cols, prices
         )
 
-    def _reset_internal_states(self):
+    def _reset_internal_states(self, timestamp: pd.Timestamp | None = None):
         """Reset internal states including portfolio."""
-        super()._reset_internal_states()
+        super()._reset_internal_states(timestamp=timestamp)
         # Initialize action tracking in data
         self.data["size"] = 0.0
         self.data["profit"] = 0.0
         self.data["action"] = 0.0
         self.pf.reset()
 
-    def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+    def reset(
+        self,
+        *,
+        timestamp: pd.Timestamp | None = None,
+        seed: Optional[int] = None,
+        options: Optional[dict] = None,
+    ):
         """Reset the environment to its initial state."""
         super().reset(seed=seed, options=options)
-        self._reset_internal_states()
+        self._reset_internal_states(timestamp=timestamp)
         return self._get_observation(), {}
 
     def render(self):
@@ -170,8 +176,7 @@ class StatefulTradingEnv(BaseTradingEnv):
 
         # Move to next step
         self.observation_index += 1
-        self.terminal = self.observation_index >= self.max_steps - 1
-
+        self.terminal = self.observation_index >= self.max_steps
         return (
             self._get_observation() if not self.terminal else None,
             reward,
