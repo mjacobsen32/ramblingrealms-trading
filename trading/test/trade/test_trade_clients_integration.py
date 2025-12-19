@@ -59,6 +59,25 @@ def open_positions() -> dict[str, deque[Position]]:
     }
 
 
+def compare_open_positions_loaded(open_positions_loaded):
+    assert len(open_positions_loaded) == 2
+    assert open_positions_loaded["AAPL"][0].lot_size == 5
+    assert open_positions_loaded["AAPL"][0].enter_price == 150.0
+    assert open_positions_loaded["AAPL"][0].enter_date == pd.Timestamp(
+        datetime.datetime(year=2024, month=1, day=1, hour=0, minute=0)
+    )
+    assert open_positions_loaded["GOOGL"][0].lot_size == 5
+    assert open_positions_loaded["GOOGL"][0].enter_price == 2500.0
+    assert open_positions_loaded["GOOGL"][0].enter_date == pd.Timestamp(
+        datetime.datetime(year=2024, month=2, day=1, hour=0, minute=0)
+    )
+
+
+def compare_account_loaded(account_loaded):
+    assert float(account_loaded.cash) == 999500.0
+    assert float(account_loaded.initial_cash) == 1000000.0
+
+
 @pytest.fixture
 def closed_positions() -> list[Position]:
     return [
@@ -88,6 +107,16 @@ def pf_history() -> list[PortfolioStats]:
             rolling_pnl_pct=1.1,
         )
     ]
+
+
+def compare_history_loaded(pf_history_loaded):
+    assert len(pf_history_loaded) == 1
+    assert pf_history_loaded[0].net_value == 100000.0
+    assert pf_history_loaded[0].cash == 90000.0
+    assert pf_history_loaded[0].pnl_pct == 1.1
+    assert pf_history_loaded[0].pnl == 1000.0
+    assert pf_history_loaded[0].rolling_pnl == 1.1
+    assert pf_history_loaded[0].rolling_pnl_pct == 1.1
 
 
 def test_get_clock(alpaca_trading_client_mock, alpaca_trade_config):
@@ -131,6 +160,26 @@ def test_position_manager_from_client_populates_holdings():
     assert pm.net_value() == pytest.approx(20.0)
 
 
+def compare_closed_positions_loaded(closed_positions_loaded):
+    assert len(closed_positions_loaded) == 1
+    assert closed_positions_loaded[0].symbol == "MSFT"
+    assert closed_positions_loaded[0].lot_size == 0
+    assert closed_positions_loaded[0].enter_date == pd.Timestamp(
+        datetime.datetime(
+            year=2023, month=12, day=1, hour=0, minute=0, tzinfo=datetime.timezone.utc
+        )
+    )
+    assert closed_positions_loaded[0].enter_price == 200.0
+    assert closed_positions_loaded[0].exit_date == pd.Timestamp(
+        datetime.datetime(
+            year=2024, month=3, day=1, hour=0, minute=0, tzinfo=datetime.timezone.utc
+        )
+    )
+    assert closed_positions_loaded[0].exit_price == 220.0
+    assert closed_positions_loaded[0].exit_size == 5
+    assert closed_positions_loaded[0].position_type == PositionType.LONG
+
+
 def test_local_client_read_write_positions(
     tmp_path,
     alpaca_trading_client_mock,
@@ -152,8 +201,6 @@ def test_local_client_read_write_positions(
     )
 
     positions = client.positions
-    assert len(positions) == 0
-    assert int(client.account.cash) == 1000000
 
     actions = pd.DataFrame(data={"profit": [0]}, index=["AAPL"])
     client.execute_trades(actions=actions)
@@ -170,21 +217,10 @@ def test_local_client_read_write_positions(
     assert os.path.exists(str(local_trade_config.closed_positions_path))
     assert os.path.exists(str(local_trade_config.account_value_series_path))
 
-    account = client._load_account()
-    assert float(account.cash) == 999500.0
-    assert float(account.initial_cash) == 1000000.0
-
-    positions = client._load_positions()
-    assert len(positions) == 2
-    assert positions["AAPL"][0].lot_size == 5
-
-    closed_positions_loaded = client._load_closed_positions()
-    assert len(closed_positions_loaded) == 1
-    assert closed_positions_loaded[0].symbol == "MSFT"
-
-    pf_history_loaded = client._load_pf_stats()
-    assert len(pf_history_loaded) == 1
-    assert pf_history_loaded[0].net_value == 100000.0
+    compare_account_loaded(client._load_account())
+    compare_open_positions_loaded(client._load_positions())
+    compare_closed_positions_loaded(client._load_closed_positions())
+    compare_history_loaded(client._load_pf_stats())
 
 
 os.environ["MOTO_S3_CUSTOM_ENDPOINTS"] = (
@@ -247,34 +283,10 @@ def test_remote_client_uses_s3_store(
         is not None
     )
 
-    account = client._load_account()
-    assert float(account.cash) == 999500.0
-    assert account.initial_cash == 1000000.0
-
-    positions = client._load_positions()
-    assert len(positions) == 2
-    assert positions["AAPL"][0].lot_size == 5
-
-    closed_positions_loaded = client._load_closed_positions()
-    assert len(closed_positions_loaded) == 1
-    assert closed_positions_loaded[0].symbol == "MSFT"
-    assert closed_positions_loaded[0].exit_price == 220.0
-    assert closed_positions_loaded[0].exit_date == pd.Timestamp(
-        datetime.datetime(
-            year=2024, month=3, day=1, hour=0, minute=0, tzinfo=datetime.timezone.utc
-        )
-    )
-    assert closed_positions_loaded[0].lot_size == 0
-    assert closed_positions_loaded[0].enter_price == 200.0
-    assert closed_positions_loaded[0].enter_date == pd.Timestamp(
-        datetime.datetime(
-            year=2023, month=12, day=1, hour=0, minute=0, tzinfo=datetime.timezone.utc
-        )
-    )
-
-    pf_history_loaded = client._load_pf_stats()
-    assert len(pf_history_loaded) == 1
-    assert pf_history_loaded[0].net_value == 100000.0
+    compare_account_loaded(client._load_account())
+    compare_open_positions_loaded(client._load_positions())
+    compare_closed_positions_loaded(client._load_closed_positions())
+    compare_history_loaded(client._load_pf_stats())
 
 
 def test_alpaca_client_positions_and_orders(

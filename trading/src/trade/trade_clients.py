@@ -73,6 +73,7 @@ class TradingClient(ABC):
         self.config: RRTradeConfig = config
         self.alpaca_account_client = alpaca_account_client
         self.defer_trade_execution = config.defer_trade_execution
+        self._account = self.account
 
     def close(
         self,
@@ -94,11 +95,7 @@ class TradingClient(ABC):
 
     @property
     def account(self) -> TradeAccount:
-        if hasattr(self, "_account"):
-            return self._account
-        else:
-            self._account: TradeAccount = self._load_account()
-            return self._account
+        return self._account
 
     @property
     def positions(self) -> dict[str, deque[Position]]:
