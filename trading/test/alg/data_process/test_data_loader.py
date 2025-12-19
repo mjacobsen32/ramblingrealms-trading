@@ -147,3 +147,116 @@ def test_unit_period_pull(data_config, feature_config):
     assert (
         len(data_loader.df) == 97
     ), "DataFrame should contain 97 rows for 5-minute intervals in one day (inclusive of end)"
+
+
+def test_cache_fetches_missing_ranges_and_updates(monkeypatch, tmp_path):
+    """
+    Verify partial-cache scenarios fetch only missing date ranges, merge, save, and return filtered data.
+    """
+
+    import types
+
+    from alpaca.data.timeframe import TimeFrameUnit
+
+    from trading.cli.alg.config import DataRequests, DataSourceType
+    from trading.src.alg.data_process import data_loader as dl
+    from trading.src.alg.data_process.data_loader import AlpacaDataLoader
+
+    def make_df(symbols, start, end):
+        dates = pd.date_range(start=start, end=end, freq="D")
+        idx = pd.MultiIndex.from_product(
+            [dates, symbols], names=["timestamp", "symbol"]
+        )
+        data = {
+            "open": range(1, len(idx) + 1),
+            "high": range(2, len(idx) + 2),
+            "low": range(0, len(idx)),
+            "close": range(1, len(idx) + 1),
+            "volume": [100] * len(idx),
+        }
+        return pd.DataFrame(data, index=idx)
+
+    class _Secret:
+        def __init__(self, val):
+            self.val = val
+
+        def get_secret_value(self):
+            return self.val
+
+    class _UserCache:
+        def load(self):
+            return types.SimpleNamespace(
+                alpaca_api_key=_Secret("key"), alpaca_api_secret=_Secret("secret")
+            )
+
+    requests_made = []
+
+    class _MockBars:
+        def __init__(self, df):
+            self.df = df
+
+    class _StockHistoricalDataClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def get_stock_bars(self, request_params):
+            start = pd.to_datetime(request_params.start)
+            end = pd.to_datetime(request_params.end)
+            symbols = request_params.symbol_or_symbols
+            requests_made.append((start, end, tuple(symbols)))
+            return _MockBars(make_df(symbols, start, end))
+
+    monkeypatch.setattr(dl.user_cache, "UserCache", _UserCache)
+    monkeypatch.setattr(dl, "StockHistoricalDataClient", _StockHistoricalDataClient)
+
+    cache_path = tmp_path
+    dataset_name = "CACHE_TEST"
+    cache_file = cache_path / f"{dataset_name}.parquet"
+
+    cache_df = make_df(["AAPL"], "2023-01-03", "2023-01-05")
+    cache_df.to_parquet(cache_file)
+
+    request = DataRequests(
+        dataset_name=dataset_name,
+        source=DataSourceType.ALPACA,
+        endpoint="StockBarRequest",
+        kwargs={"symbol_or_symbols": ["AAPL"], "adjustment": "split"},
+    )
+
+    loader = AlpacaDataLoader()
+    result = loader.get_data(
+        fetch_data=False,
+        request=request,
+        df=pd.DataFrame(),
+        cache_path=str(cache_path),
+        start_date="2023-01-01",
+        end_date="2023-01-06",
+        time_step_unit=TimeFrameUnit.Day,
+        cache_enabled=True,
+        time_step_period=1,
+    )
+
+    # ensure two segments were fetched: before cache start and after cache end
+    assert len(requests_made) == 2
+    assert requests_made[0][0] == pd.Timestamp("2023-01-01")
+    assert requests_made[0][1] == pd.Timestamp("2023-01-03")
+    assert requests_made[1][0] == pd.Timestamp("2023-01-05")
+    assert requests_made[1][1] == pd.Timestamp("2023-01-06")
+
+    # cache should be updated to cover full requested range
+    updated_cache = pd.read_parquet(cache_file)
+    assert updated_cache.index.get_level_values("timestamp").min() == pd.Timestamp(
+        "2023-01-01"
+    )
+    assert updated_cache.index.get_level_values("timestamp").max() == pd.Timestamp(
+        "2023-01-06"
+    )
+    assert len(updated_cache) == 6  # one symbol, 6 days inclusive
+
+    # returned data should match requested window and be sorted without duplicates
+    timestamps = result.index.get_level_values("timestamp")
+    assert timestamps.min() == pd.Timestamp("2023-01-01")
+    assert timestamps.max() == pd.Timestamp("2023-01-06")
+    assert timestamps.is_monotonic_increasing
+    assert result.index.is_unique
+    assert len(result) == 6
