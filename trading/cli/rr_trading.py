@@ -1,5 +1,6 @@
 import datetime
 import logging
+import uuid
 from pathlib import Path
 from typing import Annotated
 
@@ -11,7 +12,7 @@ from rich.prompt import Prompt
 
 from trading.cli.alg import alg
 from trading.cli.data import data
-from trading.cli.trading.trade_config import RRTradeConfig
+from trading.cli.trading.trade_config import ProjectPath, RRTradeConfig
 from trading.cli.utils import init_logger
 from trading.src.trade.trade_api import Trade
 from trading.src.user_cache.user_cache import UserCache as User
@@ -120,7 +121,7 @@ def paper_trade(
         str,
         typer.Option("--config", "-c", help="Path to the RRTrade configuration file."),
     ],
-    predict_time: Annotated[
+    predict_time_str: Annotated[
         str,
         typer.Option(
             "--timestamp",
@@ -128,12 +129,20 @@ def paper_trade(
             help="Timestamp for which to run the model (YYYY-MM-DD).",
         ),
     ] = "",
-    predict_time_end: Annotated[
+    predict_time_end_str: Annotated[
         str,
         typer.Option(
             "--timestamp_end",
             "-e",
             help="Timestamp for which to end if wanting a forward testing range: (YYYY-MM-DD).",
+        ),
+    ] = "",
+    account_uuid: Annotated[
+        str,
+        typer.Option(
+            "--uuid",
+            "-u",
+            help="UUID for the trading account.",
         ),
     ] = "",
 ):
@@ -142,6 +151,9 @@ def paper_trade(
     Explicit command for paper and live trading for total seperation
     """
     logging.info("Running model on Alpaca paper trading account...")
+    if account_uuid != "":
+        ProjectPath.ACTIVE_UUID = uuid.UUID(account_uuid)
+        logging.info(f"Using ACCOUNT UUID: {ProjectPath.ACTIVE_UUID}")
     with Path.open(Path(config)) as f:
         rr_trade_config = RRTradeConfig.model_validate_json(f.read())
         logging.info(f"Loaded configuration from {config}")
@@ -159,21 +171,25 @@ def paper_trade(
         alpaca_api_secret.get_secret_value(),
         paper=True,
     )
+    if predict_time_str == "":
+        predict_time = datetime.datetime.now()
+    else:
+        predict_time = datetime.datetime.fromisoformat(predict_time_str)
+
+    if predict_time_end_str == "":
+        predict_time_end = predict_time
+    else:
+        predict_time_end = datetime.datetime.fromisoformat(predict_time_end_str)
+
     trade_client = Trade(
         config=rr_trade_config,
         market_data_client=market_data_client,
         alpaca_account_client=alpaca_account_client,
         live=False,
-        predict_time=(
-            datetime.datetime.fromisoformat(predict_time) if predict_time else None
-        ),
-        end_predict_time=(
-            datetime.datetime.fromisoformat(predict_time_end)
-            if predict_time_end
-            else None
-        ),
+        predict_time=predict_time,
+        end_predict_time=predict_time_end,
     )
-    trade_client.run_model()
+    trade_client.run_model(predict_time=predict_time, end_predict_time=predict_time_end)
 
 
 @app.command(help="Run model on live trading Alpaca Account")
@@ -218,14 +234,19 @@ def live_trade(
         paper=True,
     )
 
+    predict_time = datetime.datetime.now()
+    predict_time_end = predict_time
+
     trade_client = Trade(
         config=rr_trade_config,
         market_data_client=market_data_client,
         alpaca_account_client=alpaca_account_client,
         live=True,
+        predict_time=predict_time,
+        end_predict_time=predict_time_end,
     )
 
-    trade_client.run_model()
+    trade_client.run_model(predict_time=predict_time, end_predict_time=predict_time_end)
 
 
 if __name__ == "__main__":
