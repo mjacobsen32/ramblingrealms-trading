@@ -22,6 +22,26 @@ class BrokerType(str, Enum):
     REMOTE = "REMOTE"
 
 
+class AssetExchange(str, Enum):
+    """
+    Represents the current exchanges Alpaca supports.
+    """
+
+    AMEX = "AMEX"
+    ARCA = "ARCA"
+    BATS = "BATS"
+    NYSE = "NYSE"
+    NASDAQ = "NASDAQ"
+    NYSEARCA = "NYSEARCA"
+    FTXU = "FTXU"
+    CBSE = "CBSE"
+    GNSS = "GNSS"
+    ERSX = "ERSX"
+    OTC = "OTC"
+    CRYPTO = "CRYPTO"
+    EMPTY = ""
+
+
 class RRTradeConfig(BaseModel):
     """
     Trading Configuration
@@ -78,6 +98,10 @@ class RRTradeConfig(BaseModel):
     defer_trade_execution: bool = Field(
         default=False,
         description="If True, trade executions will be deferred until program termination, utilizing batched writes.",
+    )
+    asset_exchanges: list[AssetExchange] = Field(
+        default=[AssetExchange.NYSE, AssetExchange.NASDAQ],
+        description="List of asset exchanges to filter tradable assets. If None, all exchanges are considered.",
     )
 
     @model_validator(mode="before")

@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrameUnit
+from alpaca.trading.requests import GetCalendarRequest
 
 from trading.cli.alg.config import DataConfig, DataRequests, FeatureConfig, StockEnv
 from trading.cli.trading.trade_config import RRTradeConfig
@@ -24,6 +25,17 @@ from trading.src.trade.trade_clients import TradingClient
 
 
 class Trade:
+
+    class LiveTradeError(Exception):
+        """Custom exception for live trading errors."""
+
+        OUT_OF_RANGE = "OUT_OF_RANGE"
+
+        def __init__(self, error_type: str, message: str):
+            self.error_type = error_type
+            self.message = message
+            super().__init__(f"[{error_type}] {message}")
+
     def __init__(
         self,
         config: RRTradeConfig,
@@ -137,17 +149,45 @@ class Trade:
         prices = [trade.price for trade in latest.values()]
         return np.array(prices)
 
+    def range_includes_open_markets(
+        self, start: datetime.datetime, end: datetime.datetime
+    ) -> bool:
+        request = GetCalendarRequest(start=start.date(), end=end.date())
+        calendar = self.trading_client.alpaca_account_client.get_calendar(request)
+        if len(calendar) == 0:
+            logging.debug("No market days in the given range [%s - %s]", start, end)
+            return False
+        return True
+
     def run_model(
         self,
         predict_time: datetime.datetime,
-        end_predict_time: datetime.datetime | None,
-    ) -> dict:
+        end_predict_time: datetime.datetime,
+    ) -> list[dict[str, Any]]:
+        predict_time = predict_time.replace(hour=5, minute=0, second=0, microsecond=0)
+        end_predict_time = end_predict_time.replace(
+            hour=5, minute=0, second=0, microsecond=0
+        )
+
+        if not self.range_includes_open_markets(predict_time, end_predict_time):
+            raise Trade.LiveTradeError(
+                Trade.LiveTradeError.OUT_OF_RANGE,
+                f"Predict time range [{predict_time} - {end_predict_time}] does not include any open market hours.",
+            )
 
         obs, _ = self.env.reset(timestamp=pd.Timestamp(predict_time))
         terminated, truncated = False, False
+        ret: list[dict[str, Any]] = []
 
-        while not terminated and not truncated:
+        while (
+            not terminated
+            and not truncated
+            and self.env.observation_timestamp is not None
+            and end_predict_time
+            >= self.env.observation_timestamp[self.env.observation_index]
+        ):
             action, _states = self.model.predict(obs)
             obs, reward, terminated, truncated, info = self.env.step(action)
+            ret.append(info)
 
-        return info
+        return ret

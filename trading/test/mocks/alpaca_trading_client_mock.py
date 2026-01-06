@@ -21,23 +21,33 @@ class AlpacaTradingClientMock:
         self,
         filters: Optional[GetCalendarRequest] = None,
     ) -> List[Calendar]:
-        """Return a list of `Calendar` objects from 2012-01-01 up to
-        (today - 100 days).
+        """Return a list of `Calendar` objects based on the provided filters.
 
-        This is a simple mock implementation that returns one Calendar per
-        calendar date. Each day's `open` is 09:30 UTC and `close` is 16:00 UTC.
-        If the end date is before the start date the function returns an
-        empty list.
+        This implementation excludes weekends and uses the filters to determine
+        the start and end dates. Each day's `open` is 09:30 UTC and `close` is 16:00 UTC.
+        If the end date is before the start date, the function returns an empty list.
         """
-        end = datetime.date(2012, 1, 1)
-        start = end - datetime.timedelta(days=100)
+        start = (
+            filters.start if filters and filters.start else datetime.date(2012, 1, 1)
+        )
+        end = (
+            filters.end
+            if filters and filters.end
+            else datetime.date.today() - datetime.timedelta(days=100)
+        )
+
+        if start > end:
+            return []
 
         calendars: List[Calendar] = []
         current = start
         while current <= end:
-            calendars.append(
-                Calendar(date=current.strftime("%Y-%m-%d"), open="09:30", close="16:00")
-            )
+            if current.weekday() < 5:  # Exclude weekends (Monday=0, Sunday=6)
+                calendars.append(
+                    Calendar(
+                        date=current.strftime("%Y-%m-%d"), open="09:30", close="16:00"
+                    )
+                )
             current += datetime.timedelta(days=1)
 
         return calendars

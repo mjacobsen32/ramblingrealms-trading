@@ -160,6 +160,7 @@ class StatefulTradingEnv(BaseTradingEnv):
         ) / self.pf.position_manager.initial_cash()
 
         ret_info = {
+            "timestamp": self.observation_timestamp[self.observation_index],
             "net_value": self.pf.position_manager.net_value(),
             "profit_change": d["profit"],
             "orders": d["orders"],

@@ -132,11 +132,41 @@ def test_trade_execution() -> None:
         market_data_client=market_data_client,
         alpaca_account_client=alpaca_account_client,
         live=False,
-        predict_time=datetime.datetime.fromisoformat("2025-01-01"),
-        end_predict_time=datetime.datetime.fromisoformat("2025-01-01"),
+        predict_time=datetime.datetime.fromisoformat("2024-12-31"),
+        end_predict_time=datetime.datetime.fromisoformat("2025-02-03"),
     )
 
-    trade_client.run_model(
-        predict_time=(datetime.datetime.fromisoformat("2025-01-01")),
-        end_predict_time=datetime.datetime.fromisoformat("2025-01-01"),
+    # First call should succeed without throwing
+    time_series = trade_client.run_model(
+        predict_time=datetime.datetime(
+            year=2024, month=12, day=31, tzinfo=datetime.timezone.utc
+        ),
+        end_predict_time=datetime.datetime(
+            year=2025, month=1, day=31, tzinfo=datetime.timezone.utc
+        ),
     )
+    assert time_series is not None
+
+    # Weekend request should raise OUT_OF_RANGE error
+    with pytest.raises(Trade.LiveTradeError) as exc_info:
+        trade_client.run_model(
+            predict_time=datetime.datetime(
+                year=2025, month=2, day=1, tzinfo=datetime.timezone.utc
+            ),
+            end_predict_time=datetime.datetime(
+                year=2025, month=2, day=1, tzinfo=datetime.timezone.utc
+            ),
+        )
+
+    assert exc_info.value.error_type == Trade.LiveTradeError.OUT_OF_RANGE
+
+    time_series = trade_client.run_model(
+        predict_time=datetime.datetime(
+            year=2025, month=2, day=3, tzinfo=datetime.timezone.utc
+        ),
+        end_predict_time=datetime.datetime(
+            year=2025, month=2, day=3, tzinfo=datetime.timezone.utc
+        ),
+    )
+
+    assert time_series is not None
