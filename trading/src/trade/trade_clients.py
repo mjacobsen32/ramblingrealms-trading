@@ -17,6 +17,7 @@ from alpaca.trading.models import Position as AlpacaPosition
 from alpaca.trading.models import TradeAccount as AlpacaTradeAccount
 from alpaca.trading.requests import MarketOrderRequest
 from pydantic import BaseModel
+from tests.test_records import orders
 
 from trading.cli.trading.trade_config import BrokerType, RRTradeConfig
 from trading.src.portfolio.position import (
@@ -152,7 +153,29 @@ class TradingClient(ABC):
     def execute_trades(
         self, actions: pd.DataFrame
     ) -> tuple[pd.DataFrame, float, list[MarketOrderRequest]]:
-        return actions, actions["profit"].sum(), []  # Optional to implement
+        orders: list[MarketOrderRequest] = []
+        for sym, row in actions.iterrows():
+            logging.info(
+                "sym: %s, size: %s, at price: %s, with signal: %s",
+                sym,
+                row.get("size"),
+                row.get("price"),
+                row.get("action"),
+            )
+            if row.get("size", 0) == 0:
+                continue
+            # ! for now we are placing market orders only, limit orders should be used when running live
+            # ! and stop loss can easily be added as well
+            order = MarketOrderRequest(
+                symbol=sym,
+                qty=abs(row.get("size", 0)),
+                side="buy" if row.get("size", 0) > 0 else "sell",
+                type="market",
+                time_in_force="day",
+            )
+            orders.append(order)
+
+        return actions, actions["profit"].sum(), orders  # Optional to implement
 
 
 class LocalTradingClient(TradingClient):
@@ -545,27 +568,10 @@ class AlpacaClient(TradingClient):
             "Executing %d trades via Alpaca client", len(actions[actions["size"] != 0])
         )
         order_responses: list[MarketOrderRequest] = []
-        for sym, row in actions.iterrows():
-            logging.info(
-                "sym: %s, size: %s, at price: %s, with signal: %s",
-                sym,
-                row.get("size"),
-                row.get("price"),
-                row.get("action"),
-            )
-            if row.get("size", 0) == 0:
-                continue
-            # ! for now we are placing market orders only, limit orders should be used when running live
-            # ! and stop loss can easily be added as well
-            order = MarketOrderRequest(
-                symbol=sym,
-                qty=abs(row.get("size", 0)),
-                side="buy" if row.get("size", 0) > 0 else "sell",
-                type="market",
-                time_in_force="day",
-            )
+        actions, total_profit, orders = super().execute_trades(actions)
+        for order in orders:
             order_response = self.alpaca_account_client.submit_order(order)
             order_responses.append(order_response)
             logging.info("Submitting order: %s", order)
 
-        return actions, actions["profit"].sum(), order_responses
+        return actions, total_profit, order_responses

@@ -189,7 +189,19 @@ def paper_trade(
         predict_time=predict_time,
         end_predict_time=predict_time_end,
     )
-    trade_client.run_model(predict_time=predict_time, end_predict_time=predict_time_end)
+
+    try:
+        trade_client.run_model(
+            predict_time=predict_time, end_predict_time=predict_time_end
+        )
+    except Trade.LiveTradeError as e:
+        if e.error_type == Trade.LiveTradeError.OUT_OF_RANGE:
+            logging.warning("Trade skipped: %s", e.message)
+        else:
+            raise
+    except Exception as e:
+        logging.error("Unexpected error during trade execution: %s", str(e))
+        raise
 
 
 @app.command(help="Run model on live trading Alpaca Account")
@@ -246,7 +258,18 @@ def live_trade(
         end_predict_time=predict_time_end,
     )
 
-    trade_client.run_model(predict_time=predict_time, end_predict_time=predict_time_end)
+    try:
+        trade_client.run_model(
+            predict_time=predict_time, end_predict_time=predict_time_end
+        )
+    except Trade.LiveTradeError as e:
+        if e.error_type == Trade.LiveTradeError.OUT_OF_RANGE:
+            logging.warning("Trade skipped: %s", e.message)
+        else:
+            raise
+    except Exception as e:
+        logging.error("Unexpected error during trade execution: %s", str(e))
+        raise
 
 
 if __name__ == "__main__":
