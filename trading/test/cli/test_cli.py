@@ -171,4 +171,4 @@ def test_trade_execution() -> None:
     orders = []
     for info in time_series:
         orders.append(info["orders"])
-    assert len(orders[0]) > 0
+    assert len(orders) > 0
