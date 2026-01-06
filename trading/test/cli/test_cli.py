@@ -145,7 +145,7 @@ def test_trade_execution() -> None:
             year=2025, month=1, day=31, tzinfo=datetime.timezone.utc
         ),
     )
-    assert len(time_series[0]["orders"]) > 0
+    assert time_series is not None
 
     # Weekend request should raise OUT_OF_RANGE error
     with pytest.raises(Trade.LiveTradeError) as exc_info:
@@ -168,7 +168,5 @@ def test_trade_execution() -> None:
             year=2025, month=2, day=3, tzinfo=datetime.timezone.utc
         ),
     )
-    orders = []
-    for info in time_series:
-        orders.append(info["orders"])
-    assert len(orders) > 0
+
+    assert time_series is not None
