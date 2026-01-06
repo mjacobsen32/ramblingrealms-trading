@@ -172,14 +172,18 @@ def paper_trade(
         paper=True,
     )
     if predict_time_str == "":
-        predict_time = datetime.datetime.now()
+        predict_time = datetime.datetime.now(tz=datetime.timezone.utc)
     else:
-        predict_time = datetime.datetime.fromisoformat(predict_time_str)
+        predict_time = datetime.datetime.fromisoformat(predict_time_str).replace(
+            tzinfo=datetime.timezone.utc
+        )
 
     if predict_time_end_str == "":
         predict_time_end = predict_time
     else:
-        predict_time_end = datetime.datetime.fromisoformat(predict_time_end_str)
+        predict_time_end = datetime.datetime.fromisoformat(
+            predict_time_end_str
+        ).replace(tzinfo=datetime.timezone.utc)
 
     trade_client = Trade(
         config=rr_trade_config,
