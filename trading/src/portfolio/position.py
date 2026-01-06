@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, ClassVar
 import numpy as np
 import pandas as pd
 import pyarrow as pa
+from alpaca.broker.requests import MarketOrderRequest
 from alpaca.trading.models import Position as AlpacaPosition
 from fastparquet.converted_types import nullable
 from pydantic import BaseModel
@@ -473,7 +474,9 @@ class PositionManager:
 
         return df
 
-    def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+    def step(
+        self, df: pd.DataFrame
+    ) -> tuple[pd.DataFrame, float, list[MarketOrderRequest]]:
         """
         Step through the position manager.
         Return a set indicating if a position was exited and the profit from that position.
@@ -512,7 +515,7 @@ class PositionManager:
 
         self.df["price"] = df["price"]
 
-        return df, df.loc[sell_symbols, "profit"].sum()
+        return df, df.loc[sell_symbols, "profit"].sum(), []
 
     def available_cash(self) -> float:
         """
@@ -580,8 +583,10 @@ class LivePositionManager(PositionManager):
     def reset(self):
         pass  # Override to do nothing; live positions are managed externally
 
-    def step(self, df: pd.DataFrame) -> tuple[pd.DataFrame, float]:
-        df, profit = super().step(df)
+    def step(
+        self, df: pd.DataFrame
+    ) -> tuple[pd.DataFrame, float, list[MarketOrderRequest]]:
+        df, profit, _ = super().step(df)
         # I think the pnl_pct should be from the previous net_worth
         stats = PortfolioStats(
             net_value=self.net_value(),
@@ -599,5 +604,5 @@ class LivePositionManager(PositionManager):
             ),
         )
         self.pf_history.append(stats)
-        df, profit, order = self.trading_client.execute_trades(actions=df)
-        return df, profit
+        df, profit, orders = self.trading_client.execute_trades(actions=df)
+        return df, profit, orders

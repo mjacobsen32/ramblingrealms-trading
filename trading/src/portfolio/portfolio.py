@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import vectorbt as vbt
 from alpaca.data.timeframe import TimeFrameUnit
+from alpaca.trading.requests import MarketOrderRequest
 from plotly import io as pio
 from vectorbt import _typing as tp
 
@@ -205,16 +206,18 @@ class Portfolio:
         df.loc[:, "size"] = size
         return size
 
-    def update_position_batch(self, df: pd.DataFrame) -> float:
+    def update_position_batch(
+        self, df: pd.DataFrame
+    ) -> tuple[float, list[MarketOrderRequest] | None]:
         """
         Update positions for a batch of tickers at a given timestamp.
         @TODO clean up and make more efficient
         """
         # Reduce df to a single datetime index (symbols only)
-        df, step_profit = self.position_manager.step(df)
+        df, step_profit, orders = self.position_manager.step(df)
         logging.debug("df: %s\nstep_profit: %s\n", df, step_profit)
 
-        return step_profit
+        return step_profit, orders
 
     def step(self, df: pd.DataFrame, normalized_actions: bool = False) -> dict:
         """
@@ -232,10 +235,11 @@ class Portfolio:
         df.loc[:, "size"] = self.enforce_trade_rules(
             df, df["price"].values, self.cfg.trade_mode
         )
-        step_profit = self.update_position_batch(df=df)
+        step_profit, orders = self.update_position_batch(df=df)
         return {
             "scaled_actions": df["size"].values,
             "profit": step_profit,
+            "orders": orders,
         }
 
     @classmethod

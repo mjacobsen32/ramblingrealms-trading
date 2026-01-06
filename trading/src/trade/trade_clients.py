@@ -151,8 +151,8 @@ class TradingClient(ABC):
 
     def execute_trades(
         self, actions: pd.DataFrame
-    ) -> tuple[pd.DataFrame, float, MarketOrderRequest | None]:
-        return actions, actions["profit"].sum(), None  # Optional to implement
+    ) -> tuple[pd.DataFrame, float, list[MarketOrderRequest]]:
+        return actions, actions["profit"].sum(), []  # Optional to implement
 
 
 class LocalTradingClient(TradingClient):
@@ -540,10 +540,11 @@ class AlpacaClient(TradingClient):
     def execute_trades(
         self,
         actions: pd.DataFrame,
-    ) -> tuple[pd.DataFrame, float, MarketOrderRequest | None]:
+    ) -> tuple[pd.DataFrame, float, list[MarketOrderRequest]]:
         logging.info(
             "Executing %d trades via Alpaca client", len(actions[actions["size"] != 0])
         )
+        order_responses: list[MarketOrderRequest] = []
         for sym, row in actions.iterrows():
             logging.info(
                 "sym: %s, size: %s, at price: %s, with signal: %s",
@@ -564,6 +565,7 @@ class AlpacaClient(TradingClient):
                 time_in_force="day",
             )
             order_response = self.alpaca_account_client.submit_order(order)
+            order_responses.append(order_response)
             logging.info("Submitting order: %s", order)
 
-        return actions, actions["profit"].sum(), order_response
+        return actions, actions["profit"].sum(), order_responses
