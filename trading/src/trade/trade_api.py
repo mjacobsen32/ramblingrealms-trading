@@ -141,7 +141,7 @@ class Trade:
         self,
         predict_time: datetime.datetime,
         end_predict_time: datetime.datetime | None,
-    ) -> None:
+    ) -> dict:
 
         obs, _ = self.env.reset(timestamp=pd.Timestamp(predict_time))
         terminated, truncated = False, False
@@ -150,4 +150,4 @@ class Trade:
             action, _states = self.model.predict(obs)
             obs, reward, terminated, truncated, info = self.env.step(action)
 
-        return None
+        return info

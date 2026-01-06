@@ -162,6 +162,7 @@ class StatefulTradingEnv(BaseTradingEnv):
         ret_info = {
             "net_value": self.pf.position_manager.net_value(),
             "profit_change": d["profit"],
+            "orders": d["orders"],
         }
 
         logging.debug("Env State: %s", self)

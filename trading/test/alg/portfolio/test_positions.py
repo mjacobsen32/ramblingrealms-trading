@@ -12,4 +12,4 @@ def test_positions(multi_data_loader):
     data["timestamp"] = data.index.get_level_values("timestamp")
     data["price"] = data["close"]
     for unique_date in data.index.get_level_values("timestamp").unique():
-        df, profit = p.step(df=data.loc[unique_date])
+        df, profit, orders = p.step(df=data.loc[unique_date])
