@@ -16,8 +16,6 @@ from alpaca.trading.enums import AccountStatus
 from alpaca.trading.models import Position as AlpacaPosition
 from alpaca.trading.models import TradeAccount as AlpacaTradeAccount
 from alpaca.trading.requests import MarketOrderRequest
-from pydantic import BaseModel
-from tests.test_records import orders
 
 from trading.cli.trading.trade_config import BrokerType, RRTradeConfig
 from trading.src.portfolio.position import (
