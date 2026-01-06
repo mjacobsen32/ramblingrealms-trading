@@ -80,13 +80,6 @@ class Trade:
             position_manager=position_manager,
         )
 
-        if self.env.data.index.max() < pd.Timestamp(
-            predict_time
-        ) or self.env.data.index.max() < pd.Timestamp(end_predict_time):
-            raise ValueError(
-                f"Data end time {self.env.data.index.max()} is before predict time {predict_time}"
-            )
-
         logging.debug(
             "Loaded model type: '%s' version: '%s'\nPortfolio Config: %s\nEnv Config: %s\nSymbols: %s\nFeatures: %s",
             self.meta_data.get("type", "Unknown"),

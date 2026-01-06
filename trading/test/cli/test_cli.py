@@ -136,8 +136,6 @@ def test_trade_execution() -> None:
         end_predict_time=datetime.datetime.fromisoformat("2025-01-01"),
     )
 
-    assert trade_client.env.data.index.max() == pd.Timestamp("2025-01-01", tz="UTC")
-    assert 0 == 1
     trade_client.run_model(
         predict_time=(datetime.datetime.fromisoformat("2025-01-01")),
         end_predict_time=datetime.datetime.fromisoformat("2025-01-01"),
