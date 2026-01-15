@@ -110,6 +110,10 @@ class Trade:
         )
 
     def __del__(self):
+
+        agent_config_minus_sensitive = self.agent_config.model_dump()
+        if "save_path" in agent_config_minus_sensitive:
+            agent_config_minus_sensitive.pop("save_path")
         self.trading_client.write_meta_data(
             {
                 "type": self.meta_data.get("type", "Unknown"),
@@ -120,7 +124,7 @@ class Trade:
                 "symbols": self.active_symbols,
                 "features": self.active_features,
                 "env_config": self.env_config.model_dump(),
-                "agent_config": self.agent_config.model_dump(),
+                "agent_config": agent_config_minus_sensitive,
             }
         )
 
