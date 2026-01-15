@@ -10,11 +10,12 @@ from alpaca.trading.client import TradingClient as AlpacaTradingClient
 from pydantic import SecretStr
 from rich.prompt import Prompt
 
-from trading.cli.alg import alg
+from trading.cli.alg import alg, config
 from trading.cli.data import data
 from trading.cli.trading.trade_config import ProjectPath, RRTradeConfig
 from trading.cli.utils import init_logger
-from trading.src.trade.trade_api import Trade
+from trading.src.trade.trade_api import Portfolio, Trade, TradingClient
+from trading.src.trade.trade_clients import RemoteTradingClient
 from trading.src.user_cache.user_cache import UserCache as User
 from trading.src.utility.utils import read_key
 
@@ -274,6 +275,57 @@ def live_trade(
     except Exception as e:
         logging.error("Unexpected error during trade execution: %s", str(e))
         raise
+
+
+@app.command(help="Push backtesting results to remote server.")
+def push_backtest(
+    config: Annotated[
+        str,
+        typer.Option("--config", "-c", help="Path to the RRTrade configuration file."),
+    ],
+    backtest_dir: Annotated[
+        str,
+        typer.Option(
+            "--backtest-dir",
+            "-b",
+            help="Directory where backtest results are stored.",
+        ),
+    ],
+    account_uuid: Annotated[
+        str,
+        typer.Option(
+            "--uuid",
+            "-u",
+            help="UUID for the trading account.",
+        ),
+    ] = "",
+):
+    logging.info("Pushing backtesting results")
+
+    if account_uuid != "":
+        ProjectPath.ACTIVE_UUID = uuid.UUID(account_uuid)
+        logging.info(f"Using ACCOUNT UUID: {ProjectPath.ACTIVE_UUID}")
+    with Path.open(Path(config)) as f:
+        rr_trade_config = RRTradeConfig.model_validate_json(f.read())
+        logging.info(f"Loaded configuration from {config}")
+
+    user_cache = User().load()
+    alpaca_api_key = user_cache.alpaca_api_key
+    alpaca_api_secret = user_cache.alpaca_api_secret
+
+    alpaca_account_client: AlpacaTradingClient = AlpacaTradingClient(
+        alpaca_api_key.get_secret_value(),
+        alpaca_api_secret.get_secret_value(),
+        paper=True,
+    )
+
+    trading_client = RemoteTradingClient(
+        config=rr_trade_config, alpaca_account_client=alpaca_account_client, live=False
+    )
+
+    trading_client.write_backtest_results(backtest_dir=backtest_dir)
+
+    logging.info("Push backtesting results completed successfully.")
 
 
 if __name__ == "__main__":

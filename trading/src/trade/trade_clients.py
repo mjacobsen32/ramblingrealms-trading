@@ -2,6 +2,7 @@ import datetime
 import io
 import json
 import logging
+import zipfile
 from abc import ABC, abstractmethod
 from collections import deque
 from pathlib import Path
@@ -367,6 +368,7 @@ class RemoteTradingClient(TradingClient):
         self.account_key = str(config.account_path)
         self.closed_positions_key = str(config.closed_positions_path)
         self.account_stats_key = str(config.account_value_series_path)
+        self.backtest_key = str(config.backtest_path)
 
         super().__init__(
             live=True, config=config, alpaca_account_client=alpaca_account_client
@@ -547,6 +549,50 @@ class RemoteTradingClient(TradingClient):
         )
         logging.info(
             "Wrote remote portfolio stats to bucket %s", self.config.bucket_name
+        )
+
+    def write_backtest_results(self, backtest_dir) -> None:
+        backtest_path = Path(backtest_dir)
+        if not backtest_path.exists():
+            raise FileNotFoundError(f"Backtest directory not found: {backtest_path}")
+        if not backtest_path.is_dir():
+            raise NotADirectoryError(
+                f"Backtest path is not a directory: {backtest_path}"
+            )
+
+        # Upload a single zip archive instead of many individual objects.
+        logging.info(
+            "Zipping backtest results from %s and pushing to bucket %s as %s",
+            backtest_path,
+            self.config.bucket_name,
+            self.backtest_key,
+        )
+
+        files = sorted([p for p in backtest_path.rglob("*") if p.is_file()])
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(
+            zip_buffer,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+            compresslevel=9,
+        ) as zf:
+            for file_path in files:
+                arcname = str(file_path.relative_to(backtest_path))
+                zf.write(filename=file_path, arcname=arcname)
+
+        zip_bytes = zip_buffer.getvalue()
+        self._client.put_object(
+            Bucket=self.config.bucket_name,
+            Key=self.backtest_key,
+            Body=zip_bytes,
+            ContentType="application/zip",
+        )
+        logging.info(
+            "Uploaded backtest results zip (%d files, %.2f MB) to bucket %s as %s",
+            len(files),
+            len(zip_bytes) / (1024 * 1024),
+            self.config.bucket_name,
+            self.backtest_key,
         )
 
 

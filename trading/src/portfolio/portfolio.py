@@ -259,17 +259,15 @@ class Portfolio:
         logging.info("Saving VectorBT results to %s", file_path)
         self.as_vbt_pf(df=df).save(file_path)
 
-    def save_plots(self, backtest_dir: Path):
-        plots = []
-        paths = []
-        for p in self._get_plots():
+    def save_plots(self, backtest_dir: Path, tickers: list[str] | None = None):
+        for k, p in self._get_plots().items():
+            if tickers is not None and k not in tickers:
+                continue
             title = p.layout.title.text.replace(" ", "_").lower()
             path = backtest_dir / "plots" / f"{title}.svg"
             if not path.parent.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
             p.update_layout(width=1200, height=2400)
-            plots.append(p)
-            paths.append(path)
             # use pio.write_images when kaleido is upgraded to 1.x.x
             pio.write_image(p, path, format="svg", scale=2, width=1200, height=3600)
 
@@ -287,7 +285,7 @@ class Portfolio:
         """
         self.vbt_pf = pf
 
-    def _get_plots(self) -> list[tp.BaseFigure]:
+    def _get_plots(self) -> dict[str, tp.BaseFigure]:
         """
         Get the plots for the portfolio.
         """
@@ -310,7 +308,7 @@ class Portfolio:
              "net_exposure"
             ]
         """
-        plots: list[tp.BaseFigure] = []
+        plots: dict[str, tp.BaseFigure] = {}
         p = vbt_pf.plot(
             title="Portfolio Backtest Results",
             subplots=[
@@ -326,7 +324,7 @@ class Portfolio:
             ],
         )
         if p is not None:
-            plots.append(p)
+            plots["portfolio"] = p
 
         symbols = vbt_pf.orders.records_readable["Column"].unique().tolist()
 
@@ -353,7 +351,7 @@ class Portfolio:
                 group_by=False,
             )
             if p is not None:
-                plots.append(p)
+                plots[tic] = p
 
         return plots
 
@@ -365,7 +363,7 @@ class Portfolio:
         logging.info(
             "Generating portfolio plots...\nRendering with: %s", pio.renderers.default
         )
-        for p in self._get_plots():
+        for k, p in self._get_plots():
             p.show()
 
     def stats(self):
@@ -411,7 +409,7 @@ class Portfolio:
         if analysis_config.render_plots:
             self.plot()
         if analysis_config.save_plots:
-            self.save_plots(bt_dir)
+            self.save_plots(bt_dir, analysis_config.tickers)
         if analysis_config.to_csv:
             self.get_positions().to_csv(str(bt_dir / "positions.csv"))
             self.orders().to_csv(bt_dir / "orders.csv")

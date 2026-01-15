@@ -9,7 +9,13 @@ from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrameUnit
 from alpaca.trading.requests import GetCalendarRequest
 
-from trading.cli.alg.config import DataConfig, DataRequests, FeatureConfig, StockEnv
+from trading.cli.alg.config import (
+    AgentConfig,
+    DataConfig,
+    DataRequests,
+    FeatureConfig,
+    StockEnv,
+)
 from trading.cli.trading.trade_config import RRTradeConfig
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.data_process.data_loader import DataLoader, DataSourceType
@@ -55,6 +61,7 @@ class Trade:
         )
         self.env_config = StockEnv.model_validate(self.meta_data["env_config"])
         self.data_config = DataConfig.model_validate(self.meta_data["data_config"])
+        self.agent_config = AgentConfig.model_validate(self.meta_data["agent_config"])
         self.portfolio_config = self.env_config.portfolio_config
         self.config.portfolio_config = self.portfolio_config
         self.market_data_client = market_data_client
@@ -104,7 +111,17 @@ class Trade:
 
     def __del__(self):
         self.trading_client.write_meta_data(
-            {"meta_data": self.meta_data, "config": self.config.model_dump()}
+            {
+                "type": self.meta_data.get("type", "Unknown"),
+                "version": self.meta_data.get("version", "Unknown"),
+                "active": self.config.active,
+                "id": self.config.id,
+                "asset_exchanges": self.config.asset_exchanges,
+                "symbols": self.active_symbols,
+                "features": self.active_features,
+                "env_config": self.env_config.model_dump(),
+                "agent_config": self.agent_config.model_dump(),
+            }
         )
 
     def _load_data(
