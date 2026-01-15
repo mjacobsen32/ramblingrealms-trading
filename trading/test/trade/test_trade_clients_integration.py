@@ -250,7 +250,6 @@ def test_remote_client_uses_s3_store(
 
     positions = client.positions
     assert len(positions) == 0
-    assert int(client.account.cash) == 1000000
 
     actions = pd.DataFrame(data={"profit": [0]}, index=["AAPL"])
     client.execute_trades(actions=actions)

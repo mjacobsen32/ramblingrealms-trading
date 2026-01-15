@@ -1,3 +1,4 @@
+import datetime
 import io
 import json
 import logging
@@ -84,6 +85,16 @@ class TradingClient(ABC):
         self._write_open_positions(open_positions=open_positions)
         self._write_closed_positions(closed_positions=closed_positions)
         self._write_pf_stats(stats=pf_history)
+        self._account.cash = str(cash)
+        if self._account.created_at is None:
+            self._account.created_at = datetime.datetime.now(datetime.timezone.utc)
+        if self._account.currency is None:
+            self._account.currency = "USD"
+        if self._account.initial_cash is None:
+            if self.config.portfolio_config is not None:
+                self._account.initial_cash = self.config.portfolio_config.initial_cash
+        if self._account.portfolio_value is None:
+            self._account.portfolio_value = str(pf_history[-1].net_value)
         self._write_account(cash)
 
     def get_clock(self):
@@ -148,6 +159,9 @@ class TradingClient(ABC):
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
         pass
 
+    def write_meta_data(self, meta_data: dict[str, Any]) -> None:
+        pass
+
     def execute_trades(
         self, actions: pd.DataFrame
     ) -> tuple[pd.DataFrame, float, list[MarketOrderRequest]]:
@@ -186,6 +200,7 @@ class LocalTradingClient(TradingClient):
         self.account_value_series_path = self._resolve_path(
             config.account_value_series_path, "account_value_series"
         )
+        self.meta_data_path = self._resolve_path(config.meta_data_path, "meta_data")
         super().__init__(
             live=live, config=config, alpaca_account_client=alpaca_account_client
         )
@@ -197,6 +212,13 @@ class LocalTradingClient(TradingClient):
             return path_field.as_path()
         raise ValueError(f"No path configured for local trading {default_name} data")
 
+    def write_meta_data(self, meta_data: dict[str, Any]) -> None:
+        self.meta_data_path.parent.mkdir(parents=True, exist_ok=True)
+        self.meta_data_path.write_text(
+            json.dumps(meta_data, default=_json_default, indent=2)
+        )
+        logging.info("Wrote local meta data to %s", self.meta_data_path)
+
     def _write_open_positions(self, open_positions: dict[str, deque[Position]]) -> None:
         self.positions_path.parent.mkdir(parents=True, exist_ok=True)
         self.positions_path.write_text(
@@ -205,7 +227,6 @@ class LocalTradingClient(TradingClient):
         logging.info("Wrote local positions to %s", self.positions_path)
 
     def _write_account(self, cash: float) -> None:
-        self._account.cash = str(cash)
         self.account_path.parent.mkdir(parents=True, exist_ok=True)
         self.account_path.write_text(self._account.model_dump_json(indent=2))
         logging.info("Wrote local account to %s", self.account_path)
@@ -273,15 +294,11 @@ class LocalTradingClient(TradingClient):
             raise ValueError(
                 "Portfolio config is required for local account initialization"
             )
-        else:
-            init_cash = self.config.portfolio_config.initial_cash
         if not self.account_path.exists():
             account = TradeAccount(
                 id=self.config.id,
                 account_number=self.config.account_number,
                 status=AccountStatus.ACTIVE,
-                cash=str(init_cash),
-                initial_cash=init_cash,
             )
         else:
             account = TradeAccount.model_validate_json(self.account_path.read_text())
@@ -412,13 +429,10 @@ class RemoteTradingClient(TradingClient):
                     "Portfolio config is required for local account initialization"
                 )
             else:
-                init_cash = self.config.portfolio_config.initial_cash
                 account = TradeAccount(
                     id=self.config.id,
                     account_number=self.config.account_number,
                     status=AccountStatus.ACTIVE,
-                    cash=str(init_cash),
-                    initial_cash=init_cash,
                 )
         logging.info("Loaded account id: %s; cash: %s", account.id, account.cash)
         return account
@@ -472,6 +486,15 @@ class RemoteTradingClient(TradingClient):
             logging.info("Initializing new remote closed positions")
             return []
 
+    def write_meta_data(self, meta_data: dict[str, Any]) -> None:
+        self._client.put_object(
+            Bucket=self.config.bucket_name,
+            Key=str(self.config.meta_data_path),
+            Body=json.dumps(meta_data, default=_json_default, indent=2).encode("utf-8"),
+            ContentType="application/json",
+        )
+        logging.info("Wrote remote meta data to bucket %s", self.config.bucket_name)
+
     def _write_closed_positions(self, closed_positions: list[Position]) -> None:
         sink = io.BytesIO()
         df = pd.DataFrame(closed_positions, columns=Position.COLS)
@@ -492,7 +515,6 @@ class RemoteTradingClient(TradingClient):
         )
 
     def _write_account(self, cash: float) -> None:
-        self._account.cash = str(cash)
         self._client.put_object(
             Bucket=self.config.bucket_name,
             Key=self.account_key,

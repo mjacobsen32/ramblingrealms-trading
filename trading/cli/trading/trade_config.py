@@ -87,6 +87,10 @@ class RRTradeConfig(BaseModel):
         default=None,
         description="Path to account JSON for local/remote brokers.",
     )
+    meta_data_path: ProjectPath | None = Field(
+        default=None,
+        description="Path to meta data JSON for local/remote brokers.",
+    )
     out_dir: ProjectPath = Field(
         default_factory=lambda: ProjectPath.model_construct(),
         description="Path to the output directory.",

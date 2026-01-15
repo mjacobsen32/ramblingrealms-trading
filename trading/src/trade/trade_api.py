@@ -59,8 +59,8 @@ class Trade:
         self.config.portfolio_config = self.portfolio_config
         self.market_data_client = market_data_client
 
-        feature_cfg = FeatureConfig.model_validate(self.meta_data)
-        self.active_features = getattr(feature_cfg, "features", [])
+        self.feature_cfg = FeatureConfig.model_validate(self.meta_data)
+        self.active_features = getattr(self.feature_cfg, "features", [])
         logging.debug("Active features: %s", self.active_features)
 
         self.live = live
@@ -100,6 +100,11 @@ class Trade:
             self.env_config,
             self.active_symbols,
             self.active_features,
+        )
+
+    def __del__(self):
+        self.trading_client.write_meta_data(
+            {"meta_data": self.meta_data, "config": self.config.model_dump()}
         )
 
     def _load_data(

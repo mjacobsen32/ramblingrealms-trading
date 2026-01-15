@@ -6,5 +6,6 @@
     "account_path": "{PROJECT_ROOT}/trading/test/temp/accounts/local_paper_trading_account.json",
     "closed_positions_path": "{PROJECT_ROOT}/trading/test/temp/closed_positions/{TIMESTAMP}.csv",
     "account_value_series_path":"{PROJECT_ROOT}/trading/test/temp/pf_value/{TIMESTAMP}.csv",
+    "meta_data_path": "{PROJECT_ROOT}/trading/test/temp/local_paper_trading_meta_data.json",
     "defer_trade_execution": false
 }
