@@ -9,7 +9,13 @@ from alpaca.data.requests import StockLatestTradeRequest
 from alpaca.data.timeframe import TimeFrameUnit
 from alpaca.trading.requests import GetCalendarRequest
 
-from trading.cli.alg.config import DataConfig, DataRequests, FeatureConfig, StockEnv
+from trading.cli.alg.config import (
+    AgentConfig,
+    DataConfig,
+    DataRequests,
+    FeatureConfig,
+    StockEnv,
+)
 from trading.cli.trading.trade_config import RRTradeConfig
 from trading.src.alg.agents.agents import Agent
 from trading.src.alg.data_process.data_loader import DataLoader, DataSourceType
@@ -55,12 +61,13 @@ class Trade:
         )
         self.env_config = StockEnv.model_validate(self.meta_data["env_config"])
         self.data_config = DataConfig.model_validate(self.meta_data["data_config"])
+        self.agent_config = AgentConfig.model_validate(self.meta_data["agent_config"])
         self.portfolio_config = self.env_config.portfolio_config
         self.config.portfolio_config = self.portfolio_config
         self.market_data_client = market_data_client
 
-        feature_cfg = FeatureConfig.model_validate(self.meta_data)
-        self.active_features = getattr(feature_cfg, "features", [])
+        self.feature_cfg = FeatureConfig.model_validate(self.meta_data)
+        self.active_features = getattr(self.feature_cfg, "features", [])
         logging.debug("Active features: %s", self.active_features)
 
         self.live = live
@@ -100,6 +107,25 @@ class Trade:
             self.env_config,
             self.active_symbols,
             self.active_features,
+        )
+
+    def __del__(self):
+
+        agent_config_minus_sensitive = self.agent_config.model_dump()
+        if "save_path" in agent_config_minus_sensitive:
+            agent_config_minus_sensitive.pop("save_path")
+        self.trading_client.write_meta_data(
+            {
+                "type": self.meta_data.get("type", "Unknown"),
+                "version": self.meta_data.get("version", "Unknown"),
+                "active": self.config.active,
+                "id": self.config.id,
+                "asset_exchanges": self.config.asset_exchanges,
+                "symbols": self.active_symbols,
+                "features": self.active_features,
+                "env_config": self.env_config.model_dump(),
+                "agent_config": agent_config_minus_sensitive,
+            }
         )
 
     def _load_data(

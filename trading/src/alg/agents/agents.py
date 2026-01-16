@@ -69,6 +69,7 @@ class Agent:
                     data_config.model_dump(mode="json") if data_config else {}
                 ),
                 "created_at": str(datetime.datetime.now()),
+                "agent_config": config.model_dump(mode="json"),
             }
 
     @classmethod

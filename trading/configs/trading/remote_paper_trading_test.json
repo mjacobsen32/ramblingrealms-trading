@@ -7,7 +7,7 @@
     "account_value_series_path":"paper_trading/account_value_series/{UUID}/{TIMESTAMP}.parquet",
     "meta_data_path": "paper_trading/{UUID}/meta_data.json",
     "broker": "REMOTE",
-    "bucket_name": "rr-storage",
+    "bucket_name": "rr-storage-test",
     "broker_kwargs":{
       "service_name": "s3"
     },

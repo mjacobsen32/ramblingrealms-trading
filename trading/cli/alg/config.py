@@ -284,6 +284,10 @@ class AnalysisConfig(BaseModel):
     )
     save_plots: bool = Field(True, description="Whether to save the analysis plots")
     to_csv: bool = Field(True, description="Save the analysis results to CSV files")
+    tickers: List[str] | None = Field(
+        None,
+        description="List of tickers to generate plots for. If None, generate for all.",
+    )
 
 
 class BackTestConfig(BaseModel):

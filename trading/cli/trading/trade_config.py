@@ -87,6 +87,18 @@ class RRTradeConfig(BaseModel):
         default=None,
         description="Path to account JSON for local/remote brokers.",
     )
+    meta_data_path: ProjectPath | None = Field(
+        default=None,
+        description="Path to meta data JSON for local/remote brokers.",
+    )
+    backtest_path: ProjectPath | None = Field(
+        default=None,
+        description="Path to backtest ZIP for local/remote brokers.",
+    )
+    active: bool = Field(
+        default=False,
+        description="Indicates if this configuration is active on the remote, which will enable live updates.",
+    )
     out_dir: ProjectPath = Field(
         default_factory=lambda: ProjectPath.model_construct(),
         description="Path to the output directory.",
@@ -116,6 +128,8 @@ class RRTradeConfig(BaseModel):
                 new_id,
             )
             values["id"] = new_id
+        if id_value is not None and ProjectPath.ACTIVE_UUID is None:
+            ProjectPath.ACTIVE_UUID = id_value
         if id_value is None:
             values["id"] = ProjectPath.ACTIVE_UUID
         return values

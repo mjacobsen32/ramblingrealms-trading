@@ -248,6 +248,7 @@ def local_trade_config(portfolio_config):
         account_path="{PROJECT_ROOT}/trading/test/paper_trading/accounts/ppo.json",
         closed_positions_path="{PROJECT_ROOT}/trading/test/paper_trading/closed_positions/ppo.parquet",
         account_value_series_path="{PROJECT_ROOT}/trading/test/paper_trading/account_value_series/ppo.parquet",
+        meta_data_path="{PROJECT_ROOT}/trading/test/paper_trading/meta_data/ppo.json",
         broker=BrokerType.LOCAL,
         bucket_name=None,
         broker_kwargs={},
