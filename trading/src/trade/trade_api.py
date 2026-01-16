@@ -200,6 +200,22 @@ class Trade:
                 Trade.LiveTradeError.OUT_OF_RANGE,
                 f"Predict time range [{predict_time} - {end_predict_time}] does not include any open market hours.",
             )
+        if (
+            predict_time
+            < self.env.data.index.get_level_values("timestamp").min().to_pydatetime()
+        ):
+            raise Trade.LiveTradeError(
+                Trade.LiveTradeError.OUT_OF_RANGE,
+                f"Predict time {predict_time} is before available data starting at {self.env.data.index.get_level_values('timestamp').min()}.",
+            )
+        if (
+            end_predict_time
+            > self.env.data.index.get_level_values("timestamp").max().to_pydatetime()
+        ):
+            raise Trade.LiveTradeError(
+                Trade.LiveTradeError.OUT_OF_RANGE,
+                f"End predict time {end_predict_time} is after available data ending at {self.env.data.index.get_level_values('timestamp').max()}.",
+            )
 
         obs, _ = self.env.reset(timestamp=pd.Timestamp(predict_time))
         terminated, truncated = False, False

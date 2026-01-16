@@ -133,8 +133,10 @@ def test_trade_execution() -> None:
         alpaca_account_client=alpaca_account_client,
         live=False,
         predict_time=datetime.datetime.fromisoformat("2024-12-31"),
-        end_predict_time=datetime.datetime.fromisoformat("2025-02-03"),
+        end_predict_time=datetime.datetime.fromisoformat("2025-02-04"),
     )
+
+    # TEST_SET starts on 2024-06-05 and ends on 2025-06-04
 
     # First call should succeed without throwing
     time_series = trade_client.run_model(
@@ -142,10 +144,16 @@ def test_trade_execution() -> None:
             year=2024, month=12, day=31, tzinfo=datetime.timezone.utc
         ),
         end_predict_time=datetime.datetime(
-            year=2025, month=1, day=31, tzinfo=datetime.timezone.utc
+            year=2025, month=2, day=4, tzinfo=datetime.timezone.utc
         ),
     )
-    assert time_series is not None
+    assert time_series[0]["timestamp"] == pd.Timestamp(
+        "2024-12-31 05:00:00+0000", tz="UTC"
+    )
+
+    assert time_series[-1]["timestamp"] == pd.Timestamp(
+        "2025-02-04 05:00:00+0000", tz="UTC"
+    )
 
     # Weekend request should raise OUT_OF_RANGE error
     with pytest.raises(Trade.LiveTradeError) as exc_info:
@@ -169,4 +177,54 @@ def test_trade_execution() -> None:
         ),
     )
 
-    assert time_series is not None
+    assert time_series[0]["timestamp"] == pd.Timestamp(
+        "2025-02-03 05:00:00+0000", tz="UTC"
+    )
+
+    # This is valid date but outside the range of the cache
+    with pytest.raises(Trade.LiveTradeError) as exc_info:
+        time_series = trade_client.run_model(
+            predict_time=datetime.datetime(
+                year=2025, month=6, day=5, tzinfo=datetime.timezone.utc
+            ),
+            end_predict_time=datetime.datetime(
+                year=2025, month=6, day=5, tzinfo=datetime.timezone.utc
+            ),
+        )
+
+
+def test_trade_execution_out_of_range() -> None:
+    market_data_client = StockHistoricalDataClientMock()
+
+    alpaca_account_client = AlpacaTradingClientMock()
+
+    with Path.open(Path(str(CONFIG_DIR / "trade_config.json"))) as f:
+        rr_trade_config = RRTradeConfig.model_validate_json(f.read())
+
+    trade_client = Trade(
+        config=rr_trade_config,
+        market_data_client=market_data_client,
+        alpaca_account_client=alpaca_account_client,
+        live=False,
+        predict_time=datetime.datetime.fromisoformat("2024-06-05"),
+        end_predict_time=datetime.datetime.fromisoformat("2025-06-05"),
+    )
+
+    # TEST_SET starts on 2024-06-05 and ends on 2025-06-04
+
+    # First call should succeed without throwing
+    time_series = trade_client.run_model(
+        predict_time=datetime.datetime(
+            year=2024, month=6, day=5, tzinfo=datetime.timezone.utc
+        ),
+        end_predict_time=datetime.datetime(
+            year=2025, month=6, day=5, tzinfo=datetime.timezone.utc
+        ),
+    )
+    assert time_series[0]["timestamp"] == pd.Timestamp(
+        "2024-12-31 05:00:00+0000", tz="UTC"
+    )
+
+    assert time_series[-1]["timestamp"] == pd.Timestamp(
+        "2025-02-04 05:00:00+0000", tz="UTC"
+    )
