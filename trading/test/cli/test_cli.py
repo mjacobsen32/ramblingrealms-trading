@@ -182,6 +182,50 @@ def test_trade_execution() -> None:
         "2025-02-03 05:00:00+0000", tz="UTC"
     )
 
+    # 2025 Feb 3rd at 6 AM UTC is midnight EST
+
+    time_series = trade_client.run_model(
+        predict_time=datetime.datetime(
+            year=2025, month=2, day=3, hour=6, tzinfo=datetime.timezone.utc
+        ),
+        end_predict_time=datetime.datetime(
+            year=2025, month=2, day=3, hour=6, tzinfo=datetime.timezone.utc
+        ),
+    )
+
+    assert time_series[0]["timestamp"] == pd.Timestamp(
+        "2025-02-03 05:00:00+0000", tz="UTC"
+    )
+
+    # 2025 Feb 3rd at 4 AM UTC is 11:00 pm EST, so the data returned from alpaca will be from the day prior...
+
+    time_series = trade_client.run_model(
+        predict_time=datetime.datetime(
+            year=2025, month=2, day=3, hour=4, tzinfo=datetime.timezone.utc
+        ),
+        end_predict_time=datetime.datetime(
+            year=2025, month=2, day=3, hour=4, tzinfo=datetime.timezone.utc
+        ),
+    )
+
+    assert time_series[0]["timestamp"] == pd.Timestamp(
+        "2025-01-31 05:00:00+0000", tz="UTC"
+    )
+
+    # 2025 Feb 3rd at 4 AM UTC is 11:00 pm EST, so the data returned from alpaca will be from the day prior...
+
+    five_pm_eastern = pd.Timestamp("2025-02-03 17:00:00-05:00", tz="America/New_York")
+    assert five_pm_eastern.tz_convert("UTC").hour == 22
+
+    time_series = trade_client.run_model(
+        predict_time=five_pm_eastern.tz_convert("UTC").to_pydatetime(),
+        end_predict_time=five_pm_eastern.tz_convert("UTC").to_pydatetime(),
+    )
+
+    assert time_series[0]["timestamp"] == pd.Timestamp(
+        "2025-02-3 05:00:00+0000", tz="UTC"
+    )
+
     # This is valid date but outside the range of the cache
     with pytest.raises(Trade.LiveTradeError) as exc_info:
         time_series = trade_client.run_model(

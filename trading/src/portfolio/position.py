@@ -45,7 +45,7 @@ class PortfolioStats(BaseModel):
     pnl_pct: float = 0.0
     rolling_pnl: float = 0.0
     rolling_pnl_pct: float = 0.0
-    date: datetime.datetime = datetime.datetime.utcnow()
+    date: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
 
     def __iter__(self):
         return iter(
