@@ -147,3 +147,130 @@ def test_unit_period_pull(data_config, feature_config):
     assert (
         len(data_loader.df) == 97
     ), "DataFrame should contain 97 rows for 5-minute intervals in one day (inclusive of end)"
+
+
+def test_cache_fetches_missing_ranges_and_updates(monkeypatch, tmp_path):
+    """
+    Verify partial-cache scenarios fetch only missing date ranges, merge, save, and return filtered data.
+    """
+
+    from alpaca.data.timeframe import TimeFrameUnit
+
+    from trading.cli.alg.config import DataRequests, DataSourceType
+    from trading.src.alg.data_process.data_loader import AlpacaDataLoader
+
+    def make_df(symbols, start, end):
+        dates = pd.date_range(start=start, end=end, freq="D")
+        idx = pd.MultiIndex.from_product(
+            [dates, symbols], names=["timestamp", "symbol"]
+        )
+        data = {
+            "open": range(1, len(idx) + 1),
+            "high": range(2, len(idx) + 2),
+            "low": range(0, len(idx)),
+            "close": range(1, len(idx) + 1),
+            "volume": [100] * len(idx),
+        }
+        return pd.DataFrame(data, index=idx)
+
+    requests_made = []
+
+    class _MockBars:
+        def __init__(self, df):
+            self.df = df
+
+    class _StockHistoricalDataClient:
+        def __init__(self):
+            self.calls = 0
+
+        def get_stock_bars(self, request_params):
+            self.calls += 1
+            start = pd.to_datetime(request_params.start)
+            end = pd.to_datetime(request_params.end)
+            symbols = request_params.symbol_or_symbols
+            requests_made.append((start, end, tuple(symbols)))
+
+            df = make_df(symbols, start, end)
+            # Mark fetched rows so we can assert they are present in the final result.
+            if start == pd.Timestamp("2023-01-01"):
+                df["open"] = 1111
+            elif start == pd.Timestamp("2023-01-05"):
+                df["open"] = 2222
+            return _MockBars(df)
+
+    class _Asset:
+        def __init__(self, symbol: str, tradable: bool = True):
+            self.symbol = symbol
+            self.tradable = tradable
+
+    class _TradingClient:
+        def __init__(self):
+            self.calls = 0
+
+        def get_all_assets(self, *args, **kwargs):
+            self.calls += 1
+            return [_Asset("AAPL", tradable=True)]
+
+    cache_path = tmp_path
+    dataset_name = "CACHE_TEST"
+    cache_file = cache_path / f"{dataset_name}.parquet"
+
+    cache_df = make_df(["AAPL"], "2023-01-03", "2023-01-05")
+    cache_df.to_parquet(cache_file)
+
+    request = DataRequests(
+        dataset_name=dataset_name,
+        source=DataSourceType.ALPACA,
+        endpoint="StockBarRequest",
+        # Use ALL to ensure the passed-in trading client is exercised.
+        kwargs={"symbol_or_symbols": ["ALL"], "adjustment": "split"},
+    )
+
+    loader = AlpacaDataLoader()
+    history_client = _StockHistoricalDataClient()
+    trading_client = _TradingClient()
+    result = loader.get_data(
+        fetch_data=False,
+        request=request,
+        df=pd.DataFrame(),
+        cache_path=str(cache_path),
+        start_date="2023-01-01",
+        end_date="2023-01-06",
+        time_step_unit=TimeFrameUnit.Day,
+        cache_enabled=True,
+        time_step_period=1,
+        alpaca_history_client=history_client,
+        alpaca_trading_client=trading_client,
+    )
+
+    assert trading_client.calls == 1
+    assert history_client.calls == 2
+
+    # ensure two segments were fetched: before cache start and after cache end
+    assert len(requests_made) == 2
+    assert requests_made[0][0] == pd.Timestamp("2023-01-01")
+    assert requests_made[0][1] == pd.Timestamp("2023-01-03")
+    assert requests_made[1][0] == pd.Timestamp("2023-01-05")
+    assert requests_made[1][1] == pd.Timestamp("2023-01-06")
+
+    # cache should be updated to cover full requested range
+    updated_cache = pd.read_parquet(cache_file)
+    assert updated_cache.index.get_level_values("timestamp").min() == pd.Timestamp(
+        "2023-01-01"
+    )
+    assert updated_cache.index.get_level_values("timestamp").max() == pd.Timestamp(
+        "2023-01-06"
+    )
+    assert len(updated_cache) == 6  # one symbol, 6 days inclusive
+
+    # returned data should match requested window and be sorted without duplicates
+    timestamps = result.index.get_level_values("timestamp")
+    assert timestamps.min() == pd.Timestamp("2023-01-01")
+    assert timestamps.max() == pd.Timestamp("2023-01-06")
+    assert timestamps.is_monotonic_increasing
+    assert result.index.is_unique
+    assert len(result) == 6
+
+    # Confirm that "new" (fetched) data was merged into the returned DataFrame.
+    assert result.loc[(pd.Timestamp("2023-01-01"), "AAPL"), "open"] == 1111
+    assert result.loc[(pd.Timestamp("2023-01-06"), "AAPL"), "open"] == 2222

@@ -50,6 +50,7 @@ class Trade:
         live: bool,
         predict_time: datetime.datetime,
         end_predict_time: datetime.datetime,
+        fetch_data: bool = True,
     ):
         self.config = config
         self.model, self.meta_data = Agent.load_agent(config.model_path.as_path(), None)
@@ -65,14 +66,16 @@ class Trade:
         self.portfolio_config = self.env_config.portfolio_config
         self.config.portfolio_config = self.portfolio_config
         self.market_data_client = market_data_client
-
+        self.alpaca_account_client = alpaca_account_client
         self.feature_cfg = FeatureConfig.model_validate(self.meta_data)
         self.active_features = getattr(self.feature_cfg, "features", [])
         logging.debug("Active features: %s", self.active_features)
 
         self.live = live
         self.trading_client = TradingClient.from_config(
-            config=self.config, alpaca_account_client=alpaca_account_client, live=live
+            config=self.config,
+            alpaca_account_client=self.alpaca_account_client,
+            live=live,
         )
 
         position_manager = LivePositionManager(
@@ -89,7 +92,9 @@ class Trade:
         )
 
         self.env = StatefulTradingEnv(
-            data=self._load_data(predict_time, end_predict_time).df,
+            data=self._load_data(
+                predict_time, end_predict_time, fetch_data=fetch_data
+            ).df,
             cfg=self.env_config,
             features=self.active_features,
             time_step=(
@@ -132,6 +137,7 @@ class Trade:
         self,
         predict_time: datetime.datetime,
         end_predict_time: datetime.datetime,
+        fetch_data: bool = True,
     ) -> DataLoader:
         calendar = self.trading_client.alpaca_account_client.get_calendar()
         range_of_days = end_predict_time.date() - predict_time.date()
@@ -147,16 +153,18 @@ class Trade:
             -(effective_lookback):
         ]
 
-        data_start, data_end = window[0], window[-1]
+        data_start = window[0]
         logging.info(
-            "Loading data window to satisfy lookback+horizon: [%s, %s]",
-            data_start.date,
-            data_end.date,
+            f"Loading data window: [start_predict: %s, end_predict: %s]\n\tlookback_window: %s, data_start: %s",
+            predict_time,
+            end_predict_time,
+            effective_lookback,
+            data_start,
         )
 
         data_config = self.data_config
         data_config.start_date = str(data_start.date)
-        data_config.end_date = str(data_end.date)
+        data_config.end_date = end_predict_time.isoformat()
         data_config.cache_enabled = (
             False if self.live else data_config.cache_enabled
         )  # no caching for trading live
@@ -167,7 +175,13 @@ class Trade:
             features=self.meta_data["features"], fill_strategy="interpolate"
         )
 
-        return DataLoader(data_config=data_config, feature_config=feature_config)
+        return DataLoader(
+            data_config=data_config,
+            feature_config=feature_config,
+            fetch_data=fetch_data,
+            alpaca_history_client=self.market_data_client,
+            alpaca_trading_client=self.alpaca_account_client,
+        )
 
     def get_prices(self) -> np.ndarray:
         req = StockLatestTradeRequest(symbol_or_symbols=self.active_symbols)
@@ -190,10 +204,6 @@ class Trade:
         predict_time: datetime.datetime,
         end_predict_time: datetime.datetime,
     ) -> list[dict[str, Any]]:
-        predict_time = predict_time.replace(hour=5, minute=0, second=0, microsecond=0)
-        end_predict_time = end_predict_time.replace(
-            hour=5, minute=0, second=0, microsecond=0
-        )
 
         if not self.range_includes_open_markets(predict_time, end_predict_time):
             raise Trade.LiveTradeError(
@@ -221,12 +231,25 @@ class Trade:
         terminated, truncated = False, False
         ret: list[dict[str, Any]] = []
 
+        end_time = pd.Timestamp(end_predict_time)
+
+        # Check that observation data is available before logging or entering loop
+        if self.env.observation_timestamp is None or self.env.observation_index is None:
+            logging.warning("No observation data available")
+            return ret
+
+        logging.info(
+            "Observation Index : [%s, %s]",
+            self.env.observation_timestamp[self.env.observation_index],
+            self.env.observation_timestamp[-1],
+        )
+
         while (
             not terminated
             and not truncated
             and self.env.observation_timestamp is not None
-            and end_predict_time
-            >= self.env.observation_timestamp[self.env.observation_index]
+            and self.env.observation_index is not None
+            and end_time >= self.env.observation_timestamp[self.env.observation_index]
         ):
             action, _states = self.model.predict(obs)
             obs, reward, terminated, truncated, info = self.env.step(action)

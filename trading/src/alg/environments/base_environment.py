@@ -86,7 +86,7 @@ class BaseTradingEnv(gym.Env, ABC):
         self.data = data.copy()
         self.data["timestamp"] = self.data.index.get_level_values("timestamp")
         self.timestamps = data.index.get_level_values("timestamp").unique().to_list()
-        self.max_steps = len(self.timestamps) - 1
+        self.max_steps = len(self.timestamps)
         # Initialize observation_timestamp here so it's available immediately
         self.observation_timestamp = self.data.index.get_level_values(
             "timestamp"
