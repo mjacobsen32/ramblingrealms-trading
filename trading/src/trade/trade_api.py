@@ -67,6 +67,7 @@ class Trade:
         self.config.portfolio_config = self.portfolio_config
         self.market_data_client = market_data_client
         self.alpaca_account_client = alpaca_account_client
+
         self.feature_cfg = FeatureConfig.model_validate(self.meta_data)
         self.active_features = getattr(self.feature_cfg, "features", [])
         logging.debug("Active features: %s", self.active_features)
