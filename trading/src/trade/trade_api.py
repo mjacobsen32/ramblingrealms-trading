@@ -149,11 +149,24 @@ class Trade:
             + 1
         )
 
-        # Filter and access directly with negative indexing
+        # Filter and access with bounds checking to avoid IndexError
         filtered_calendar = [
             entry for entry in calendar if entry.date <= end_predict_time.date()
         ]
-        data_start = filtered_calendar[-effective_lookback]
+        if not filtered_calendar:
+            raise ValueError(
+                "No calendar entries available on or before the specified end_predict_time."
+            )
+        if len(filtered_calendar) < effective_lookback:
+            logging.warning(
+                "Requested lookback (%s) exceeds available calendar entries (%s); "
+                "using earliest available calendar date instead.",
+                effective_lookback,
+                len(filtered_calendar),
+            )
+            data_start = filtered_calendar[0]
+        else:
+            data_start = filtered_calendar[-effective_lookback]
 
         logging.info(
             "Loading data window: [start_predict: %s, end_predict: %s]\n\tlookback_window: %s, data_start: %s",
