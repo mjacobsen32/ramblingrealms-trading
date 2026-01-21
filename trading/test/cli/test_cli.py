@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from pandas_market_calendars.calendars.asx import ZoneInfo
 from typer.testing import CliRunner
 
 from trading.cli.alg.config import ProjectPath
@@ -236,3 +237,118 @@ def test_trade_execution() -> None:
                 year=2025, month=6, day=5, tzinfo=datetime.timezone.utc
             ),
         )
+
+
+@pytest.mark.parametrize(
+    "predict_time, expected_actual_predict_time",
+    [
+        (
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=5, tzinfo=datetime.timezone.utc
+            ),
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=5, tzinfo=datetime.timezone.utc
+            ),
+        ),
+        (
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=0, tzinfo=ZoneInfo("America/New_York")
+            ),
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=0, tzinfo=ZoneInfo("America/New_York")
+            ),
+        ),
+    ],
+)
+def test_trade_predict_time(predict_time, expected_actual_predict_time) -> None:
+    market_data_client = StockHistoricalDataClientMock()
+
+    alpaca_account_client = AlpacaTradingClientMock()
+
+    with Path.open(Path(str(CONFIG_DIR / "trade_config.json"))) as f:
+        rr_trade_config = RRTradeConfig.model_validate_json(f.read())
+
+    for predict_time, expected_actual_predict_time in zip(
+        [predict_time], [expected_actual_predict_time]
+    ):
+        trade_client = Trade(
+            config=rr_trade_config,
+            market_data_client=market_data_client,
+            alpaca_account_client=alpaca_account_client,
+            live=False,
+            predict_time=predict_time,
+            end_predict_time=predict_time,
+            fetch_data=False,
+        )
+        time_series = trade_client.run_model(
+            predict_time=predict_time,
+            end_predict_time=predict_time,
+        )
+        assert time_series[0]["timestamp"] == expected_actual_predict_time
+
+
+@pytest.mark.parametrize(
+    "predict_time, end_predict_time, expected_actual_predict_time, length_of_series",
+    [
+        (
+            datetime.datetime(
+                year=2024, month=12, day=30, hour=5, tzinfo=datetime.timezone.utc
+            ),
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=5, tzinfo=datetime.timezone.utc
+            ),
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=5, tzinfo=datetime.timezone.utc
+            ),
+            2,
+        ),
+        (
+            datetime.datetime(
+                year=2024, month=12, day=26, hour=0, tzinfo=ZoneInfo("America/New_York")
+            ),
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=0, tzinfo=ZoneInfo("America/New_York")
+            ),
+            datetime.datetime(
+                year=2024, month=12, day=31, hour=0, tzinfo=ZoneInfo("America/New_York")
+            ),
+            4,
+        ),
+    ],
+)
+def test_trade_predict_time_with_endtime(
+    predict_time, end_predict_time, expected_actual_predict_time, length_of_series
+) -> None:
+    market_data_client = StockHistoricalDataClientMock()
+
+    alpaca_account_client = AlpacaTradingClientMock()
+
+    with Path.open(Path(str(CONFIG_DIR / "trade_config.json"))) as f:
+        rr_trade_config = RRTradeConfig.model_validate_json(f.read())
+
+    for (
+        predict_time,
+        end_predict_time,
+        expected_actual_predict_time,
+        length_of_series,
+    ) in zip(
+        [predict_time],
+        [end_predict_time],
+        [expected_actual_predict_time],
+        [length_of_series],
+    ):
+        trade_client = Trade(
+            config=rr_trade_config,
+            market_data_client=market_data_client,
+            alpaca_account_client=alpaca_account_client,
+            live=False,
+            predict_time=predict_time,
+            end_predict_time=end_predict_time,
+            fetch_data=False,
+        )
+        time_series = trade_client.run_model(
+            predict_time=predict_time,
+            end_predict_time=end_predict_time,
+        )
+        assert time_series[-1]["timestamp"] == expected_actual_predict_time
+        assert len(time_series) == length_of_series

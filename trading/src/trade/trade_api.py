@@ -12,7 +12,6 @@ from alpaca.trading.requests import GetCalendarRequest
 from trading.cli.alg.config import (
     AgentConfig,
     DataConfig,
-    DataRequests,
     FeatureConfig,
     StockEnv,
 )
@@ -141,34 +140,43 @@ class Trade:
         fetch_data: bool = True,
     ) -> DataLoader:
         calendar = self.trading_client.alpaca_account_client.get_calendar()
-        range_of_days = end_predict_time.date() - predict_time.date()
+        range_of_days = (end_predict_time.date() - predict_time.date()).days
 
         effective_lookback = (
             self.env_config.lookback_window
             + min_window_size(self.active_features)
-            + range_of_days.days
+            + range_of_days
             + 1
         )
 
-        window = [entry for entry in calendar if entry.date <= end_predict_time.date()][
-            -(effective_lookback):
+        # Filter and access directly with negative indexing
+        filtered_calendar = [
+            entry for entry in calendar if entry.date <= end_predict_time.date()
         ]
+        data_start = filtered_calendar[-effective_lookback]
 
-        data_start = window[0]
         logging.info(
-            f"Loading data window: [start_predict: %s, end_predict: %s]\n\tlookback_window: %s, data_start: %s",
+            "Loading data window: [start_predict: %s, end_predict: %s]\n\tlookback_window: %s, data_start: %s",
             predict_time,
             end_predict_time,
             effective_lookback,
             data_start,
         )
 
+        # Ensure timezone awareness, default to UTC
+        start_dt = datetime.datetime.combine(
+            data_start.date, datetime.time.min, tzinfo=datetime.timezone.utc
+        )
+        end_dt = (
+            end_predict_time
+            if end_predict_time.tzinfo is not None
+            else end_predict_time.replace(tzinfo=datetime.timezone.utc)
+        )
+
         data_config = self.data_config
-        data_config.start_date = str(data_start.date)
-        data_config.end_date = end_predict_time.isoformat()
-        data_config.cache_enabled = (
-            False if self.live else data_config.cache_enabled
-        )  # no caching for trading live
+        data_config.start_date = start_dt.isoformat()
+        data_config.end_date = end_dt.isoformat()
+        data_config.cache_enabled = not self.live and data_config.cache_enabled
 
         logging.debug("Data Config: %s", data_config.model_dump_json(indent=4))
 
