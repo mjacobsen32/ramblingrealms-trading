@@ -179,6 +179,11 @@ class StatefulTradingEnv(BaseTradingEnv):
         # Move to next step
         self.observation_index += 1
         self.terminal = self.observation_index >= self.max_steps
+        if self.terminal:
+            logging.info(
+                "Reached terminal state at index %s",
+                self.observation_index,
+            )
         return (
             self._get_observation() if not self.terminal else None,
             reward,
