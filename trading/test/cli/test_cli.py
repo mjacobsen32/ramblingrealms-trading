@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from pandas_market_calendars.calendars.asx import ZoneInfo
+from zoneinfo import ZoneInfo
 from typer.testing import CliRunner
 
 from trading.cli.alg.config import ProjectPath
