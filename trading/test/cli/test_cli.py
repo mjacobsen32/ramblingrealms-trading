@@ -224,7 +224,7 @@ def test_trade_execution() -> None:
     )
 
     assert time_series[0]["timestamp"] == pd.Timestamp(
-        "2025-02-3 05:00:00+0000", tz="UTC"
+        "2025-02-03 05:00:00+0000", tz="UTC"
     )
 
     # This is valid date but outside the range of the cache
