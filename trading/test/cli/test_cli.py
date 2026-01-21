@@ -229,7 +229,7 @@ def test_trade_execution() -> None:
 
     # This is valid date but outside the range of the cache
     with pytest.raises(Trade.LiveTradeError) as exc_info:
-        time_series = trade_client.run_model(
+        trade_client.run_model(
             predict_time=datetime.datetime(
                 year=2025, month=6, day=5, tzinfo=datetime.timezone.utc
             ),
