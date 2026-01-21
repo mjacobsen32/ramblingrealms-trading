@@ -175,16 +175,12 @@ def paper_trade(
     if predict_time_str == "":
         predict_time = datetime.datetime.now(tz=datetime.timezone.utc)
     else:
-        predict_time = datetime.datetime.fromisoformat(predict_time_str).replace(
-            tzinfo=datetime.timezone.utc
-        )
+        predict_time = datetime.datetime.fromisoformat(predict_time_str)
 
     if predict_time_end_str == "":
         predict_time_end = predict_time
     else:
-        predict_time_end = datetime.datetime.fromisoformat(
-            predict_time_end_str
-        ).replace(tzinfo=datetime.timezone.utc)
+        predict_time_end = datetime.datetime.fromisoformat(predict_time_end_str)
 
     trade_client = Trade(
         config=rr_trade_config,
@@ -193,6 +189,7 @@ def paper_trade(
         live=False,
         predict_time=predict_time,
         end_predict_time=predict_time_end,
+        fetch_data=False,
     )
 
     try:
@@ -261,6 +258,7 @@ def live_trade(
         live=True,
         predict_time=predict_time,
         end_predict_time=predict_time_end,
+        fetch_data=False,
     )
 
     try:

@@ -94,7 +94,7 @@ class TradingClient(ABC):
         if self._account.initial_cash is None:
             if self.config.portfolio_config is not None:
                 self._account.initial_cash = self.config.portfolio_config.initial_cash
-        if self._account.portfolio_value is None:
+        if self._account.portfolio_value is None and len(pf_history) > 0:
             self._account.portfolio_value = str(pf_history[-1].net_value)
         self._write_account(cash)
 
