@@ -277,4 +277,8 @@ class Trade:
             obs, reward, terminated, truncated, info = self.env.step(action)
             ret.append(info)
 
+        total_trades = sum([len(info.get("orders", [])) for info in ret])
+        logging.info(
+            f"Completed model run with {total_trades} trades, from time series: [{ret[0]['timestamp']},  {ret[-1]['timestamp']}]"
+        )
         return ret

@@ -111,7 +111,22 @@ class Agent:
 
         with zipfile.ZipFile(zip_path, "r") as zipf:
             # Load meta_data.json directly from zip
-            with zipf.open("meta_data.json") as f:
+            logging.debug("zip contents: %s", zipf.namelist())
+
+            # Find meta_data.json - support both root and nested patterns
+            meta_data_path = None
+            model_zip_path = None
+
+            for name in zipf.namelist():
+                if name.endswith("meta_data.json"):
+                    meta_data_path = name
+                if name.endswith("model.zip"):
+                    model_zip_path = name
+
+            if not meta_data_path:
+                raise ValueError("meta_data.json not found in the zip file.")
+
+            with zipf.open(meta_data_path) as f:
                 meta_data = json.load(f)
 
                 algo = meta_data.get("type", None).lower()
@@ -121,7 +136,9 @@ class Agent:
                     )
 
             # Load model.zip directly from zip into memory
-            with zipf.open("model.zip") as model_file:
+            if not model_zip_path:
+                raise ValueError("model.zip not found in the zip file.")
+            with zipf.open(model_zip_path) as model_file:
                 # Stable Baselines3 expects a file path, so we need to write to a temporary file
                 with tempfile.NamedTemporaryFile(
                     suffix=".zip", delete=False
