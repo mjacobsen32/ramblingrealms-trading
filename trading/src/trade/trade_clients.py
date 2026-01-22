@@ -168,7 +168,7 @@ class TradingClient(ABC):
     ) -> tuple[pd.DataFrame, float, list[MarketOrderRequest]]:
         orders: list[MarketOrderRequest] = []
         for sym, row in actions.iterrows():
-            logging.info(
+            logging.debug(
                 "sym: %s, size: %s, at price: %s, with signal: %s",
                 sym,
                 row.get("size"),
