@@ -1,9 +1,9 @@
 import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
-from zoneinfo import ZoneInfo
 from typer.testing import CliRunner
 
 from trading.cli.alg.config import ProjectPath
