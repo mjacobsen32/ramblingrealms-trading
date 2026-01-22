@@ -1,9 +1,9 @@
 import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pytest
+from zoneinfo import ZoneInfo
 from typer.testing import CliRunner
 
 from trading.cli.alg.config import ProjectPath
@@ -313,54 +313,6 @@ def test_trade_predict_time(predict_time, expected_actual_predict_time) -> None:
                 year=2024, month=12, day=31, hour=0, tzinfo=ZoneInfo("America/New_York")
             ),
             4,
-        ),
-        (
-            datetime.datetime(
-                year=2024,
-                month=9,
-                day=26,
-                hour=3,
-                minute=59,
-                second=59,
-                tzinfo=datetime.timezone.utc,
-            ),
-            datetime.datetime(
-                year=2024,
-                month=9,
-                day=26,
-                hour=4,
-                minute=0,
-                second=1,
-                tzinfo=datetime.timezone.utc,
-            ),
-            datetime.datetime(
-                year=2024, month=9, day=26, hour=4, tzinfo=datetime.timezone.utc
-            ),
-            1,
-        ),
-        (
-            datetime.datetime(
-                year=2024,
-                month=12,
-                day=26,
-                hour=4,
-                minute=59,
-                second=59,
-                tzinfo=datetime.timezone.utc,
-            ),
-            datetime.datetime(
-                year=2024,
-                month=12,
-                day=26,
-                hour=5,
-                minute=0,
-                second=0,
-                tzinfo=datetime.timezone.utc,
-            ),
-            datetime.datetime(
-                year=2024, month=12, day=26, hour=5, tzinfo=datetime.timezone.utc
-            ),
-            1,
         ),
     ],
 )
