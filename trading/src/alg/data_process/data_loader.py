@@ -72,6 +72,27 @@ class DataSource:
         return subclass(**data)
 
 
+class EdgarDataLoader(DataSource):
+    TYPE: ClassVar[DataSourceType] = DataSourceType.EDGAR
+    def get_data(
+        self,
+        fetch_data: bool,
+        request: DataRequests,
+        df: pd.DataFrame,
+        cache_path: str,
+        start_date: str,
+        end_date: str,
+        time_step_unit: str = TimeFrameUnit.Day,
+        cache_enabled: bool = True,
+        time_step_period: int = 1,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """
+        Fetches data from Edgar.
+        """
+        df['edgar_dummy'] = 1.0
+        return df
+
 class AlpacaDataLoader(DataSource):
     """
     ! TODO add columns to and from parquet

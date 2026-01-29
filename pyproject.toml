@@ -44,6 +44,7 @@ dependencies = [
   "quantstats (>=0.0.70,<0.0.71)",
   "boto3 (>=1.42.5,<2.0.0)",
   "pyarrow (>=22.0.0,<23.0.0)",
+  "edgartools (>=5.11.2,<6.0.0)",
 ]
 
 [project.urls]

@@ -84,6 +84,7 @@ class DataSourceType(str, Enum):
     """
 
     ALPACA = "alpaca"
+    EDGAR = "edgar"
 
 
 class FeatureConfig(BaseModel):
