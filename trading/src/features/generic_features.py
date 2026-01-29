@@ -24,6 +24,12 @@ class FeatureType(str, Enum):
     ATR = "atr"
     MSTD = "mstd"
     OBV = "obv"
+    # EDGAR Financial Features
+    EDGAR_FUNDAMENTALS = "edgar_fundamentals"
+    EDGAR_PROFITABILITY = "edgar_profitability"
+    EDGAR_LIQUIDITY = "edgar_liquidity"
+    EDGAR_GROWTH = "edgar_growth"
+    EDGAR_VALUATION = "edgar_valuation"
 
 
 class FillStrategy(str, Enum):
@@ -694,5 +700,419 @@ class Turbulence(Feature):
             len(df) - len(turbulence_values)
         ) + turbulence_values
         df[self.name] = result_values
+
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+# ======================== EDGAR Financial Features ======================== #
+
+
+class EdgarFundamentals(Feature):
+    """
+    EDGAR Fundamentals feature - extracts core financial statement data.
+
+    This feature provides access to fundamental financial data from SEC EDGAR filings:
+    - Revenue and revenue-related metrics
+    - Net income and earnings
+    - Assets, liabilities, and equity
+    - Cash flow components
+
+    The data is aligned by filing date (when it was released) to avoid look-ahead bias.
+    Data is forward-filled from each filing until the next one is released.
+
+    Note: This feature requires the EdgarDataLoader to be run first to populate
+    the edgar_* columns in the dataframe.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.EDGAR_FUNDAMENTALS
+
+    # Which fundamental metrics to include
+    include_revenue: bool = Field(True, description="Include revenue metrics")
+    include_income: bool = Field(True, description="Include income metrics")
+    include_balance_sheet: bool = Field(
+        True, description="Include balance sheet metrics"
+    )
+    include_cash_flow: bool = Field(True, description="Include cash flow metrics")
+    normalize: bool = Field(True, description="Normalize values using log transform")
+
+    def get_feature_names(self) -> List[str]:
+        """Get the feature names based on configuration."""
+        features = []
+
+        if self.include_revenue:
+            features.extend(
+                [
+                    f"{self.name}_revenue",
+                    f"{self.name}_gross_profit",
+                ]
+            )
+
+        if self.include_income:
+            features.extend(
+                [
+                    f"{self.name}_net_income",
+                    f"{self.name}_operating_income",
+                    f"{self.name}_ebitda",
+                ]
+            )
+
+        if self.include_balance_sheet:
+            features.extend(
+                [
+                    f"{self.name}_total_assets",
+                    f"{self.name}_total_liabilities",
+                    f"{self.name}_total_equity",
+                    f"{self.name}_cash",
+                    f"{self.name}_debt",
+                ]
+            )
+
+        if self.include_cash_flow:
+            features.extend(
+                [
+                    f"{self.name}_operating_cf",
+                    f"{self.name}_free_cf",
+                ]
+            )
+
+        return features
+
+    def get_raw_feature_names(self) -> List[str]:
+        return self.get_feature_names()
+
+    def _safe_log_transform(self, series: pd.Series) -> pd.Series:
+        """Apply log transform handling negative values and zeros."""
+        # Use sign-preserving log transform: sign(x) * log(|x| + 1)
+        return np.sign(series) * np.log1p(np.abs(series))
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        """
+        Extract EDGAR fundamental features from the dataframe.
+
+        The EdgarDataLoader should have already populated the edgar_* columns.
+        This feature class transforms and normalizes them for use in the model.
+        """
+        if df.empty:
+            return df
+
+        # Map edgar columns to our feature names
+        column_mapping = {}
+
+        if self.include_revenue:
+            column_mapping[f"{self.name}_revenue"] = "edgar_revenue"
+            column_mapping[f"{self.name}_gross_profit"] = "edgar_gross_profit"
+
+        if self.include_income:
+            column_mapping[f"{self.name}_net_income"] = "edgar_net_income"
+            column_mapping[f"{self.name}_operating_income"] = "edgar_operating_income"
+            column_mapping[f"{self.name}_ebitda"] = "edgar_ebitda"
+
+        if self.include_balance_sheet:
+            column_mapping[f"{self.name}_total_assets"] = "edgar_total_assets"
+            column_mapping[f"{self.name}_total_liabilities"] = "edgar_total_liabilities"
+            column_mapping[f"{self.name}_total_equity"] = "edgar_total_equity"
+            column_mapping[f"{self.name}_cash"] = "edgar_cash_and_equivalents"
+            column_mapping[f"{self.name}_debt"] = "edgar_total_debt"
+
+        if self.include_cash_flow:
+            column_mapping[f"{self.name}_operating_cf"] = "edgar_operating_cash_flow"
+            column_mapping[f"{self.name}_free_cf"] = "edgar_free_cash_flow"
+
+        # Copy and transform columns
+        for new_col, edgar_col in column_mapping.items():
+            if edgar_col in df.columns:
+                if self.normalize:
+                    df[new_col] = self._safe_log_transform(df[edgar_col])
+                else:
+                    df[new_col] = df[edgar_col]
+            else:
+                df[new_col] = np.nan
+
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+class EdgarProfitability(Feature):
+    """
+    EDGAR Profitability feature - extracts profitability ratios and margins.
+
+    This feature provides profitability metrics:
+    - Profit margin (Net Income / Revenue)
+    - Gross margin (Gross Profit / Revenue)
+    - Operating margin (Operating Income / Revenue)
+    - Return on Equity (ROE)
+    - Return on Assets (ROA)
+
+    These ratios are already normalized (percentages) so no additional
+    normalization is typically needed.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.EDGAR_PROFITABILITY
+
+    include_margins: bool = Field(True, description="Include margin ratios")
+    include_returns: bool = Field(True, description="Include ROE/ROA")
+    clip_outliers: bool = Field(True, description="Clip extreme values")
+    clip_range: tuple = Field(
+        (-2.0, 2.0), description="Range for clipping (-200% to 200%)"
+    )
+
+    def get_feature_names(self) -> List[str]:
+        features = []
+
+        if self.include_margins:
+            features.extend(
+                [
+                    f"{self.name}_profit_margin",
+                    f"{self.name}_gross_margin",
+                    f"{self.name}_operating_margin",
+                ]
+            )
+
+        if self.include_returns:
+            features.extend(
+                [
+                    f"{self.name}_roe",
+                    f"{self.name}_roa",
+                ]
+            )
+
+        return features
+
+    def get_raw_feature_names(self) -> List[str]:
+        return self.get_feature_names()
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        """Extract EDGAR profitability features."""
+        if df.empty:
+            return df
+
+        column_mapping = {}
+
+        if self.include_margins:
+            column_mapping[f"{self.name}_profit_margin"] = "edgar_profit_margin"
+            column_mapping[f"{self.name}_gross_margin"] = "edgar_gross_margin"
+            column_mapping[f"{self.name}_operating_margin"] = "edgar_operating_margin"
+
+        if self.include_returns:
+            column_mapping[f"{self.name}_roe"] = "edgar_roe"
+            column_mapping[f"{self.name}_roa"] = "edgar_roa"
+
+        for new_col, edgar_col in column_mapping.items():
+            if edgar_col in df.columns:
+                values = df[edgar_col].copy()
+                if self.clip_outliers:
+                    values = values.clip(
+                        lower=self.clip_range[0], upper=self.clip_range[1]
+                    )
+                df[new_col] = values
+            else:
+                df[new_col] = np.nan
+
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+class EdgarLiquidity(Feature):
+    """
+    EDGAR Liquidity feature - extracts liquidity and leverage ratios.
+
+    This feature provides:
+    - Current ratio (Current Assets / Current Liabilities)
+    - Debt to Equity ratio
+    - Cash ratio variations
+
+    These ratios help assess the company's financial health and risk.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.EDGAR_LIQUIDITY
+
+    include_current_ratio: bool = Field(True, description="Include current ratio")
+    include_leverage: bool = Field(True, description="Include leverage ratios")
+    normalize: bool = Field(True, description="Apply log transform to ratios")
+
+    def get_feature_names(self) -> List[str]:
+        features = []
+
+        if self.include_current_ratio:
+            features.append(f"{self.name}_current_ratio")
+
+        if self.include_leverage:
+            features.append(f"{self.name}_debt_to_equity")
+
+        return features
+
+    def get_raw_feature_names(self) -> List[str]:
+        return self.get_feature_names()
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        """Extract EDGAR liquidity features."""
+        if df.empty:
+            return df
+
+        if self.include_current_ratio:
+            col_name = f"{self.name}_current_ratio"
+            if "edgar_current_ratio" in df.columns:
+                values = df["edgar_current_ratio"].copy()
+                if self.normalize:
+                    # Log transform: values > 1 are positive, < 1 are negative
+                    values = np.log(values.clip(lower=0.01))
+                df[col_name] = values
+            else:
+                df[col_name] = np.nan
+
+        if self.include_leverage:
+            col_name = f"{self.name}_debt_to_equity"
+            if "edgar_debt_to_equity" in df.columns:
+                values = df["edgar_debt_to_equity"].copy()
+                if self.normalize:
+                    # Sign-preserving log transform
+                    values = np.sign(values) * np.log1p(np.abs(values))
+                df[col_name] = values
+            else:
+                df[col_name] = np.nan
+
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+class EdgarGrowth(Feature):
+    """
+    EDGAR Growth feature - extracts year-over-year growth metrics.
+
+    This feature provides growth rates:
+    - Revenue growth (YoY)
+    - Earnings growth (YoY)
+    - EPS growth
+
+    Growth rates are useful for identifying companies with momentum.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.EDGAR_GROWTH
+
+    include_revenue_growth: bool = Field(True, description="Include revenue growth")
+    include_earnings_growth: bool = Field(True, description="Include earnings growth")
+    clip_outliers: bool = Field(True, description="Clip extreme growth values")
+    clip_range: tuple = Field(
+        (-5.0, 5.0), description="Range for clipping (-500% to 500%)"
+    )
+
+    def get_feature_names(self) -> List[str]:
+        features = []
+
+        if self.include_revenue_growth:
+            features.append(f"{self.name}_revenue_growth")
+
+        if self.include_earnings_growth:
+            features.append(f"{self.name}_earnings_growth")
+
+        return features
+
+    def get_raw_feature_names(self) -> List[str]:
+        return self.get_feature_names()
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        """Extract EDGAR growth features."""
+        if df.empty:
+            return df
+
+        if self.include_revenue_growth:
+            col_name = f"{self.name}_revenue_growth"
+            if "edgar_revenue_growth_yoy" in df.columns:
+                values = df["edgar_revenue_growth_yoy"].copy()
+                if self.clip_outliers:
+                    values = values.clip(
+                        lower=self.clip_range[0], upper=self.clip_range[1]
+                    )
+                df[col_name] = values
+            else:
+                df[col_name] = np.nan
+
+        if self.include_earnings_growth:
+            col_name = f"{self.name}_earnings_growth"
+            if "edgar_earnings_growth_yoy" in df.columns:
+                values = df["edgar_earnings_growth_yoy"].copy()
+                if self.clip_outliers:
+                    values = values.clip(
+                        lower=self.clip_range[0], upper=self.clip_range[1]
+                    )
+                df[col_name] = values
+            else:
+                df[col_name] = np.nan
+
+        return self.clean_columns(self.get_feature_names(), df)
+
+
+class EdgarValuation(Feature):
+    """
+    EDGAR Valuation feature - extracts valuation-related metrics.
+
+    This feature provides:
+    - EPS (Earnings Per Share)
+    - Book Value Per Share
+    - Shares Outstanding (normalized)
+
+    Note: P/E ratio and other price-based valuations should be calculated
+    by combining these with price data in a separate feature.
+    """
+
+    TYPE: ClassVar[FeatureType] = FeatureType.EDGAR_VALUATION
+
+    include_eps: bool = Field(True, description="Include EPS")
+    include_book_value: bool = Field(True, description="Include book value per share")
+    include_shares: bool = Field(False, description="Include shares outstanding")
+    normalize: bool = Field(True, description="Apply normalization")
+
+    def get_feature_names(self) -> List[str]:
+        features = []
+
+        if self.include_eps:
+            features.append(f"{self.name}_eps")
+
+        if self.include_book_value:
+            features.append(f"{self.name}_book_value")
+
+        if self.include_shares:
+            features.append(f"{self.name}_shares")
+
+        return features
+
+    def get_raw_feature_names(self) -> List[str]:
+        return self.get_feature_names()
+
+    def _safe_log_transform(self, series: pd.Series) -> pd.Series:
+        """Apply log transform handling negative values and zeros."""
+        return np.sign(series) * np.log1p(np.abs(series))
+
+    def to_df(self, df: pd.DataFrame, data: Any) -> pd.DataFrame:
+        """Extract EDGAR valuation features."""
+        if df.empty:
+            return df
+
+        if self.include_eps:
+            col_name = f"{self.name}_eps"
+            if "edgar_eps" in df.columns:
+                values = df["edgar_eps"].copy()
+                if self.normalize:
+                    values = self._safe_log_transform(values)
+                df[col_name] = values
+            else:
+                df[col_name] = np.nan
+
+        if self.include_book_value:
+            col_name = f"{self.name}_book_value"
+            if "edgar_book_value_per_share" in df.columns:
+                values = df["edgar_book_value_per_share"].copy()
+                if self.normalize:
+                    values = self._safe_log_transform(values)
+                df[col_name] = values
+            else:
+                df[col_name] = np.nan
+
+        if self.include_shares:
+            col_name = f"{self.name}_shares"
+            if "edgar_shares_outstanding" in df.columns:
+                values = df["edgar_shares_outstanding"].copy()
+                if self.normalize:
+                    values = np.log1p(values)  # Always positive
+                df[col_name] = values
+            else:
+                df[col_name] = np.nan
 
         return self.clean_columns(self.get_feature_names(), df)

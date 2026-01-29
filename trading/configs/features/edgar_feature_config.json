@@ -1,0 +1,54 @@
+{
+    "features": [
+        {
+            "type": "candle",
+            "name": "candle",
+            "enabled": true
+        },
+        {
+            "type": "edgar_fundamentals",
+            "name": "fundamentals",
+            "enabled": true,
+            "include_revenue": true,
+            "include_income": true,
+            "include_balance_sheet": true,
+            "include_cash_flow": true,
+            "normalize": true
+        },
+        {
+            "type": "edgar_profitability",
+            "name": "profitability",
+            "enabled": true,
+            "include_margins": true,
+            "include_returns": true,
+            "clip_outliers": true,
+            "clip_range": [-2.0, 2.0]
+        },
+        {
+            "type": "edgar_liquidity",
+            "name": "liquidity",
+            "enabled": true,
+            "include_current_ratio": true,
+            "include_leverage": true,
+            "normalize": true
+        },
+        {
+            "type": "edgar_growth",
+            "name": "growth",
+            "enabled": true,
+            "include_revenue_growth": true,
+            "include_earnings_growth": true,
+            "clip_outliers": true,
+            "clip_range": [-5.0, 5.0]
+        },
+        {
+            "type": "edgar_valuation",
+            "name": "valuation",
+            "enabled": true,
+            "include_eps": true,
+            "include_book_value": true,
+            "include_shares": false,
+            "normalize": true
+        }
+    ]
+}
