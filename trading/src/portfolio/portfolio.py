@@ -256,8 +256,28 @@ class Portfolio:
         return ret
 
     def save(self, file_path: str, df: pd.DataFrame | None = None):
-        logging.info("Saving VectorBT results to %s", file_path)
-        self.as_vbt_pf(df=df).save(file_path)
+        file_path_obj = Path(file_path)
+        suffix = file_path_obj.suffix.lower()
+
+        if suffix == ".json":
+            logging.info("Saving portfolio results to JSON at %s", file_path)
+            vbt_pf = self.as_vbt_pf(df=df)
+
+            # Prepare data for JSON serialization
+            data = {
+                "stats": vbt_pf.stats().to_dict(),
+                "orders": vbt_pf.orders.records_readable.to_dict(orient="records"),
+                "trades": vbt_pf.trades.records_readable.to_dict(orient="records"),
+            }
+
+            import json
+
+            with open(file_path, "w") as f:
+                json.dump(data, f, indent=2, default=str)
+        else:
+            # Default to pickle format (.pkl or any other extension)
+            logging.info("Saving VectorBT results to %s", file_path)
+            self.as_vbt_pf(df=df).save(file_path)
 
     def save_plots(self, backtest_dir: Path, tickers: list[str] | None = None):
         for k, p in self._get_plots().items():
