@@ -31,6 +31,7 @@ class BaseTradingEnv(gym.Env, ABC):
         self.stock_dimension = data.index.get_level_values("symbol").nunique()
         if len(self.symbols) != self.stock_dimension:
             raise ValueError("Data symbols length does not match stock dimension.")
+        self.features = features
         self.feature_cols = feature_utils.get_feature_cols(features)
         self.init_data(data)
         self.cfg: StockEnv = cfg

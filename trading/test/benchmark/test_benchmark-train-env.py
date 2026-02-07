@@ -135,22 +135,7 @@ def params_lb() -> tuple[list[EnvBenchmarkArgs], list[str]]:
     return ret, ret_names
 
 
-def params_gpu() -> tuple[list[EnvBenchmarkArgs], list[str]]:
-    ret: list[EnvBenchmarkArgs] = []
-    ret_names: list[str] = []
-    for gpu in [False, True]:
-        ret.append(
-            EnvBenchmarkArgs(
-                num_tickers=10000,
-                lookback_window=100,
-                num_features=10000,
-                gpu=gpu,
-            )
-        )
-        ret_names.append(f"gpu:{gpu}")
-    return ret, ret_names
-
-
+@pytest.mark.benchmark
 @pytest.mark.parametrize("args", params_lb()[0], ids=params_lb()[1])
 def test_benchmark_lookback(benchmark, args):
     actions = np.random.rand(args.num_tickers)
@@ -158,6 +143,7 @@ def test_benchmark_lookback(benchmark, args):
     benchmark.pedantic(benchmark_train_env, args=(env, actions), rounds=ROUNDS)
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize("args", params_tickers()[0], ids=params_tickers()[1])
 def test_benchmark_tickers(benchmark, args):
     actions = np.random.rand(args.num_tickers)
@@ -165,6 +151,7 @@ def test_benchmark_tickers(benchmark, args):
     benchmark.pedantic(benchmark_train_env, args=(env, actions), rounds=ROUNDS)
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize("args", params_numfeatures()[0], ids=params_numfeatures()[1])
 def test_benchmark_numfeatures(benchmark, args):
     actions = np.random.rand(args.num_tickers)
@@ -172,15 +159,9 @@ def test_benchmark_numfeatures(benchmark, args):
     benchmark.pedantic(benchmark_train_env, args=(env, actions), rounds=ROUNDS)
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize("args", params()[0], ids=params()[1])
 def test_benchmark_train(benchmark, args):
-    actions = np.random.rand(args.num_tickers)
-    env = init_env(args)
-    benchmark.pedantic(benchmark_train_env, args=(env, actions), rounds=ROUNDS)
-
-
-@pytest.mark.parametrize("args", params_gpu()[0], ids=params_gpu()[1])
-def test_benchmark_gpu(benchmark, args):
     actions = np.random.rand(args.num_tickers)
     env = init_env(args)
     benchmark.pedantic(benchmark_train_env, args=(env, actions), rounds=ROUNDS)
