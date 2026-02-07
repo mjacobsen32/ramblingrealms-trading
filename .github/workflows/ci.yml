@@ -50,7 +50,7 @@ jobs:
 
       - name: Run test suite
         run: |
-          poetry run coverage run -m pytest
+          poetry run coverage run -m pytest -m "not benchmark"
           poetry run coverage xml -o reports/coverage.xml
           poetry run coverage report
 

@@ -282,7 +282,10 @@ class AnalysisConfig(BaseModel):
     render_plots: bool = Field(
         True, description="Plot the backtesting results in browser using .show()"
     )
-    save_plots: bool = Field(True, description="Whether to save the analysis plots")
+    save_plots: bool = Field(
+        True,
+        description="Whether to save the analysis plots, supports pkl and json based on extension",
+    )
     to_csv: bool = Field(True, description="Save the analysis results to CSV files")
     tickers: List[str] | None = Field(
         None,

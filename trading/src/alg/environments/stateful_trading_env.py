@@ -25,7 +25,7 @@ class StatefulTradingEnv(BaseTradingEnv):
         self,
         data: pd.DataFrame,
         cfg: StockEnv,
-        features: List[Feature],
+        features: list[Feature] | list[str],
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
         position_manager: PositionManager | None = None,
     ):

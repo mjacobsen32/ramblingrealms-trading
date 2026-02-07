@@ -69,6 +69,7 @@ defusedxml = "^0.7.1"
 py-spy = "^0.4.1"
 types-requests = "^2.32.4.20250809"
 moto = "^5.1.18"
+pytest-benchmark = "^5.2.3"
 
 
 [tool.poetry.group.docs.dependencies]

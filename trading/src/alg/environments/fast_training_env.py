@@ -20,13 +20,17 @@ class FastTrainingEnv(BaseTradingEnv):
     Optimized for speed with constant-time operations.
     Does NOT maintain position history, trade constraints, or complex metrics.
     Target: 10,000 iterations per second.
+
+    Anti-memorization features:
+    - Symbol shuffling at each reset to prevent learning position-specific patterns
+    - hmax constraint to limit concentration in any single stock
     """
 
     def __init__(
         self,
         data: pd.DataFrame,
         cfg: StockEnv,
-        features: List[Feature],
+        features: list[str] | list[Feature],
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
     ):
         super().__init__(data, cfg, features, time_step)
@@ -36,13 +40,22 @@ class FastTrainingEnv(BaseTradingEnv):
         self.cash = self.initial_cash
         self.holdings = np.zeros(self.stock_dimension, dtype=np.float32)
 
+        # Symbol shuffling: maps action index -> actual symbol index in data
+        # This prevents the model from memorizing "action[i] = best stock"
+        self._symbol_permutation = np.arange(self.stock_dimension, dtype=np.int32)
+        self._inverse_permutation = np.arange(self.stock_dimension, dtype=np.int32)
+
         # Pre-compute price data for fast access
         self._precompute_price_arrays()
 
+        # Pre-compute hmax as shares limit per stock (for speed)
+        self._hmax = cfg.portfolio_config.hmax
+
         logging.info(
-            "FastTrainingEnv initialized with %d symbols, lookback=%d",
+            "FastTrainingEnv initialized with %d symbols, lookback=%d, hmax=%.2f",
             self.stock_dimension,
             self.cfg.lookback_window,
+            self._hmax,
         )
 
     def _precompute_price_arrays(self):
@@ -73,21 +86,26 @@ class FastTrainingEnv(BaseTradingEnv):
         """
         Get observation with minimal computation using pre-computed matrices.
         Returns: [cash, holdings, current_prices, indicators]
+
+        Note: Holdings and prices are returned in SHUFFLED order matching the
+        current symbol permutation, so the model sees a consistent view.
         """
         if i == -1:
             i = self.observation_index
 
-        # Get portfolio state (just cash and holdings, no complex calculations)
-        portfolio_state = np.concatenate([[self.cash], self.holdings])
+        # Get portfolio state with shuffled holdings order
+        # This ensures the model sees holdings in the same order as actions
+        shuffled_holdings = self.holdings[self._symbol_permutation]
+        portfolio_state = np.concatenate([[self.cash], shuffled_holdings])
 
-        # Get current prices from pre-computed matrix
-        prices = self.price_matrix[i]
+        # Get current prices from pre-computed matrix, shuffled to match action order
+        prices = self.price_matrix[i][self._symbol_permutation]
 
         # Get features for the lookback window from pre-computed matrix
-        # Instead of slicing dataframe, we slice the feature matrix
+        # Shuffle features to match the symbol permutation
         start_idx = max(0, i - self.cfg.lookback_window)
         end_idx = i + 1
-        feature_window = self.feature_matrix[start_idx:end_idx].flatten()
+        feature_window = self._get_shuffled_features(start_idx, end_idx)
 
         # Combine all observations
         observation = np.concatenate([portfolio_state, prices, feature_window], axis=0)
@@ -101,18 +119,57 @@ class FastTrainingEnv(BaseTradingEnv):
 
         return observation.astype(np.float32)
 
+    def _get_shuffled_features(self, start_idx: int, end_idx: int) -> np.ndarray:
+        """
+        Get features for the lookback window, shuffled to match symbol permutation.
+        Maintains speed by using pre-computed indices.
+        """
+        num_features = len(self.feature_cols)
+        raw_features = self.feature_matrix[
+            start_idx:end_idx
+        ]  # [timesteps, features*symbols]
+
+        # Reshape to [timesteps, symbols, features], shuffle symbols, then flatten
+        timesteps = raw_features.shape[0]
+        reshaped = raw_features.reshape(timesteps, self.stock_dimension, num_features)
+        shuffled = reshaped[:, self._symbol_permutation, :]
+        return shuffled.flatten()
+
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
-        """Reset to initial state."""
+        """
+        Reset to initial state with symbol shuffling.
+
+        Symbol shuffling prevents the model from memorizing that a specific
+        action index corresponds to the best-performing stock. Each episode,
+        the mapping between action indices and actual stocks is randomized.
+        """
         super().reset(seed=seed, options=options)
         self._reset_internal_states()
         self.cash = self.initial_cash
         self.holdings.fill(0.0)
+
+        # Shuffle symbol order to prevent memorization
+        # This randomizes which action index maps to which stock
+        rng = np.random.default_rng(seed)
+        self._symbol_permutation = rng.permutation(self.stock_dimension).astype(
+            np.int32
+        )
+        # Compute inverse permutation for mapping actions back to data indices
+        self._inverse_permutation = np.argsort(self._symbol_permutation).astype(
+            np.int32
+        )
+
+        logging.debug("Reset with symbol permutation: %s", self._symbol_permutation[:5])
+
         return self._get_observation(), {}
 
     def step(self, action):
         """
         Fast step with minimal state updates.
         Reward based on immediate portfolio value change.
+
+        Actions are mapped through the symbol permutation to actual stock indices.
+        hmax constraint limits maximum shares traded per stock per step.
         """
         if self.terminal:
             return (
@@ -123,19 +180,24 @@ class FastTrainingEnv(BaseTradingEnv):
                 {},
             )
 
-        # Get current prices
+        # Get current prices (in original data order, not shuffled)
         current_prices = self.price_matrix[self.observation_index]
 
         # Calculate portfolio value before action
         portfolio_value_before = self.cash + np.dot(self.holdings, current_prices)
 
+        # Map actions from shuffled order back to original data order
+        # action[i] corresponds to symbol at _symbol_permutation[i]
+        # We need to reorder actions to match the original data order
+        action_in_data_order = action[self._inverse_permutation]
+
         # Simple action scaling: convert normalized actions to share amounts
         # Action > threshold means buy, < -threshold means sell
         action_threshold = self.cfg.portfolio_config.action_threshold
 
-        # Vectorized action processing
-        buy_mask = action > action_threshold
-        sell_mask = action < -action_threshold
+        # Vectorized action processing (now in data order)
+        buy_mask = action_in_data_order > action_threshold
+        sell_mask = action_in_data_order < -action_threshold
 
         # Use configured trade limit percent for scaling
         trade_limit = self.cfg.portfolio_config.trade_limit_percent
@@ -145,8 +207,12 @@ class FastTrainingEnv(BaseTradingEnv):
             max_buy_per_stock = (portfolio_value_before * trade_limit) / (
                 current_prices + EPSILON
             )
-            buy_amounts = np.where(buy_mask, action * max_buy_per_stock, 0.0)
-            sell_amounts = np.where(sell_mask, action * self.holdings, 0.0)
+            buy_amounts = np.where(
+                buy_mask, action_in_data_order * max_buy_per_stock, 0.0
+            )
+            sell_amounts = np.where(
+                sell_mask, action_in_data_order * self.holdings, 0.0
+            )
         else:
             # Discrete mode: all-in or all-out
             max_shares = (portfolio_value_before * trade_limit) / (
@@ -157,6 +223,11 @@ class FastTrainingEnv(BaseTradingEnv):
 
         # Combine buy and sell
         net_shares = buy_amounts + sell_amounts
+
+        # Apply hmax constraint: limit maximum shares traded per stock per step
+        # This prevents over-concentration in any single stock
+        hmax_in_shares = self._hmax / (current_prices + EPSILON)
+        net_shares = np.clip(net_shares, -hmax_in_shares, hmax_in_shares)
 
         # Ensure we don't sell more than we have
         net_shares = np.clip(net_shares, -self.holdings, np.inf)

@@ -23,7 +23,7 @@ class BaseTradingEnv(gym.Env, ABC):
         self,
         data: pd.DataFrame,
         cfg: StockEnv,
-        features: List[Feature],
+        features: list[Feature] | list[str],
         time_step: tuple[TimeFrameUnit, int] = (TimeFrameUnit.Day, 1),
     ):
         super().__init__()
@@ -32,7 +32,7 @@ class BaseTradingEnv(gym.Env, ABC):
         if len(self.symbols) != self.stock_dimension:
             raise ValueError("Data symbols length does not match stock dimension.")
         self.features = features
-        self.feature_cols = feature_utils.get_feature_cols(features=self.features)
+        self.feature_cols = feature_utils.get_feature_cols(features)
         self.init_data(data)
         self.cfg: StockEnv = cfg
         self.time_step = time_step
