@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import gymnasium as gym
 from stable_baselines3 import A2C, DDPG, DQN, PPO, SAC
+from stable_baselines3.common.callbacks import CallbackList
 
 from trading.cli.alg.config import AgentConfig, DataConfig, ProjectPath
 from trading.src.alg.agents.lr_schedule import BaseLRSchedule
+from trading.src.alg.callbacks.training_telemetry import TradingTelemetryCallback
 
 if TYPE_CHECKING:
     from trading.src.alg.environments.base_environment import BaseTradingEnv
@@ -150,15 +152,36 @@ class Agent:
 
         return model, meta_data
 
-    def learn(self, timesteps: Optional[int] = None):
+    def learn(self, timesteps: Optional[int] = None, callbacks: Optional[list] = None):
+        """
+        Train the agent with enhanced telemetry tracking.
+
+        Args:
+            timesteps: Number of timesteps to train for (uses config if None)
+            callbacks: Additional callbacks to include
+        """
         logging.debug("Starting training for %s agent.", self.config.algo)
+
+        # Create telemetry callback
+        telemetry_callback = TradingTelemetryCallback(
+            verbose=1, log_freq=self.config.kwargs.get("n_steps", 256)
+        )
+
+        # Combine with any additional callbacks
+        callback_list = [telemetry_callback]
+        if callbacks:
+            callback_list.extend(callbacks)
+
+        combined_callbacks = CallbackList(callback_list)
+
         ret = self.model.learn(
             total_timesteps=(
                 self.config.total_timesteps if timesteps is None else timesteps
             ),
             progress_bar=True,
+            callback=combined_callbacks,
         )
-        logging.debug("Training completed for %s agent.", self.config.algo)
+        logging.debug("Training completed for %s agent.")
         return ret
 
     def predict(self, obs):
