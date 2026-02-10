@@ -14,6 +14,19 @@ dist
 .vscode
 trading/cli/configuration/prod.yml
 
+# config files
+trading/configs
+!trading/configs/sample_ppo.json
+!trading/configs/agents/ppo.json
+!trading/configs/agents/ddpg.json
+!trading/configs/data/SPY_5.json
+!trading/configs/envs/env.json
+!trading/configs/features/features.json
+!trading/configs/trading/alpaca_paper_trading.json
+!trading/configs/trading/local_paper_trading.json
+!trading/configs/remote_paper_trading.json
+
+
 # logs
 logs
 out
