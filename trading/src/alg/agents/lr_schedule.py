@@ -110,6 +110,7 @@ class ExponentialLRSchedule(BaseLRSchedule):
             )
 
         self.decay_rate = decay_rate
+
     def func(self, progress_remaining: float) -> float:
         """
         Exponential decay from initial_value to initial_value * decay_rate.
@@ -142,6 +143,7 @@ class CosineWarmupLRSchedule(BaseLRSchedule):
             raise ValueError(
                 f"warmup_fraction must be in the open interval (0, 1), got {self.warmup_fraction!r}"
             )
+
     def func(self, progress_remaining: float) -> float:
         """
         Linear warmup followed by cosine annealing.
@@ -188,6 +190,7 @@ class PolynomialLRSchedule(BaseLRSchedule):
             raise ValueError(
                 f"PolynomialLRSchedule 'power' must be non-negative, got {self.power}"
             )
+
     def func(self, progress_remaining: float) -> float:
         """
         Polynomial decay from initial_value to final_value.
