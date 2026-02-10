@@ -102,10 +102,16 @@ class ExponentialLRSchedule(BaseLRSchedule):
         super().__init__(cfg)
         if isinstance(cfg, dict):
             # decay_rate determines how fast it decays (default 0.1 means 10% of initial at end)
-            self.decay_rate = cfg.get("decay_rate", 0.1)
+            decay_rate = cfg.get("decay_rate", 0.1)
         else:
-            self.decay_rate = 0.1
+            decay_rate = 0.1
 
+        if not (0.0 < decay_rate <= 1.0):
+            raise ValueError(
+                f"decay_rate must be in the interval (0, 1], got {decay_rate}"
+            )
+
+        self.decay_rate = decay_rate
     def func(self, progress_remaining: float) -> float:
         """
         Exponential decay from initial_value to initial_value * decay_rate.
