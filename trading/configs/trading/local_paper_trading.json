@@ -1,11 +1,11 @@
 {
-    "model_path": "{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/ppo_fast_training.zip",
-    "out_dir": "{PROJECT_ROOT}/out/trading",
-    "broker": "LOCAL",
-    "positions_path": "{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/trading/local_paper_trading_positions.json",
-    "account_path": "{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/trading/local_paper_trading_account.json",
-    "closed_positions_path": "{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/trading/closed_positions/{TIMESTAMP}.csv",
-    "account_value_series_path":"{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/trading/pf_value/{TIMESTAMP}.csv",
-    "meta_data_path": "{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/trading/local_paper_trading_meta_data.json",
-    "defer_trade_execution": true
+  "model_path": "{PROJECT_ROOT}/out/production/50_tickers_1M_learned_NVDA/ppo_fast_training.zip",
+  "out_dir": "{PROJECT_ROOT}/out/trading",
+  "broker": "LOCAL",
+  "positions_path": "{PROJECT_ROOT}/out/ppo_1_0/local_paper_trading_positions.json",
+  "account_path": "{PROJECT_ROOT}/out/ppo_1_0/local_paper_trading_account.json",
+  "closed_positions_path": "{PROJECT_ROOT}/out/ppo_1_0/closed_positions/{TIMESTAMP}.csv",
+  "account_value_series_path": "{PROJECT_ROOT}/out/ppo_1_0/pf_value/{TIMESTAMP}.csv",
+  "meta_data_path": "{PROJECT_ROOT}/out/ppo_1_0/local_paper_trading_meta_data.json",
+  "defer_trade_execution": true
 }

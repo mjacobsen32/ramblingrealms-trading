@@ -24,6 +24,7 @@ trading/configs
 !trading/configs/features/features.json
 !trading/configs/trading/alpaca_paper_trading.json
 !trading/configs/trading/local_paper_trading.json
+!trading/configs/trading/remote_paper_trading.json
 !trading/configs/remote_paper_trading.json
 
 
