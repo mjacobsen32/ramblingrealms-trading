@@ -4,7 +4,6 @@ Tracks portfolio metrics, action distributions, and trading patterns.
 """
 
 import logging
-from typing import Any
 
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
@@ -21,14 +20,18 @@ class TradingTelemetryCallback(BaseCallback):
     - Per-ticker performance insights
     """
 
-    def __init__(self, verbose: int = 0, log_freq: int = 256):
+    def __init__(
+        self, verbose: int = 0, log_freq: int = 256, action_threshold: float = 0.1
+    ):
         """
         Args:
             verbose: Verbosity level (0: silent, 1: info, 2: debug)
             log_freq: How often to log detailed metrics (in steps)
+            action_threshold: Threshold to consider an action as buy/sell/hold
         """
         super().__init__(verbose)
         self.log_freq = log_freq
+        self.action_threshold = action_threshold
 
         # Episode tracking
         self.episode_rewards: list[float] = []
@@ -37,7 +40,7 @@ class TradingTelemetryCallback(BaseCallback):
         self.episode_equity_end: list[float] = []
 
         # Action statistics
-        self.action_history: list[float] = []
+        self.action_history: list[np.ndarray] = []
         self.buy_count = 0
         self.sell_count = 0
         self.hold_count = 0
@@ -47,9 +50,6 @@ class TradingTelemetryCallback(BaseCallback):
         self.min_portfolio_value = float("inf")
         self.cumulative_trades = 0
 
-        # Episode-specific
-        self.current_episode_reward = 0
-        self.current_episode_length = 0
         self.current_episode_start_value = None
 
     def _on_training_start(self) -> None:
@@ -81,11 +81,9 @@ class TradingTelemetryCallback(BaseCallback):
             if isinstance(actions, np.ndarray):
                 self.action_history.append(actions.copy())
 
-                # Count actions above/below threshold (assuming threshold ~0.1)
-                action_threshold = 0.1
-                self.buy_count += np.sum(actions > action_threshold)
-                self.sell_count += np.sum(actions < -action_threshold)
-                self.hold_count += np.sum(np.abs(actions) <= action_threshold)
+                self.buy_count += np.sum(actions > self.action_threshold)
+                self.sell_count += np.sum(actions < -self.action_threshold)
+                self.hold_count += np.sum(np.abs(actions) <= self.action_threshold)
 
         # Extract info from environment
         infos = self.locals.get("infos", [{}])
@@ -182,6 +180,7 @@ class TradingTelemetryCallback(BaseCallback):
             self.buy_count = 0
             self.sell_count = 0
             self.hold_count = 0
+            self.action_history = []
 
     def _log_detailed_metrics(self) -> None:
         """Log detailed metrics about training progress."""
@@ -237,3 +236,7 @@ class TradingTelemetryCallback(BaseCallback):
         logging.info(f"  Mean episode reward: {np.mean(self.episode_rewards):.2f}")
         logging.info(f"  Max portfolio value: {self.max_portfolio_value:.2f}")
         logging.info(f"  Min portfolio value: {self.min_portfolio_value:.2f}")
+        if len(self.episode_rewards) > 0:
+            logging.info(f"  Mean episode reward: {np.mean(self.episode_rewards):.2f}")
+        else:
+            logging.info("  Mean episode reward: N/A (no episodes completed)")

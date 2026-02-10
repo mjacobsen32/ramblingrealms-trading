@@ -152,7 +152,9 @@ class Agent:
 
         return model, meta_data
 
-    def learn(self, timesteps: Optional[int] = None, callbacks: Optional[list] = None):
+    def learn(
+        self, timesteps: Optional[int] = None, callbacks: Optional[list] = None
+    ) -> A2C | DDPG | DQN | PPO | SAC | Any:
         """
         Train the agent with enhanced telemetry tracking.
 
@@ -162,9 +164,16 @@ class Agent:
         """
         logging.debug("Starting training for %s agent.", self.config.algo)
 
+        action_threshold = (
+            self.env.cfg.portfolio_config.action_threshold
+            if hasattr(self.env, "cfg")
+            else 0.1
+        )
         # Create telemetry callback
         telemetry_callback = TradingTelemetryCallback(
-            verbose=1, log_freq=self.config.kwargs.get("n_steps", 256)
+            verbose=1,
+            log_freq=self.config.kwargs.get("n_steps", 256),
+            action_threshold=action_threshold,
         )
 
         # Combine with any additional callbacks
@@ -181,7 +190,7 @@ class Agent:
             progress_bar=True,
             callback=combined_callbacks,
         )
-        logging.debug("Training completed for %s agent.")
+        logging.debug("Training completed for %s agent.", self.config.algo)
         return ret
 
     def predict(self, obs):
