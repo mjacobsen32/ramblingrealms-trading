@@ -13,6 +13,13 @@
       "period": 50
     },
     {
+      "type": "moving_window",
+      "name": "ma15",
+      "enabled": true,
+      "field": "close",
+      "period": 15
+    },
+    {
       "type": "atr",
       "name": "atr_14",
       "enabled": true,

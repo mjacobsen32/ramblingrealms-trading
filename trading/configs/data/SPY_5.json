@@ -1,0 +1,20 @@
+{
+  "start_date": "2020-01-01",
+  "end_date": "2025-01-01",
+  "time_step_unit": "Day",
+  "time_step_period": 1,
+  "cache_path": "{PROJECT_ROOT}/data",
+  "cache_enabled": true,
+  "validation_split": 0.2,
+  "requests": [
+    {
+      "dataset_name": "SPY_5_years",
+      "source": "alpaca",
+      "endpoint": "StockBarsRequest",
+      "kwargs": {
+        "symbol_or_symbols": ["NVDA", "AAPL", "GOOG", "MSFT", "AMZN"],
+        "adjustment": "split"
+      }
+    }
+  ]
+}

@@ -1,16 +1,16 @@
 {
-  "name": "ppo_multi_ticker",
+  "name": "ppo_spy_5",
   "description": "A generic ppo trading algorithm configuration.",
   "version": "1.0",
   "out_dir": "{PROJECT_ROOT}/out/alg/",
-  "agent_config": "{PROJECT_ROOT}/trading/configs/agents/ppo_config.json",
+  "agent_config": "{PROJECT_ROOT}/trading/configs/agents/ppo.json",
   "feature_config": "{PROJECT_ROOT}/trading/configs/features/feature_config.json",
-  "data_config": "{PROJECT_ROOT}/trading/configs/data/multi_ticker_data_config.json",
+  "data_config": "{PROJECT_ROOT}/trading/configs/data/SPY_5.json",
   "stock_env": "{PROJECT_ROOT}/trading/configs/envs/stock_env.json",
   "backtest_config": {
     "save_results": true,
     "backtest_dir": "{OUT_DIR}/backtest_results/",
-    "results_path": "{BACKTEST_DIR}/ppo_multi_ticker_results.pkl",
+    "results_path": "{BACKTEST_DIR}/ppo_spy_5_results.pkl",
     "analysis_config": {
       "tickers": ["portfolio"],
       "render_plots": false,

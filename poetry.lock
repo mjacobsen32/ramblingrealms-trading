@@ -6645,4 +6645,4 @@ repair = ["scipy (>=1.6.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "cf0d563c85da8c10b7b6c41abd2112bfd430bdc84779f83e82f2e615323e4b77"
+content-hash = "9bb22e22ba850b6ea3918b32151c7459f9bd8c92b193d0ff0905f529f741863b"
