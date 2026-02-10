@@ -170,6 +170,15 @@ class PolynomialLRSchedule(BaseLRSchedule):
         else:
             self.power = 2.0
 
+        # Validate power early to avoid runtime errors like 0.0 ** negative.
+        if not isinstance(self.power, (int, float)):
+            raise TypeError(
+                f"PolynomialLRSchedule 'power' must be a number (int or float), got {type(self.power).__name__}"
+            )
+        if self.power < 0:
+            raise ValueError(
+                f"PolynomialLRSchedule 'power' must be non-negative, got {self.power}"
+            )
     def func(self, progress_remaining: float) -> float:
         """
         Polynomial decay from initial_value to final_value.
