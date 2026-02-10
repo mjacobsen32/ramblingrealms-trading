@@ -159,7 +159,7 @@ class PolynomialLRSchedule(BaseLRSchedule):
     Polynomial learning rate decay.
     More gradual than exponential, more controlled than linear.
 
-    Formula: lr = (initial_lr - final_lr) * (1 - progress)^power + final_lr
+    Formula: lr = (initial_lr - final_lr) * (progress_remaining**power) + final_lr
     """
 
     def __init__(self, cfg: dict | float):
