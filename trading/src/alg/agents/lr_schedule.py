@@ -1,6 +1,4 @@
-import logging
 import math
-from typing import Callable
 
 
 class BaseLRSchedule:
