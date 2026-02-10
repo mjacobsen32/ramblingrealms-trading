@@ -133,6 +133,11 @@ class CosineWarmupLRSchedule(BaseLRSchedule):
         else:
             self.warmup_fraction = 0.1
 
+        # Validate warmup_fraction to avoid division-by-zero and invalid progress values
+        if not (0.0 < self.warmup_fraction < 1.0):
+            raise ValueError(
+                f"warmup_fraction must be in the open interval (0, 1), got {self.warmup_fraction!r}"
+            )
     def func(self, progress_remaining: float) -> float:
         """
         Linear warmup followed by cosine annealing.
