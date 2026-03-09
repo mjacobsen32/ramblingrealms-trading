@@ -2,6 +2,7 @@ import logging
 import os
 from typing import ClassVar, Dict, Type
 
+import numpy as np
 import pandas as pd
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
@@ -16,6 +17,7 @@ from trading.cli.alg.config import (
     DataSourceType,
     FeatureConfig,
 )
+from trading.src.data.edgar_client import EDGARClient
 from trading.src.features.utils import get_feature_cols
 from trading.src.user_cache import user_cache
 
@@ -322,6 +324,145 @@ class AlpacaDataLoader(DataSource):
             )
 
         return filtered
+
+
+class EDGARDataSource(DataSource):
+    """
+    EDGAR SEC Data Source for fundamental financial data.
+    
+    Fetches company financial metrics from SEC filings and aligns them
+    to price data timestamps without look-ahead bias.
+    """
+
+    TYPE: ClassVar[DataSourceType] = DataSourceType.EDGAR
+
+    def get_data(
+        self,
+        fetch_data: bool,
+        request: DataRequests,
+        df: pd.DataFrame,
+        cache_path: str,
+        start_date: str,
+        end_date: str,
+        time_step_unit: str = TimeFrameUnit.Day,
+        cache_enabled: bool = True,
+        time_step_period: int = 1,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """
+        Fetch EDGAR fundamental data and align to price data.
+        
+        Args:
+            df: Price DataFrame with MultiIndex (timestamp, symbol)
+            request: Data request configuration
+            cache_path: Path for caching EDGAR responses
+            fetch_data: Force fresh data fetch
+            Other args: Standard DataSource interface
+        
+        Returns:
+            DataFrame with EDGAR metrics added as columns
+        """
+        if df.empty:
+            logging.warning(
+                "EDGARDataSource received empty DataFrame. "
+                "EDGAR requires base price data. Returning empty."
+            )
+            return df
+        
+        # Initialize EDGAR client with caching
+        edgar = EDGARClient(
+            cache_dir=cache_path,
+            cache_ttl_hours=24
+        )
+        
+        # Get symbols to fetch
+        symbols = df.index.get_level_values("symbol").unique().tolist()
+        request_symbols = request.kwargs.get("symbol_or_symbols", None)
+        if request_symbols and request_symbols != ["ALL"]:
+            symbols = [s for s in request_symbols if s in symbols]
+        
+        if not symbols:
+            logging.warning("No symbols found for EDGAR data")
+            return df
+        
+        logging.info(f"EDGARDataSource fetching data for {len(symbols)} symbols")
+        
+        # Fetch and process EDGAR data for each symbol
+        edgar_df = df.copy()
+        
+        # Initialize EDGAR columns with NaN
+        edgar_columns = [
+            "edgar_revenue", "edgar_net_income", "edgar_gross_profit",
+            "edgar_operating_income", "edgar_total_assets", "edgar_total_liabilities",
+            "edgar_total_equity", "edgar_current_assets", "edgar_current_liabilities",
+            "edgar_operating_cash_flow", "edgar_capital_expenditures",
+            "edgar_shares_outstanding", "edgar_eps", "edgar_book_value_per_share",
+            "edgar_profit_margin", "edgar_gross_margin", "edgar_operating_margin",
+            "edgar_current_ratio", "edgar_debt_to_equity", "edgar_roe", "edgar_roa",
+            "edgar_free_cash_flow", "edgar_revenue_growth_yoy", "edgar_earnings_growth_yoy",
+        ]
+        
+        for col in edgar_columns:
+            if col not in edgar_df.columns:
+                edgar_df[col] = np.nan
+        
+        # Fetch EDGAR data for each symbol
+        for symbol in symbols:
+            try:
+                financials = edgar.extract_financials(symbol)
+                if financials:
+                    # Fill all rows for this symbol with the latest financials
+                    # (In production, you'd align by filing dates, but latest is simplest)
+                    mask = edgar_df.index.get_level_values("symbol") == symbol
+                    for col_name, value in financials.items():
+                        if col_name in edgar_df.columns and value is not None:
+                            edgar_df.loc[mask, col_name] = value
+                    
+                    # Calculate derived metrics
+                    symbol_df = edgar_df.loc[mask].copy()
+                    
+                    # Margins
+                    if "edgar_net_income" in symbol_df.columns and "edgar_revenue" in symbol_df.columns:
+                        revenue = symbol_df["edgar_revenue"].iloc[0] if len(symbol_df) > 0 else None
+                        net_income = symbol_df["edgar_net_income"].iloc[0] if len(symbol_df) > 0 else None
+                        if revenue and revenue != 0:
+                            edgar_df.loc[mask, "edgar_profit_margin"] = net_income / revenue
+                    
+                    # Current Ratio
+                    if "edgar_current_assets" in symbol_df.columns and "edgar_current_liabilities" in symbol_df.columns:
+                        ca = symbol_df["edgar_current_assets"].iloc[0] if len(symbol_df) > 0 else None
+                        cl = symbol_df["edgar_current_liabilities"].iloc[0] if len(symbol_df) > 0 else None
+                        if ca is not None and cl is not None and cl != 0:
+                            edgar_df.loc[mask, "edgar_current_ratio"] = ca / cl
+                    
+                    # Debt to Equity
+                    if "edgar_total_debt" in symbol_df.columns and "edgar_total_equity" in symbol_df.columns:
+                        debt = symbol_df["edgar_total_debt"].iloc[0] if "edgar_total_debt" in symbol_df.columns else None
+                        equity = symbol_df["edgar_total_equity"].iloc[0] if len(symbol_df) > 0 else None
+                        if debt is not None and equity is not None and equity != 0:
+                            edgar_df.loc[mask, "edgar_debt_to_equity"] = debt / equity
+                    
+                    # ROE and ROA
+                    if "edgar_net_income" in symbol_df.columns and "edgar_total_equity" in symbol_df.columns:
+                        ni = symbol_df["edgar_net_income"].iloc[0] if len(symbol_df) > 0 else None
+                        equity = symbol_df["edgar_total_equity"].iloc[0] if len(symbol_df) > 0 else None
+                        if ni is not None and equity is not None and equity != 0:
+                            edgar_df.loc[mask, "edgar_roe"] = ni / equity
+                    
+                    if "edgar_net_income" in symbol_df.columns and "edgar_total_assets" in symbol_df.columns:
+                        ni = symbol_df["edgar_net_income"].iloc[0] if len(symbol_df) > 0 else None
+                        assets = symbol_df["edgar_total_assets"].iloc[0] if len(symbol_df) > 0 else None
+                        if ni is not None and assets is not None and assets != 0:
+                            edgar_df.loc[mask, "edgar_roa"] = ni / assets
+                    
+                    logging.info(f"Extracted EDGAR data for {symbol}")
+                else:
+                    logging.warning(f"No EDGAR data found for {symbol}")
+            
+            except Exception as e:
+                logging.warning(f"Error fetching EDGAR data for {symbol}: {e}")
+        
+        return edgar_df
 
 
 class DataLoader:

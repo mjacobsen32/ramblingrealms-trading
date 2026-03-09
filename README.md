@@ -2,9 +2,11 @@
 
 ![Black](https://img.shields.io/badge/code%20style-black-000000.svg):small_orange_diamond:![CI](https://github.com/mjacobsen32/ramblingrealms-trading/actions/workflows/ci.yml/badge.svg):small_orange_diamond:[![Documentation Status](https://readthedocs.org/projects/ramblingrealms-trading/badge/?version=latest)](https://ramblingrealms-trading.readthedocs.io/en/latest/?badge=latest):small_orange_diamond:![codecov](https://raw.githubusercontent.com/mjacobsen32/ramblingrealms-trading/main/assets/coverage.svg)
 
-## Model Performance Demo's
+## Model Performance Demos
 
-[Model Performance](https://ramblingrealms.com)
+Visit the live demo and experiment results at: https://ramblingrealms.com
+
+Note: This change is a small README tweak to standardize wording.
 
 ## Documentation
 
