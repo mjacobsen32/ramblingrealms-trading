@@ -1,0 +1,50 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "AGENTS.md",
+    "docs/source/getting_started.rst",
+    "docs/source/usage.rst",
+    "docs/source/configuration.rst",
+    ".github/workflows/ci.yml"
+  ],
+  "formatter": {
+    "black": {
+      "command": ["poetry", "run", "black", "$FILE"],
+      "extensions": [".py"]
+    },
+    "isort": {
+      "command": ["poetry", "run", "isort", "$FILE"],
+      "extensions": [".py"]
+    }
+  },
+  "lsp": {
+    "pyright": {
+      "disabled": false
+    }
+  },
+  "permission": {
+    "edit": "allow",
+    "bash": {
+      "*": "ask",
+      "poetry run pytest*": "allow",
+      "poetry run coverage*": "allow",
+      "poetry run pre-commit*": "allow",
+      "poetry run black*": "allow",
+      "poetry run isort*": "allow",
+      "poetry run ruff*": "allow",
+      "poetry run mypy*": "allow",
+      "ls *": "allow",
+      "cat *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git branch*": "allow"
+    }
+  },
+  "agent": {
+    "trading-research": {
+      "description": "Deep research across envs, portfolio, features, data loaders",
+      "mode": "subagent"
+    }
+  }
+}
